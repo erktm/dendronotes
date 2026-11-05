@@ -1,15 +1,15 @@
-# leafnotes – build and development tasks. `make help` lists all targets.
+# dendronotes – build and development tasks. `make help` lists all targets.
 
 VERSION           ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 SOURCE_DATE_EPOCH ?= $(shell git log -1 --format=%ct 2>/dev/null || echo 0)
-IMAGE             ?= leafnotes:$(VERSION)
+IMAGE             ?= dendronotes:$(VERSION)
 PLATFORM          ?= linux/$(shell uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')
 LDFLAGS           := -s -w -X main.version=$(VERSION)
 
-DEV_VAULT    ?= $(CURDIR)/dev/vault
+DEV_SOMA     ?= $(CURDIR)/dev/soma
 DEV_DATA     ?= $(CURDIR)/dev/data
 DEV_PASSWORD := $(CURDIR)/dev/password
-DEV_ENV       = DENDRONOTES_SOMA_DIR=$(DEV_VAULT) DENDRONOTES_DATA_DIR=$(DEV_DATA) DENDRONOTES_AUTH_PASSWORD_FILE=$(DEV_PASSWORD) \
+DEV_ENV       = DENDRONOTES_SOMA_DIR=$(DEV_SOMA) DENDRONOTES_DATA_DIR=$(DEV_DATA) DENDRONOTES_AUTH_PASSWORD_FILE=$(DEV_PASSWORD) \
                 DENDRONOTES_LOG_FORMAT=text DENDRONOTES_LOG_LEVEL=debug
 
 NPM_DEPS := web/node_modules/.package-lock.json
@@ -32,9 +32,9 @@ $(DEV_PASSWORD):
 	@chmod 600 $@
 
 dev-setup: $(DEV_PASSWORD)
-	@mkdir -p $(DEV_VAULT) $(DEV_DATA)
-	@if [ -z "$$(ls -A $(DEV_VAULT))" ]; then \
-	  printf '# Welcome to leafnotes\n\nThis note is a plain Markdown file in dev/vault.\n' > $(DEV_VAULT)/Welcome.md; \
+	@mkdir -p $(DEV_SOMA) $(DEV_DATA)
+	@if [ -z "$$(ls -A $(DEV_SOMA))" ]; then \
+	  printf '# Welcome to dendronotes\n\nThis note is a plain Markdown file in your dev soma (dev/soma).\n' > $(DEV_SOMA)/Welcome.md; \
 	fi
 	@echo "Dev password: $$(cat $(DEV_PASSWORD))   (stored in dev/password)"
 
@@ -56,7 +56,7 @@ dev: $(NPM_DEPS) dev-ports dev-setup ## Run Go server (:8080) and Vite dev serve
 	  (cd web && npm run dev) & \
 	  wait
 
-dev-api: dev-setup ## Run only the Go server with the dev vault
+dev-api: dev-setup ## Run only the Go server with the dev soma
 	$(DEV_ENV) go run ./cmd/dendronotes
 
 dev-web: $(NPM_DEPS) ## Run only the Vite dev server
@@ -67,8 +67,8 @@ dev-web: $(NPM_DEPS) ## Run only the Vite dev server
 web: $(NPM_DEPS) ## Build the frontend (web/dist)
 	cd web && npm run build
 
-build: web ## Build bin/leafnotes with the embedded frontend
-	CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "$(LDFLAGS)" -o bin/leafnotes ./cmd/dendronotes
+build: web ## Build bin/dendronotes with the embedded frontend
+	CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "$(LDFLAGS)" -o bin/dendronotes ./cmd/dendronotes
 
 test: test-go test-web ## Run all tests and checks
 
@@ -79,7 +79,7 @@ test-go: ## go vet + Go tests with the race detector
 test-web: $(NPM_DEPS) ## Type-check the frontend
 	cd web && npm run check
 
-fuzz: ## Fuzz the vault path validation for 60 seconds
+fuzz: ## Fuzz the soma path validation for 60 seconds
 	go test -run='^$$' -fuzz=FuzzCleanPath -fuzztime=60s ./internal/soma/
 
 audit: $(NPM_DEPS) ## Check npm dependencies for known vulnerabilities (needs network)
@@ -110,12 +110,12 @@ vendor-npm: ## Create the npm offline cache for the container build
 
 # --- Container -----------------------------------------------------------------------
 
-# The image is exported as an OCI archive (bin/leafnotes-<version>-<platform>.oci.tar)
+# The image is exported as an OCI archive (bin/dendronotes-<version>-<platform>.oci.tar)
 # and then loaded into Docker. The archive can be carried straight into an
 # air gap (`docker load` or `skopeo copy oci-archive:…`).
 # rewrite-timestamp + SOURCE_DATE_EPOCH + no provenance attestation (it
 # contains build timestamps) yield the same digest for the same source.
-OCI_TAR    = bin/leafnotes-$(VERSION)-$(subst /,-,$(PLATFORM)).oci.tar
+OCI_TAR    = bin/dendronotes-$(VERSION)-$(subst /,-,$(PLATFORM)).oci.tar
 BUILD_ARGS = --platform $(PLATFORM) --provenance=false \
              --build-arg VERSION=$(VERSION) \
              --build-arg SOURCE_DATE_EPOCH=$(SOURCE_DATE_EPOCH) \
@@ -135,7 +135,7 @@ image-offline: ## Rebuild without cache and network (checks air-gap readiness; n
 run-image: dev-setup ## Run the image hardened (read-only, no capabilities)
 	docker run --rm -p 8080:8080 \
 	  --read-only --cap-drop ALL --security-opt no-new-privileges \
-	  -v $(DEV_VAULT):/vault -v $(DEV_DATA):/data \
+	  -v $(DEV_SOMA):/soma -v $(DEV_DATA):/data \
 	  -v $(DEV_PASSWORD):/run/secrets/password:ro -e DENDRONOTES_AUTH_PASSWORD_FILE=/run/secrets/password \
 	  $(IMAGE)
 

@@ -1,28 +1,53 @@
-# leafnotes
+# dendronotes
 
-Self-hosted Markdown notes. Your notes stay plain `.md` files in a folder (the *vault*);
+Self-hosted Markdown notes. Your notes stay plain `.md` files in a folder, the **soma**;
 everything else – search index, sessions – is a derived cache that can be rebuilt at any time.
 
 One container, one process, no external services, no external requests (air-gap friendly).
 
-> **Status: milestone 1** – vault access, authentication, file tree (create, rename, move by
+> **Status: milestone 1** – soma access, authentication, file tree (create, rename, move by
 > drag & drop, delete to `.trash`) and a plain editor with autosave and conflict detection.
-> Live preview, search, backlinks and live sync follow in M2–M5.
+> Live preview, search, synapses (wiki links and backlinks) and live sync follow in M2–M5.
+
+## Vocabulary
+
+| Term        | Meaning                                                                          |
+|-------------|----------------------------------------------------------------------------------|
+| **soma**    | The folder that holds your notes – the cell body everything grows from. Plural: somas. |
+| **note**    | A Markdown file in the soma.                                                     |
+| **synapse** | A connection between two notes, e.g. the wiki link `[[Note]]`. Plural: synapses. |
+| backlinks   | The synapses pointing *to* a note ("Incoming synapses").                         |
+
+Files in a soma remain plain, Obsidian-compatible Markdown; the wiki link syntax is the usual
+`[[Note]]`, `[[Note|Alias]]` and `[[Note#Heading]]`. Obsidian vaults can be opened as a soma.
 
 ## Quick start
 
 Requirements: Go ≥ 1.26, Node 26 / npm, Docker (for the image).
 
 ```bash
-make dev          # Go server :8080 + Vite dev server :5173 (vault: ./dev/vault)
+make dev          # Go server :8080 + Vite dev server :5173 (soma: ./dev/soma)
 make test         # go vet, Go tests (-race), Svelte type check
 make fuzz         # fuzz the path validation for 60 s
-make build        # bin/leafnotes with the embedded frontend
+make build        # bin/dendronotes with the embedded frontend
 make image        # build the container image and load it into Docker
 make run-image    # run the image hardened (read-only, no capabilities)
 ```
 
 `make dev` creates a random password in `dev/password` on first start and prints it.
+
+## Running the container
+
+```bash
+docker run -d --name dendronotes -p 8080:8080 \
+  --read-only --cap-drop ALL --security-opt no-new-privileges \
+  -v /path/to/notes:/soma -v dendronotes-data:/data \
+  -e DENDRONOTES_AUTH_PASSWORD_HASH='<output of hash-password>' \
+  dendronotes:<version>
+```
+
+The image runs as UID 65532. `/soma` holds the notes, `/data` the rebuildable caches; both must
+be writable. Back up the soma – nothing else is needed to restore everything.
 
 ## Configuration
 
@@ -54,7 +79,7 @@ authentication configured, the server does not start.
 
 The port variable is deliberately not called `DENDRONOTES_PORT`: Kubernetes injects
 `DENDRONOTES_PORT` and `DENDRONOTES_SERVICE_*` into every pod when a Service named
-`dendronotes` exists. The manifests also set `enableServiceLinks: false`.
+`dendronotes` exists. On Kubernetes, also set `enableServiceLinks: false` in the pod spec.
 
 Operational endpoints: `/healthz` (liveness), `/readyz` (readiness; 503 while starting,
 while shutting down, or when the soma is unreachable).
@@ -64,24 +89,25 @@ while shutting down, or when the soma is unreachable).
 **Single user with a password** (default). Create a hash and pass it as a secret:
 
 ```bash
-docker run --rm -it leafnotes:dev hash-password
+docker run --rm -it dendronotes:<version> hash-password
 ```
 
 Login attempts are rate-limited per client IP and globally; sessions are stored only as
-SHA-256 hashes in `$DENDRONOTES_DATA_DIR/sessions.json` and sent as `HttpOnly`, `SameSite=Strict` cookies
-(`__Host-` prefixed and `Secure` over HTTPS).
+SHA-256 hashes in `$DENDRONOTES_DATA_DIR/sessions.json` and sent as `HttpOnly`,
+`SameSite=Strict` cookies (`__Host-` prefixed and `Secure` over HTTPS).
 
-**Behind an authenticating proxy** (e.g. oauth2-proxy with Keycloak): set `DENDRONOTES_AUTH_MODE=proxy`,
-`DENDRONOTES_TRUSTED_PROXIES` to the proxy's address range and `DENDRONOTES_AUTH_PROXY_HEADER` to the header it sets
-(oauth2-proxy with `--set-xauthrequest`: `X-Auth-Request-User`). The header is ignored from any
-other peer, so make sure only the proxy can reach leafnotes (Kubernetes: a NetworkPolicy).
+**Behind an authenticating proxy** (e.g. oauth2-proxy with Keycloak): set
+`DENDRONOTES_AUTH_MODE=proxy`, `DENDRONOTES_TRUSTED_PROXIES` to the proxy's address range and
+`DENDRONOTES_AUTH_PROXY_HEADER` to the header it sets (oauth2-proxy with
+`--set-xauthrequest`: `X-Auth-Request-User`). The header is ignored from any other peer, so make
+sure only the proxy can reach dendronotes (Kubernetes: a NetworkPolicy).
 
 ## Security notes
 
 - Every file access goes through Go's `os.Root`: paths with `..`, absolute paths and symlinks
-  pointing out of the vault are refused by the kernel-level lookup. API paths are validated
+  pointing out of the soma are refused by the kernel-level lookup. API paths are validated
   beforehand and can never address hidden entries (`.git`, `.trash`, …). Symlinks inside the
-  vault are shown read-only.
+  soma are shown read-only.
 - Saving requires the version the client started from (`If-Match`); changes made elsewhere in
   the meantime are never overwritten silently.
 - State-changing requests from other origins are rejected (`Sec-Fetch-Site`/`Origin`); the API
@@ -115,7 +141,7 @@ make image-offline   # rebuild without cache and without network in the build st
 
 - Base images are pinned by digest in the `Dockerfile`. In an air gap, mirror them into a local
   registry and pass `--build-arg NODE_IMAGE=… GO_IMAGE=… RUNTIME_IMAGE=…`.
-- `make image` also writes `bin/leafnotes-<version>-<platform>.oci.tar` for transfer.
+- `make image` also writes `bin/dendronotes-<version>-<platform>.oci.tar` for transfer.
 - Same source ⇒ same image digest (`SOURCE_DATE_EPOCH`, `rewrite-timestamp`, no provenance
   attestation with timestamps).
 - `npm run build` fails if the bundle contains unexpected external URLs.
@@ -123,12 +149,15 @@ make image-offline   # rebuild without cache and without network in the build st
 ## Layout
 
 ```
-cmd/leafnotes/    entry point: serve, hash-password, healthcheck, version
-internal/config/  read and validate environment variables
-internal/vault/   vault access exclusively through os.Root (tree, notes, move, trash)
-internal/auth/    password (argon2id), sessions, rate limit, proxy header
+cmd/dendronotes/   entry point: serve, hash-password, healthcheck, version
+internal/config/   read and validate DENDRONOTES_* environment variables
+internal/soma/     soma access exclusively through os.Root (tree, notes, move, trash)
+internal/auth/     password (argon2id), sessions, rate limit, proxy header
 internal/clientip/ client address behind trusted proxies
-internal/httpx/   JSON helpers
-internal/server/  routes, middleware (CSP with nonce, logging, recovery), health, assets
-web/              Svelte 5 frontend (Vite), embedded into the binary via go:embed
+internal/httpx/    JSON helpers
+internal/server/   route table, middleware (CSP with nonce, logging, recovery), health, assets
+web/               Svelte 5 frontend (Vite), embedded into the binary via go:embed
+docs/openapi.yaml  API description
 ```
+
+Contributors (human or AI): read [`CLAUDE.md`](CLAUDE.md) for the vocabulary and naming rules.

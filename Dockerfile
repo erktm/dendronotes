@@ -1,4 +1,4 @@
-# leafnotes – reproducible multi-stage build
+# dendronotes – reproducible multi-stage build
 #
 # Deliberately without a "# syntax=…" line: Docker's built-in BuildKit
 # frontend is sufficient, so the build never pulls a frontend image from
@@ -39,20 +39,25 @@ COPY . .
 COPY --from=web /src/web/dist ./web/dist
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -buildvcs=false \
       -ldflags "-s -w -X main.version=${VERSION}" \
-      -o /out/leafnotes ./cmd/dendronotes \
- && mkdir -p /out/vault /out/data
+      -o /out/dendronotes ./cmd/dendronotes \
+ && mkdir -p /out/soma /out/data
 
 # --- Runtime: distroless, no shell, UID 65532 --------------------------------
 FROM ${RUNTIME_IMAGE}
-COPY --from=build /out/leafnotes /usr/local/bin/leafnotes
-COPY --from=build --chown=65532:65532 /out/vault /vault
+ARG VERSION=dev
+LABEL org.opencontainers.image.title="dendronotes" \
+      org.opencontainers.image.description="Self-hosted Markdown notes" \
+      org.opencontainers.image.version="${VERSION}"
+COPY --from=build /out/dendronotes /usr/local/bin/dendronotes
+# /soma holds the notes (mount the soma volume here), /data the caches.
+COPY --from=build --chown=65532:65532 /out/soma /soma
 COPY --from=build --chown=65532:65532 /out/data /data
-ENV DENDRONOTES_SOMA_DIR=/vault \
+ENV DENDRONOTES_SOMA_DIR=/soma \
     DENDRONOTES_DATA_DIR=/data \
     DENDRONOTES_HTTP_PORT=8080
 USER 65532:65532
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
-  CMD ["/usr/local/bin/leafnotes", "healthcheck"]
-ENTRYPOINT ["/usr/local/bin/leafnotes"]
+  CMD ["/usr/local/bin/dendronotes", "healthcheck"]
+ENTRYPOINT ["/usr/local/bin/dendronotes"]
 CMD ["serve"]
