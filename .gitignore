@@ -1,0 +1,8 @@
+/bin/
+/dev/
+/web/node_modules/
+/web/dist/*
+!/web/dist/.keep
+/.offline/*
+!/.offline/.keep
+.DS_Store

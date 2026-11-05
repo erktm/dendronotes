@@ -1,0 +1,13 @@
+# Allowlist: only what the build needs ends up in the context.
+*
+!go.mod
+!go.sum
+!cmd/
+!internal/
+!web/
+!vendor/
+!.offline/
+
+web/node_modules/
+web/dist/
+**/.DS_Store
