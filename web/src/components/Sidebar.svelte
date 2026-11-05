@@ -6,6 +6,8 @@
   import { app } from '../lib/state/app.svelte'
   import { checkReady, type ServerState } from '../lib/api/health'
   import { dirname } from '../lib/paths'
+  import { strings } from '../lib/strings'
+  import Wordmark from './Wordmark.svelte'
 
   let serverState = $state<ServerState>('checking')
 
@@ -26,17 +28,17 @@
   const targetFolder = () => (app.note ? dirname(app.note.path) : '')
 </script>
 
-<aside class="sidebar" aria-label="Files">
+<aside class="sidebar" aria-label={strings.nav.files}>
   <header class="head">
-    <span class="wordmark">leaf<span>notes</span></span>
+    <Wordmark />
     <div class="actions">
-      <button type="button" aria-label="New note" title="New note" onclick={() => app.startCreate('new-note', targetFolder())}>
+      <button type="button" aria-label={strings.tree.newNote} title={strings.tree.newNote} onclick={() => app.startCreate('new-note', targetFolder())}>
         <Icon name="plus" size={18} />
       </button>
       <button
         type="button"
-        aria-label="New folder"
-        title="New folder"
+        aria-label={strings.tree.newFolder}
+        title={strings.tree.newFolder}
         onclick={() => app.startCreate('new-folder', targetFolder())}
       >
         <Icon name="folder-plus" size={18} />
@@ -48,8 +50,8 @@
 
   <footer class="foot">
     <StatusChip state={serverState} />
-    <span class="user" title="Signed in as {app.user}">{app.user}</span>
-    <button type="button" aria-label="Sign out" title="Sign out" onclick={() => void app.logout()}>
+    <span class="user" title={strings.auth.signedInAs(app.user)}>{app.user}</span>
+    <button type="button" aria-label={strings.auth.signOut} title={strings.auth.signOut} onclick={() => void app.logout()}>
       <Icon name="logout" size={17} />
     </button>
   </footer>
@@ -72,16 +74,6 @@
     height: 48px;
     padding: 0 var(--space-2) 0 var(--space-4);
     border-bottom: 1px solid var(--line);
-  }
-  .wordmark {
-    font-size: var(--text-lg);
-    font-weight: 650;
-    letter-spacing: -0.02em;
-    color: var(--accent);
-  }
-  .wordmark span {
-    color: var(--text);
-    font-weight: 500;
   }
   .actions {
     display: flex;

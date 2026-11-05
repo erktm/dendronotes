@@ -1,5 +1,7 @@
-// Helpers for vault-relative, "/"-separated paths. The rules for new names
-// mirror the server (internal/vault/path.go) so problems show up while typing.
+// Helpers for soma-relative, "/"-separated paths. The rules for new names
+// mirror the server (internal/soma/path.go) so problems show up while typing.
+
+import { strings } from './strings'
 
 export const NOTE_EXTENSIONS = ['.md', '.markdown', '.txt']
 
@@ -55,13 +57,13 @@ const RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
 /** Returns why a new file or folder name is not allowed, or null if it is fine. */
 export function nameProblem(raw: string): string | null {
   const name = raw.normalize('NFC')
-  if (!name.trim()) return 'Please enter a name.'
-  if (name.startsWith('.')) return 'Names can’t start with a dot.'
-  if (FORBIDDEN.test(name)) return 'Names can’t contain \\ / : * ? " < > |'
-  if (/^\s|\s$/.test(name)) return 'Names can’t start or end with a space.'
-  if (name.endsWith('.')) return 'Names can’t end with a dot.'
-  if (RESERVED.test(name.split('.')[0] ?? '')) return 'That name is reserved on Windows.'
-  if (new TextEncoder().encode(name).length > 255) return 'That name is too long.'
+  if (!name.trim()) return strings.names.empty
+  if (name.startsWith('.')) return strings.names.leadingDot
+  if (FORBIDDEN.test(name)) return strings.names.forbidden
+  if (/^\s|\s$/.test(name)) return strings.names.space
+  if (name.endsWith('.')) return strings.names.trailingDot
+  if (RESERVED.test(name.split('.')[0] ?? '')) return strings.names.reserved
+  if (new TextEncoder().encode(name).length > 255) return strings.names.tooLong
   return null
 }
 

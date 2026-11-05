@@ -2,6 +2,7 @@
   import Icon from './Icon.svelte'
   import { app } from '../lib/state/app.svelte'
   import { cssVars, focusOnMount } from '../lib/actions'
+  import { strings } from '../lib/strings'
 
   let {
     depth,
@@ -65,8 +66,8 @@
     onblur={() => void commit()}
     spellcheck="false"
     autocomplete="off"
-    aria-label={initial ? 'New name' : kind === 'folder' ? 'Folder name' : 'Note name'}
-    placeholder={kind === 'folder' ? 'Folder name' : 'Note name'}
+    aria-label={initial ? strings.tree.newName : kind === 'folder' ? strings.tree.folderName : strings.tree.noteName}
+    placeholder={kind === 'folder' ? strings.tree.folderName : strings.tree.noteName}
   />
 </div>
 

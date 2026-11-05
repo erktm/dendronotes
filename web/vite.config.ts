@@ -5,7 +5,7 @@ import { writeFileSync } from 'node:fs'
 // go:embed needs at least one file in dist/. Vite empties dist/ on every
 // build, so we recreate the placeholder afterwards.
 const keepFile: Plugin = {
-  name: 'leafnotes-keep-dist',
+  name: 'dendronotes-keep-dist',
   apply: 'build',
   closeBundle() {
     writeFileSync(new URL('./dist/.keep', import.meta.url), '')

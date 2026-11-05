@@ -3,6 +3,7 @@
   import TreeInput from './TreeInput.svelte'
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
   import { app } from '../lib/state/app.svelte'
+  import { strings } from '../lib/strings'
   import type { TreeNode } from '../lib/tree'
 
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null)
@@ -25,15 +26,15 @@
     const folder = node ? (node.type === 'dir' ? node.path : null) : ''
     if (folder !== null) {
       items.push(
-        { label: 'New note', icon: 'note', action: () => startCreate('new-note', folder) },
-        { label: 'New folder', icon: 'folder-plus', action: () => startCreate('new-folder', folder) },
+        { label: strings.tree.newNote, icon: 'note', action: () => startCreate('new-note', folder) },
+        { label: strings.tree.newFolder, icon: 'folder-plus', action: () => startCreate('new-folder', folder) },
       )
     }
     if (node) {
       items.push(
-        { label: 'Rename', icon: 'pencil', action: () => (app.edit = { kind: 'rename', path: node.path }) },
+        { label: strings.tree.rename, icon: 'pencil', action: () => (app.edit = { kind: 'rename', path: node.path }) },
         {
-          label: 'Delete',
+          label: strings.tree.delete,
           icon: 'trash',
           danger: true,
           action: () => void app.remove(node.path),
@@ -71,7 +72,7 @@
   }}
   {ondrop}
 >
-  <ul role="tree" aria-label="Notes">
+  <ul role="tree" aria-label={strings.soma.treeLabel}>
     {#if creatingAtRoot}
       <li>
         <TreeInput
@@ -88,11 +89,11 @@
 
   {#if empty}
     <div class="empty">
-      <p>Your vault is empty.</p>
-      <button type="button" onclick={() => startCreate('new-note', '')}>Create your first note</button>
+      <p>{strings.soma.empty}</p>
+      <button type="button" onclick={() => startCreate('new-note', '')}>{strings.soma.createFirstNote}</button>
     </div>
   {:else if !app.treeLoaded}
-    <p class="loading">Loading …</p>
+    <p class="loading">{strings.soma.loading}</p>
   {/if}
 </div>
 

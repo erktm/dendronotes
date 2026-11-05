@@ -1,4 +1,4 @@
-import type { Entry } from './api/vault'
+import type { Entry } from './api/soma'
 import { basename, dirname } from './paths'
 
 export interface TreeNode {

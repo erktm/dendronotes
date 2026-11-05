@@ -1,14 +1,10 @@
 <script lang="ts">
   import type { ServerState } from '../lib/api/health'
+  import { strings } from '../lib/strings'
 
   let { state }: { state: ServerState } = $props()
 
-  const labels: Record<ServerState, string> = {
-    checking: 'Connecting …',
-    ready: 'Connected',
-    unavailable: 'Server not ready',
-    offline: 'No connection',
-  }
+  const labels: Record<ServerState, string> = strings.server
 </script>
 
 <span class="chip {state}" role="status">

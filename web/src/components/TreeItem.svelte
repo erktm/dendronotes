@@ -1,6 +1,6 @@
 <script lang="ts" module>
   /** Data type used when dragging tree entries. */
-  export const DRAG_TYPE = 'application/x-leafnotes-path'
+  export const DRAG_TYPE = 'application/x-dendronotes-path'
 </script>
 
 <script lang="ts">
@@ -11,6 +11,7 @@
   import { router } from '../lib/router.svelte'
   import { cssVars } from '../lib/actions'
   import { displayName, isNote } from '../lib/paths'
+  import { strings } from '../lib/strings'
   import type { TreeNode } from '../lib/tree'
 
   let {
@@ -117,7 +118,7 @@
         <Icon name={isNote(node.path) ? 'note' : 'file'} size={17} />
       {/if}
       <span class="label">{displayName(node.path)}</span>
-      {#if node.readOnly}<span class="badge" title="Read-only (symbolic link)"><Icon name="lock" size={13} /></span>{/if}
+      {#if node.readOnly}<span class="badge" title={strings.tree.readOnly}><Icon name="lock" size={13} /></span>{/if}
     </button>
   {/if}
 

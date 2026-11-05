@@ -3,6 +3,7 @@
   import Icon from './Icon.svelte'
   import type { NoteSession } from '../lib/state/note.svelte'
   import { displayName } from '../lib/paths'
+  import { strings } from '../lib/strings'
 
   let { session }: { session: NoteSession } = $props()
 
@@ -17,33 +18,30 @@
 </script>
 
 {#if session.status === 'loading'}
-  <p class="loading">Loading …</p>
+  <p class="loading">{strings.note.loading}</p>
 {:else if session.status === 'missing'}
-  <EmptyState title="Note not found" text="“{displayName(session.path)}” may have been moved or deleted." />
+  <EmptyState title={strings.note.notFoundTitle} text={strings.note.notFoundText(displayName(session.path))} />
 {:else if session.status === 'unsupported'}
-  <EmptyState
-    title="Can’t open this file yet"
-    text="leafnotes edits text notes (.md, .markdown, .txt). Previews for other files are coming later."
-  />
+  <EmptyState title={strings.note.unsupportedTitle} text={strings.note.unsupportedText} />
 {:else if session.status === 'too-large'}
-  <EmptyState title="This note is too large" text="It exceeds the size limit for the editor (MAX_NOTE_MB)." />
+  <EmptyState title={strings.note.tooLargeTitle} text={strings.note.tooLargeText} />
 {:else if session.status === 'error'}
-  <EmptyState title="Couldn’t load this note" text="Something went wrong while loading it.">
-    <button type="button" class="button" onclick={() => void session.load()}>Try again</button>
+  <EmptyState title={strings.note.errorTitle} text={strings.note.errorText}>
+    <button type="button" class="button" onclick={() => void session.load()}>{strings.note.retry}</button>
   </EmptyState>
 {:else}
   <div class="note">
     {#if session.conflict !== null}
       <div class="banner warn" role="alert">
         <Icon name="alert" size={18} />
-        <p><strong>This note was changed elsewhere.</strong> Your latest edits are not saved yet.</p>
-        <button type="button" class="button" onclick={() => void session.reloadFromDisk()}>Use version on disk</button>
-        <button type="button" class="button primary" onclick={() => void session.save(true)}>Keep mine</button>
+        <p><strong>{strings.note.conflictTitle}</strong> {strings.note.conflictText}</p>
+        <button type="button" class="button" onclick={() => void session.reloadFromDisk()}>{strings.note.useDisk}</button>
+        <button type="button" class="button primary" onclick={() => void session.save(true)}>{strings.note.keepMine}</button>
       </div>
     {:else if session.readOnly}
       <div class="banner">
         <Icon name="lock" size={17} />
-        <p>This note is a symbolic link and can only be read here.</p>
+        <p>{strings.note.readOnly}</p>
       </div>
     {/if}
     <textarea
@@ -52,8 +50,8 @@
       bind:value={session.content}
       oninput={() => session.scheduleSave()}
       readonly={session.readOnly}
-      aria-label="Content of {displayName(session.path)}"
-      placeholder="Start writing …"
+      aria-label={strings.note.contentLabel(displayName(session.path))}
+      placeholder={strings.note.placeholder}
       spellcheck="true"
     ></textarea>
   </div>

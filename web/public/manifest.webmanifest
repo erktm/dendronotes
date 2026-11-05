@@ -1,0 +1,11 @@
+{
+  "name": "dendronotes",
+  "short_name": "dendronotes",
+  "description": "Self-hosted Markdown notes",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f3f5ef",
+  "theme_color": "#2f7a4b",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

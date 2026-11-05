@@ -1,16 +1,17 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
   import Logo from './Logo.svelte'
+  import { strings } from '../lib/strings'
 
   let {
-    title = 'Nothing open yet',
-    text = 'Pick a note on the left or create a new one. Your notes stay plain .md files in your vault.',
+    title = strings.empty.title,
+    text = strings.empty.text,
     children,
   }: { title?: string; text?: string; children?: Snippet } = $props()
 </script>
 
 <section class="empty">
-  <div class="mark"><Logo size={64} /></div>
+  <div class="mark"><Logo size={68} /></div>
   <h1>{title}</h1>
   <p>{text}</p>
   {@render children?.()}
@@ -30,8 +31,8 @@
   .mark {
     display: grid;
     place-items: center;
-    width: 104px;
-    height: 104px;
+    width: 108px;
+    height: 108px;
     margin-bottom: var(--space-2);
     border-radius: 50%;
     background: var(--accent-soft);

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { app } from '../lib/state/app.svelte'
+  import { strings } from '../lib/strings'
 
   let dialog: HTMLDialogElement | undefined = $state()
 
@@ -23,7 +24,7 @@
     <h2 id="confirm-title">{req.title}</h2>
     <p id="confirm-text">{req.message}</p>
     <div class="actions">
-      <button type="button" class="secondary" onclick={() => app.answer(false)}>Cancel</button>
+      <button type="button" class="secondary" onclick={() => app.answer(false)}>{strings.dialogs.cancel}</button>
       <button type="button" class="confirm" class:danger={req.danger} onclick={() => app.answer(true)}>
         {req.confirmLabel}
       </button>

@@ -1,7 +1,8 @@
 import { ApiError } from '../api/client'
-import { readNote, saveNote } from '../api/vault'
+import { readNote, saveNote } from '../api/soma'
 import { errorMessage } from '../errors'
 import { isNote } from '../paths'
+import { strings } from '../strings'
 
 export type NoteStatus = 'loading' | 'ready' | 'missing' | 'unsupported' | 'too-large' | 'error'
 
@@ -97,7 +98,7 @@ export class NoteSession {
           this.conflict = err.body.etag
         } else {
           this.failed = true
-          if (!this.closed) this.host.toast(`Couldn’t save: ${errorMessage(err)}`)
+          if (!this.closed) this.host.toast(strings.toasts.saveFailed(errorMessage(err)))
         }
       } finally {
         this.saving = false

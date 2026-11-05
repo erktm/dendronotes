@@ -8,6 +8,7 @@
   import { app } from '../lib/state/app.svelte'
   import { router } from '../lib/router.svelte'
   import { displayName } from '../lib/paths'
+  import { strings } from '../lib/strings'
 
   const narrow = window.matchMedia('(max-width: 760px)')
   let filesOpen = $state(!narrow.matches)
@@ -26,7 +27,7 @@
   })
 
   $effect(() => {
-    document.title = app.note ? `${displayName(app.note.path)} – leafnotes` : 'leafnotes'
+    document.title = strings.app.title(app.note ? displayName(app.note.path) : undefined)
   })
 
   const crumbs = $derived(app.note ? app.note.path.split('/') : [])
@@ -34,12 +35,12 @@
   const save = $derived.by(() => {
     const n = app.note
     if (!n || n.status !== 'ready') return null
-    if (n.readOnly) return { kind: 'muted', label: 'Read-only' }
-    if (n.conflict !== null) return { kind: 'warn', label: 'Conflict' }
-    if (n.saving) return { kind: 'muted', label: 'Saving …' }
-    if (n.failed) return { kind: 'err', label: 'Not saved' }
-    if (n.dirty) return { kind: 'muted', label: 'Edited' }
-    return { kind: 'ok', label: 'Saved' }
+    if (n.readOnly) return { kind: 'muted', label: strings.saveState.readOnly }
+    if (n.conflict !== null) return { kind: 'warn', label: strings.saveState.conflict }
+    if (n.saving) return { kind: 'muted', label: strings.saveState.saving }
+    if (n.failed) return { kind: 'err', label: strings.saveState.failed }
+    if (n.dirty) return { kind: 'muted', label: strings.saveState.edited }
+    return { kind: 'ok', label: strings.saveState.saved }
   })
 
   function onkeydown(e: KeyboardEvent) {
@@ -72,7 +73,7 @@
   {/if}
   <main class="main">
     <header class="topbar">
-      <nav class="crumbs" aria-label="Location">
+      <nav class="crumbs" aria-label={strings.soma.location}>
         {#if app.note}
           {#each crumbs as part, i (i)}
             {#if i > 0}<span class="sep" aria-hidden="true">/</span>{/if}
@@ -83,7 +84,7 @@
             {/if}
           {/each}
         {:else}
-          <span>Vault</span>
+          <span>{strings.soma.label}</span>
         {/if}
       </nav>
       {#if save}

@@ -4,13 +4,15 @@
   import { ApiError } from '../lib/api/client'
   import { errorMessage } from '../lib/errors'
   import { focusOnMount } from '../lib/actions'
+  import { brand, strings } from '../lib/strings'
+  import Wordmark from './Wordmark.svelte'
 
   let password = $state('')
   let busy = $state(false)
   let error = $state('')
 
   $effect(() => {
-    document.title = 'Sign in – leafnotes'
+    document.title = strings.auth.pageTitle
   })
 
   async function submit(e: SubmitEvent) {
@@ -22,10 +24,10 @@
       await app.login(password)
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        error = 'That password isn’t correct.'
+        error = strings.auth.wrongPassword
       } else if (err instanceof ApiError && err.status === 429) {
         const secs = typeof err.body.retryAfter === 'number' ? err.body.retryAfter : 0
-        error = secs ? `Too many attempts. Try again in ${secs} seconds.` : errorMessage(err)
+        error = secs ? strings.auth.tooManyAttempts(secs) : errorMessage(err)
       } else {
         error = errorMessage(err)
       }
@@ -40,23 +42,20 @@
   <div class="card">
     <div class="brand">
       <Logo size={44} />
-      <span class="wordmark">leaf<span>notes</span></span>
+      <Wordmark size="lg" />
     </div>
 
     {#if app.mode === 'proxy'}
-      <h1>You’re not signed in</h1>
-      <p class="lead">
-        This server expects your reverse proxy (for example oauth2-proxy) to sign you in, but it didn’t
-        receive a user. Reload to try again, or ask your administrator.
-      </p>
-      <button class="primary" type="button" onclick={() => location.reload()}>Reload</button>
+      <h1>{strings.auth.proxyTitle}</h1>
+      <p class="lead">{strings.auth.proxyText}</p>
+      <button class="primary" type="button" onclick={() => location.reload()}>{strings.auth.reload}</button>
     {:else}
-      <h1>Welcome back</h1>
-      <p class="lead">Sign in to open your vault.</p>
+      <h1>{strings.auth.welcome}</h1>
+      <p class="lead">{strings.auth.lead}</p>
       <form onsubmit={submit}>
         <!-- Helps password managers that expect a user name. -->
-        <input class="visually-hidden" type="text" name="username" autocomplete="username" value="leafnotes" readonly tabindex="-1" aria-hidden="true" />
-        <label for="password">Password</label>
+        <input class="visually-hidden" type="text" name="username" autocomplete="username" value={brand.name} readonly tabindex="-1" aria-hidden="true" />
+        <label for="password">{strings.auth.password}</label>
         <input
           id="password"
           name="password"
@@ -72,7 +71,7 @@
           <p class="error" id="login-error" role="alert">{error}</p>
         {/if}
         <button class="primary" type="submit" disabled={busy || !password}>
-          {busy ? 'Signing in …' : 'Sign in'}
+          {busy ? strings.auth.signingIn : strings.auth.signIn}
         </button>
       </form>
     {/if}
@@ -102,16 +101,6 @@
     align-items: center;
     gap: var(--space-3);
     margin-bottom: var(--space-6);
-  }
-  .wordmark {
-    font-size: 1.5rem;
-    font-weight: 650;
-    letter-spacing: -0.02em;
-    color: var(--accent);
-  }
-  .wordmark span {
-    color: var(--text);
-    font-weight: 500;
   }
   h1 {
     font-size: var(--text-xl);

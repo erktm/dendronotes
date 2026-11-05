@@ -1,7 +1,7 @@
 import { SvelteSet } from 'svelte/reactivity'
 import { ApiError, onUnauthorized } from '../api/client'
-import * as api from '../api/vault'
-import type { Entry, Me } from '../api/vault'
+import * as api from '../api/soma'
+import type { Entry, Me } from '../api/soma'
 import { errorMessage } from '../errors'
 import {
   ancestors,
@@ -16,6 +16,7 @@ import {
   withNoteExtension,
 } from '../paths'
 import { router } from '../router.svelte'
+import { strings } from '../strings'
 import { buildTree } from '../tree'
 import { NoteSession } from './note.svelte'
 
@@ -38,7 +39,7 @@ export interface ConfirmRequest {
   resolve: (ok: boolean) => void
 }
 
-const EXPANDED_KEY = 'leafnotes.expanded'
+const EXPANDED_KEY = 'dendronotes.expanded'
 
 function loadExpanded(): string[] {
   try {
@@ -73,7 +74,7 @@ class App {
     onUnauthorized(() => {
       if (this.auth !== 'authenticated') return
       this.auth = 'anonymous'
-      this.toast('Your session has ended. Please sign in again.', 'info')
+      this.toast(strings.auth.sessionEnded, 'info')
     })
   }
 
@@ -189,7 +190,7 @@ class App {
 
   async moveInto(path: string, targetDir: string): Promise<void> {
     if (isInside(targetDir, path)) {
-      if (targetDir !== path) this.toast('A folder can’t be moved into itself.')
+      if (targetDir !== path) this.toast(strings.tree.moveIntoSelf)
       return
     }
     const to = join(targetDir, basename(path))
@@ -228,9 +229,9 @@ class App {
   async remove(path: string): Promise<void> {
     const isDir = this.entries.find((e) => e.path === path)?.type === 'dir'
     const ok = await this.ask({
-      title: isDir ? 'Delete folder?' : 'Delete note?',
-      message: `“${displayName(path)}”${isDir ? ' and everything in it' : ''} will be moved to the .trash folder in your vault.`,
-      confirmLabel: 'Move to trash',
+      title: isDir ? strings.dialogs.deleteFolderTitle : strings.dialogs.deleteNoteTitle,
+      message: strings.dialogs.deleteMessage(displayName(path), isDir),
+      confirmLabel: strings.dialogs.moveToTrash,
       danger: true,
     })
     if (!ok) return
@@ -247,7 +248,7 @@ class App {
     }
     for (const p of [...this.expanded]) if (isInside(p, path)) this.expanded.delete(p)
     await this.refresh()
-    this.toast(`Moved “${displayName(path)}” to the trash.`, 'info')
+    this.toast(strings.toasts.movedToTrash(displayName(path)), 'info')
   }
 
   // --- Navigation -------------------------------------------------------
@@ -257,9 +258,9 @@ class App {
     const cur = this.note
     if (cur && cur.path !== path && cur.conflict !== null) {
       const ok = await this.ask({
-        title: 'Discard your changes?',
-        message: `“${displayName(cur.path)}” was changed elsewhere and your version is not saved.`,
-        confirmLabel: 'Discard',
+        title: strings.dialogs.discardTitle,
+        message: strings.dialogs.discardMessage(displayName(cur.path)),
+        confirmLabel: strings.dialogs.discard,
         danger: true,
       })
       if (!ok) return
