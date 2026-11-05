@@ -44,8 +44,10 @@ dev-ports:
 	for p in 8080 5173; do \
 	  pid=$$(lsof -ti tcp:$$p -sTCP:LISTEN 2>/dev/null | head -1); \
 	  if [ -n "$$pid" ]; then \
+	    pgid=$$(ps -o pgid= -p $$pid | tr -d ' '); \
 	    echo "Port $$p is already in use by PID $$pid ($$(ps -o comm= -p $$pid | xargs basename))."; \
-	    echo "Stop the other 'make dev' first (Ctrl+C in its terminal) or run: kill $$pid"; \
+	    echo "Stop the other 'make dev' first (Ctrl+C in its terminal), or stop its whole"; \
+	    echo "process group (Go server and Vite together) with: kill -- -$$pgid"; \
 	    exit 1; \
 	  fi; \
 	done
