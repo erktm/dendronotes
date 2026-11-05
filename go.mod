@@ -1,4 +1,4 @@
-module leafnotes
+module dendronotes
 
 // Minimum version required by the golang.org/x modules (os.Root is complete
 // since 1.25). The container image is built with the current Go release.

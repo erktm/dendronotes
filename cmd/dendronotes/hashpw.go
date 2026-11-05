@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/term"
 
-	"leafnotes/internal/auth"
+	"dendronotes/internal/auth"
 )
 
 const minPasswordLen = 8

@@ -3,7 +3,7 @@ package server
 import (
 	"net/http"
 
-	"leafnotes/internal/httpx"
+	"dendronotes/internal/httpx"
 )
 
 // handleHealthz is the liveness probe: the process is alive and serving HTTP.
@@ -31,12 +31,12 @@ func (s *Server) handleReadyz(w http.ResponseWriter, _ *http.Request) {
 		checks["server"] = "ok"
 	}
 
-	if err := s.vault.Check(); err != nil {
-		s.log.Warn("readiness: vault unavailable", "err", err)
-		checks["vault"] = "unavailable"
+	if err := s.soma.Check(); err != nil {
+		s.log.Warn("readiness: soma unavailable", "err", err)
+		checks["soma"] = "unavailable"
 		ok = false
 	} else {
-		checks["vault"] = "ok"
+		checks["soma"] = "ok"
 	}
 
 	status, code := "ok", http.StatusOK

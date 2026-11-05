@@ -10,7 +10,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	"leafnotes/internal/httpx"
+	"dendronotes/internal/httpx"
 )
 
 type ctxKey int

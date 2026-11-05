@@ -5,7 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"leafnotes/internal/auth"
+	"dendronotes/internal/auth"
+	"dendronotes/internal/config"
 )
 
 func TestCommands(t *testing.T) {
@@ -26,15 +27,15 @@ func TestCommands(t *testing.T) {
 	out.Reset()
 	env := func(k string) string {
 		switch k {
-		case "VAULT_DIR":
+		case config.EnvSomaDir:
 			return t.TempDir() + "/missing"
-		case "DATA_DIR":
+		case config.EnvDataDir:
 			return t.TempDir()
 		}
 		return ""
 	}
 	if code := run([]string{"serve"}, env, nil, &out, &errOut); code != 1 {
-		t.Errorf("serve with missing vault: code %d", code)
+		t.Errorf("serve with missing soma: code %d", code)
 	}
 	if !strings.Contains(out.String(), `"msg":"invalid configuration"`) {
 		t.Errorf("no JSON log about the configuration: %q", out.String())

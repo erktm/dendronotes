@@ -1,4 +1,4 @@
-// leafnotes – self-hosted Markdown notes.
+// dendronotes – self-hosted Markdown notes.
 package main
 
 import (
@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
-	"leafnotes/internal/config"
-	"leafnotes/internal/server"
-	"leafnotes/web"
+	"dendronotes/internal/config"
+	"dendronotes/internal/server"
+	"dendronotes/web"
 )
 
 // version is set at build time via -ldflags "-X main.version=…".
@@ -51,7 +51,7 @@ func run(args []string, getenv func(string) string, stdin io.Reader, stdout, std
 }
 
 func usage(w io.Writer) {
-	fmt.Fprint(w, `leafnotes – self-hosted Markdown notes
+	fmt.Fprint(w, `dendronotes – self-hosted Markdown notes
 
 Commands:
   serve           Start the server (default)
@@ -60,7 +60,7 @@ Commands:
   healthcheck     Query /healthz of the running server (for Docker HEALTHCHECK)
   version         Print the version
 
-Configuration via environment variables, see README.md.
+Configuration via DENDRONOTES_* environment variables, see README.md.
 `)
 }
 
@@ -98,10 +98,10 @@ func newLogger(w io.Writer, format string, level slog.Level) *slog.Logger {
 
 func healthcheck(getenv func(string) string, stderr io.Writer) int {
 	port := config.DefaultPort
-	if v := getenv("PORT"); v != "" {
+	if v := getenv(config.EnvHTTPPort); v != "" {
 		p, err := strconv.Atoi(v)
 		if err != nil {
-			fmt.Fprintf(stderr, "invalid PORT: %q\n", v)
+			fmt.Fprintf(stderr, "invalid %s: %q\n", config.EnvHTTPPort, v)
 			return 1
 		}
 		port = p

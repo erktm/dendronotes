@@ -1,4 +1,4 @@
-package vault
+package soma
 
 import (
 	"path"
@@ -14,7 +14,7 @@ const (
 	maxNameBytes = 255
 )
 
-// CleanPath validates a vault-relative, "/"-separated path that refers to
+// CleanPath validates a soma-relative, "/"-separated path that refers to
 // an existing entry. It is deliberately lenient about characters (files may
 // have been created by other tools), but strict about structure:
 //
@@ -51,8 +51,8 @@ func validSegment(seg string) bool {
 	return true
 }
 
-// forbiddenNameChars cannot be used in names created through leafnotes, so
-// that vaults stay portable to Windows/macOS when synced (e.g. Syncthing).
+// forbiddenNameChars cannot be used in names created through dendronotes, so
+// that somas stay portable to Windows/macOS when synced (e.g. Syncthing).
 const forbiddenNameChars = `\/:*?"<>|`
 
 var reservedWindowsNames = map[string]bool{

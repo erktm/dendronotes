@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"leafnotes/internal/clientip"
+	"dendronotes/internal/clientip"
 )
 
 // cheap parameters keep the tests fast; production uses DefaultParams.

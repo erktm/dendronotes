@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"leafnotes/internal/httpx"
+	"dendronotes/internal/httpx"
 )
 
 // noncePlaceholder appears in web/index.html and is replaced per response.

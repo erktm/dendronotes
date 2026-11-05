@@ -31,9 +31,9 @@ export interface Me {
   logoutUrl?: string
 }
 
-const file = (p: string) => `/api/files/${encodePath(p)}`
+const file = (p: string) => `/api/soma/notes/${encodePath(p)}`
 
-export const getTree = () => request<{ entries: Entry[] }>('GET', '/api/tree').then((r) => r.entries)
+export const getTree = () => request<{ entries: Entry[] }>('GET', '/api/soma/tree').then((r) => r.entries)
 
 export const readNote = (path: string) => request<Note>('GET', file(path))
 
@@ -42,13 +42,13 @@ export const saveNote = (path: string, content: string, etag: string) =>
 
 export const createNote = (path: string, content = '') => request<NoteMeta>('POST', file(path), { body: { content } })
 
-export const createFolder = (path: string) => request<Entry>('POST', `/api/folders/${encodePath(path)}`, { body: {} })
+export const createFolder = (path: string) => request<Entry>('POST', `/api/soma/folders/${encodePath(path)}`, { body: {} })
 
 export const move = (from: string, to: string) =>
-  request<{ path: string }>('POST', '/api/move', { body: { from, to } })
+  request<{ path: string }>('POST', '/api/soma/move', { body: { from, to } })
 
 export const trash = (path: string) =>
-  request<{ trashedTo: string }>('DELETE', `/api/entries/${encodePath(path)}`)
+  request<{ trashedTo: string }>('DELETE', `/api/soma/entries/${encodePath(path)}`)
 
 export const me = () => request<Me>('GET', '/api/auth/me', { expect401: true })
 

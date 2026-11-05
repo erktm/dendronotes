@@ -39,7 +39,7 @@ COPY . .
 COPY --from=web /src/web/dist ./web/dist
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -buildvcs=false \
       -ldflags "-s -w -X main.version=${VERSION}" \
-      -o /out/leafnotes ./cmd/leafnotes \
+      -o /out/leafnotes ./cmd/dendronotes \
  && mkdir -p /out/vault /out/data
 
 # --- Runtime: distroless, no shell, UID 65532 --------------------------------
@@ -47,9 +47,9 @@ FROM ${RUNTIME_IMAGE}
 COPY --from=build /out/leafnotes /usr/local/bin/leafnotes
 COPY --from=build --chown=65532:65532 /out/vault /vault
 COPY --from=build --chown=65532:65532 /out/data /data
-ENV VAULT_DIR=/vault \
-    DATA_DIR=/data \
-    PORT=8080
+ENV DENDRONOTES_SOMA_DIR=/vault \
+    DENDRONOTES_DATA_DIR=/data \
+    DENDRONOTES_HTTP_PORT=8080
 USER 65532:65532
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \

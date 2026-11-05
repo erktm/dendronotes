@@ -16,8 +16,8 @@ import (
 	"testing/fstest"
 	"time"
 
-	"leafnotes/internal/auth"
-	"leafnotes/internal/config"
+	"dendronotes/internal/auth"
+	"dendronotes/internal/config"
 )
 
 const testIndex = `<!doctype html><html><head><meta name="csp-nonce" content="__CSP_NONCE__"></head><body>app</body></html>`
@@ -44,7 +44,7 @@ func testConfig(t *testing.T) config.Config {
 	t.Helper()
 	base := t.TempDir()
 	return config.Config{
-		VaultDir:        filepath.Join(base, "vault"),
+		SomaDir:         filepath.Join(base, "soma"),
 		DataDir:         filepath.Join(base, "data"),
 		Port:            0,
 		LogLevel:        slog.LevelInfo,
@@ -68,7 +68,7 @@ func newTestServer(t *testing.T, fsys fstest.MapFS) *Server {
 
 func newTestServerWith(t *testing.T, fsys fstest.MapFS, cfg config.Config) *Server {
 	t.Helper()
-	for _, d := range []string{cfg.VaultDir, cfg.DataDir} {
+	for _, d := range []string{cfg.SomaDir, cfg.DataDir} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -260,14 +260,14 @@ func TestReadyzLifecycle(t *testing.T) {
 		t.Fatalf("after start: %d", code)
 	}
 
-	// The vault disappears (volume unmounted) → no longer ready.
-	if err := os.Remove(s.cfg.VaultDir); err != nil {
+	// The soma disappears (volume unmounted) → no longer ready.
+	if err := os.Remove(s.cfg.SomaDir); err != nil {
 		t.Fatal(err)
 	}
-	if code, checks := readyStatus(t, h); code != 503 || checks["vault"] != "unavailable" {
-		t.Fatalf("without vault: %d %v", code, checks)
+	if code, checks := readyStatus(t, h); code != 503 || checks["soma"] != "unavailable" {
+		t.Fatalf("without soma: %d %v", code, checks)
 	}
-	if err := os.Mkdir(s.cfg.VaultDir, 0o755); err != nil {
+	if err := os.Mkdir(s.cfg.SomaDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -320,7 +320,7 @@ func TestGracefulShutdown(t *testing.T) {
 	}
 	resCh := make(chan result, 1)
 	go func() {
-		resp, err := http.Get(base + "/slow")
+		resp, err := noKeepAlive.Get(base + "/slow")
 		if err != nil {
 			resCh <- result{err: err}
 			return
@@ -354,7 +354,7 @@ func waitReady(t *testing.T, base string) {
 	t.Helper()
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		resp, err := http.Get(base + "/readyz")
+		resp, err := noKeepAlive.Get(base + "/readyz")
 		if err == nil {
 			resp.Body.Close()
 			if resp.StatusCode == 200 {
@@ -365,3 +365,8 @@ func waitReady(t *testing.T, base string) {
 	}
 	t.Fatal("server did not become ready")
 }
+
+// noKeepAlive avoids pooled spare connections: the server treats a connection
+// that never sent a request as busy for up to 5 s during shutdown, which made
+// TestGracefulShutdown flaky under load.
+var noKeepAlive = &http.Client{Transport: &http.Transport{DisableKeepAlives: true}}

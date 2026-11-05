@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"leafnotes/internal/clientip"
-	"leafnotes/internal/httpx"
+	"dendronotes/internal/clientip"
+	"dendronotes/internal/httpx"
 )
 
 // Mode selects the authentication method.
@@ -29,8 +29,8 @@ const (
 const OwnerUser = "owner"
 
 const (
-	cookieSecure   = "__Host-leafnotes_session" // requires HTTPS, Path=/ and no Domain
-	cookieInsecure = "leafnotes_session"
+	cookieSecure   = "__Host-dendronotes_session" // requires HTTPS, Path=/ and no Domain
+	cookieInsecure = "dendronotes_session"
 	maxPasswordLen = 1024
 )
 

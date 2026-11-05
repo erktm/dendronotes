@@ -9,8 +9,8 @@ LDFLAGS           := -s -w -X main.version=$(VERSION)
 DEV_VAULT    ?= $(CURDIR)/dev/vault
 DEV_DATA     ?= $(CURDIR)/dev/data
 DEV_PASSWORD := $(CURDIR)/dev/password
-DEV_ENV       = VAULT_DIR=$(DEV_VAULT) DATA_DIR=$(DEV_DATA) AUTH_PASSWORD_FILE=$(DEV_PASSWORD) \
-                LOG_FORMAT=text LOG_LEVEL=debug
+DEV_ENV       = DENDRONOTES_SOMA_DIR=$(DEV_VAULT) DENDRONOTES_DATA_DIR=$(DEV_DATA) DENDRONOTES_AUTH_PASSWORD_FILE=$(DEV_PASSWORD) \
+                DENDRONOTES_LOG_FORMAT=text DENDRONOTES_LOG_LEVEL=debug
 
 NPM_DEPS := web/node_modules/.package-lock.json
 
@@ -52,12 +52,12 @@ dev-ports:
 
 dev: $(NPM_DEPS) dev-ports dev-setup ## Run Go server (:8080) and Vite dev server (:5173) together
 	@trap 'kill 0' INT TERM EXIT; \
-	  $(DEV_ENV) go run ./cmd/leafnotes & \
+	  $(DEV_ENV) go run ./cmd/dendronotes & \
 	  (cd web && npm run dev) & \
 	  wait
 
 dev-api: dev-setup ## Run only the Go server with the dev vault
-	$(DEV_ENV) go run ./cmd/leafnotes
+	$(DEV_ENV) go run ./cmd/dendronotes
 
 dev-web: $(NPM_DEPS) ## Run only the Vite dev server
 	cd web && npm run dev
@@ -68,7 +68,7 @@ web: $(NPM_DEPS) ## Build the frontend (web/dist)
 	cd web && npm run build
 
 build: web ## Build bin/leafnotes with the embedded frontend
-	CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "$(LDFLAGS)" -o bin/leafnotes ./cmd/leafnotes
+	CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags "$(LDFLAGS)" -o bin/leafnotes ./cmd/dendronotes
 
 test: test-go test-web ## Run all tests and checks
 
@@ -80,7 +80,7 @@ test-web: $(NPM_DEPS) ## Type-check the frontend
 	cd web && npm run check
 
 fuzz: ## Fuzz the vault path validation for 60 seconds
-	go test -run='^$$' -fuzz=FuzzCleanPath -fuzztime=60s ./internal/vault/
+	go test -run='^$$' -fuzz=FuzzCleanPath -fuzztime=60s ./internal/soma/
 
 audit: $(NPM_DEPS) ## Check npm dependencies for known vulnerabilities (needs network)
 	cd web && npm audit --audit-level=moderate
@@ -136,7 +136,7 @@ run-image: dev-setup ## Run the image hardened (read-only, no capabilities)
 	docker run --rm -p 8080:8080 \
 	  --read-only --cap-drop ALL --security-opt no-new-privileges \
 	  -v $(DEV_VAULT):/vault -v $(DEV_DATA):/data \
-	  -v $(DEV_PASSWORD):/run/secrets/password:ro -e AUTH_PASSWORD_FILE=/run/secrets/password \
+	  -v $(DEV_PASSWORD):/run/secrets/password:ro -e DENDRONOTES_AUTH_PASSWORD_FILE=/run/secrets/password \
 	  $(IMAGE)
 
 clean: ## Remove build artifacts

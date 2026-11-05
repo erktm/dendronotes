@@ -1,4 +1,4 @@
-package vault
+package soma
 
 import (
 	"errors"
@@ -7,7 +7,7 @@ import (
 	"syscall"
 )
 
-// Errors returned by the vault. The HTTP layer maps them to status codes.
+// Errors returned by the soma. The HTTP layer maps them to status codes.
 var (
 	ErrInvalidPath  = errors.New("invalid path")
 	ErrInvalidName  = errors.New("invalid name")
@@ -29,8 +29,8 @@ type ConflictError struct{ ETag string }
 func (e *ConflictError) Error() string        { return ErrConflict.Error() }
 func (e *ConflictError) Is(target error) bool { return target == ErrConflict }
 
-// mapErr translates file system errors into vault errors. Attempts to leave
-// the vault (via "..", absolute or escaping symlinks) are reported as
+// mapErr translates file system errors into soma errors. Attempts to leave
+// the soma (via "..", absolute or escaping symlinks) are reported as
 // ErrNotFound so that nothing about the outside is revealed.
 func mapErr(err error) error {
 	switch {

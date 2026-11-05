@@ -1,0 +1,319 @@
+openapi: 3.1.0
+info:
+  title: dendronotes API
+  version: "1"
+  description: |
+    JSON API of dendronotes. A soma is the folder of plain Markdown notes that a
+    dendronotes server works on. Paths inside the soma are soma-relative,
+    "/"-separated and URL-encoded per segment; they may contain "/" even though
+    they are a single path parameter here.
+
+    State-changing requests must come from the same origin (checked via
+    Sec-Fetch-Site/Origin) and send `Content-Type: application/json`.
+    Errors use the `Error` schema with a stable machine-readable code.
+
+    This file is checked against the server's route table by a test
+    (internal/server/openapi_test.go).
+security:
+  - session: []
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      security: []
+      responses:
+        "200":
+          description: The process is alive.
+  /readyz:
+    get:
+      summary: Readiness probe
+      description: 503 while starting, while shutting down, or when the soma is unreachable.
+      security: []
+      responses:
+        "200":
+          description: Ready.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Readiness" }
+        "503":
+          description: Not ready.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Readiness" }
+  /api/auth/login:
+    post:
+      summary: Sign in with the password (password mode only)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string, maxLength: 1024 }
+      responses:
+        "200":
+          description: Signed in; the session cookie is set.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404":
+          description: Not available in proxy mode (`not_available`).
+        "429":
+          description: Too many attempts (`rate_limited`); see the Retry-After header.
+  /api/auth/logout:
+    post:
+      summary: Sign out
+      security: []
+      responses:
+        "200":
+          description: Session ended. In proxy mode, `logoutUrl` says where to sign out at the proxy.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logoutUrl: { type: string }
+  /api/auth/me:
+    get:
+      summary: Who is signed in
+      security: []
+      responses:
+        "200":
+          description: Signed in.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/soma/tree:
+    get:
+      summary: All visible files and folders of the soma
+      description: Hidden entries (names starting with a dot, e.g. .trash) and ignored names are not listed.
+      responses:
+        "200":
+          description: Entries, parents before their children.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries]
+                properties:
+                  entries:
+                    type: array
+                    items: { $ref: "#/components/schemas/Entry" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/soma/notes/{path}:
+    parameters:
+      - $ref: "#/components/parameters/path"
+    get:
+      summary: Read a note
+      responses:
+        "200":
+          description: The note; the ETag header carries its version.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Note" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/Error" }
+        "413": { $ref: "#/components/responses/Error" }
+        "415": { $ref: "#/components/responses/Error" }
+    put:
+      summary: Save a note
+      description: Requires the version the client started from in If-Match. A change made elsewhere in the meantime answers 412 with the current ETag.
+      parameters:
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: string, example: '"Zm9vYmFy"' }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string }
+      responses:
+        "200":
+          description: Saved.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NoteMeta" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "412":
+          description: Changed elsewhere (`conflict`).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string, const: conflict }
+                  etag: { type: string }
+        "428": { $ref: "#/components/responses/Error" }
+    post:
+      summary: Create a note
+      description: Missing parent folders are created. New names must not contain \ / : * ? " < > | and must not start with a dot.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content: { type: string }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NoteMeta" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/soma/folders/{path}:
+    parameters:
+      - $ref: "#/components/parameters/path"
+    post:
+      summary: Create a folder
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Entry" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/soma/move:
+    post:
+      summary: Rename or move a file or folder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from, to]
+              properties:
+                from: { type: string }
+                to: { type: string }
+      responses:
+        "200":
+          description: Moved; `path` is the new location.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  path: { type: string }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/soma/entries/{path}:
+    parameters:
+      - $ref: "#/components/parameters/path"
+    delete:
+      summary: Move a file or folder to the .trash folder of the soma
+      responses:
+        "200":
+          description: Moved to the trash.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trashedTo: { type: string, example: .trash/Projects/Idea.md }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/Error" }
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: __Host-dendronotes_session
+      description: >
+        Session cookie (named dendronotes_session over plain HTTP). In proxy
+        mode the reverse proxy authenticates every request instead.
+  parameters:
+    path:
+      name: path
+      in: path
+      required: true
+      description: Soma-relative path, URL-encoded per segment.
+      schema: { type: string, example: Projects/Idea.md }
+  responses:
+    Unauthorized:
+      description: Not signed in (`unauthorized`); `mode` tells the client how to sign in.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string, const: unauthorized }
+              mode: { type: string, enum: [password, proxy] }
+    Error:
+      description: Error with a stable code.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          description: >
+            One of invalid_path, invalid_name, not_found, exists, not_a_note,
+            read_only, too_large, is_directory, not_a_directory, move_into_self,
+            if_match_required, content_required, bad_request,
+            unsupported_media_type, cross_origin_request, internal_error.
+    Readiness:
+      type: object
+      properties:
+        status: { type: string, enum: [ok, unavailable] }
+        checks:
+          type: object
+          properties:
+            server: { type: string, enum: [ok, starting, shutting_down] }
+            soma: { type: string, enum: [ok, unavailable] }
+    Me:
+      type: object
+      required: [user, mode]
+      properties:
+        user: { type: string }
+        mode: { type: string, enum: [password, proxy] }
+        logoutUrl: { type: string }
+    Entry:
+      type: object
+      required: [path, type, mtime]
+      properties:
+        path: { type: string }
+        type: { type: string, enum: [file, dir] }
+        size: { type: integer }
+        mtime: { type: integer, description: Unix milliseconds }
+        readOnly: { type: boolean, description: True for symbolic links inside the soma. }
+    Note:
+      type: object
+      required: [path, content, etag, size, mtime]
+      properties:
+        path: { type: string }
+        content: { type: string }
+        etag: { type: string }
+        size: { type: integer }
+        mtime: { type: integer }
+        readOnly: { type: boolean }
+    NoteMeta:
+      type: object
+      required: [path, etag, size, mtime]
+      properties:
+        path: { type: string }
+        etag: { type: string }
+        size: { type: integer }
+        mtime: { type: integer }

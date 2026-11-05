@@ -5,42 +5,63 @@ import (
 	"net/http"
 	"strings"
 
-	"leafnotes/internal/httpx"
-	"leafnotes/internal/vault"
+	"dendronotes/internal/httpx"
+	"dendronotes/internal/soma"
 )
 
-// apiRoutes registers the JSON API. Everything except login/logout/me
-// requires an authenticated user.
-func (s *Server) apiRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/auth/login", s.auth.HandleLogin)
-	mux.HandleFunc("POST /api/auth/logout", s.auth.HandleLogout)
-	mux.HandleFunc("GET /api/auth/me", s.auth.HandleMe)
+// route is one endpoint. The table is the single source of truth for the
+// HTTP surface; a test checks it against docs/openapi.yaml.
+type route struct {
+	method  string
+	pattern string
+	handler http.HandlerFunc
+	public  bool // reachable without authentication
+}
 
-	protect := func(pattern string, h http.HandlerFunc) {
-		mux.Handle(pattern, s.auth.Require(h))
+// routes lists all endpoints except the frontend assets. Everything that
+// works on the soma lives below /api/soma/ and requires a signed-in user.
+func (s *Server) routes() []route {
+	return []route{
+		{"GET", "/healthz", s.handleHealthz, true},
+		{"GET", "/readyz", s.handleReadyz, true},
+
+		{"POST", "/api/auth/login", s.auth.HandleLogin, true},
+		{"POST", "/api/auth/logout", s.auth.HandleLogout, true},
+		{"GET", "/api/auth/me", s.auth.HandleMe, true},
+
+		{"GET", "/api/soma/tree", s.handleTree, false},
+		{"GET", "/api/soma/notes/{path...}", s.handleReadNote, false},
+		{"PUT", "/api/soma/notes/{path...}", s.handleWriteNote, false},
+		{"POST", "/api/soma/notes/{path...}", s.handleCreateNote, false},
+		{"POST", "/api/soma/folders/{path...}", s.handleMkdir, false},
+		{"POST", "/api/soma/move", s.handleMove, false},
+		{"DELETE", "/api/soma/entries/{path...}", s.handleTrash, false},
 	}
-	protect("GET /api/tree", s.handleTree)
-	protect("GET /api/files/{path...}", s.handleReadNote)
-	protect("PUT /api/files/{path...}", s.handleWriteNote)
-	protect("POST /api/files/{path...}", s.handleCreateNote)
-	protect("POST /api/folders/{path...}", s.handleMkdir)
-	protect("POST /api/move", s.handleMove)
-	protect("DELETE /api/entries/{path...}", s.handleTrash)
+}
+
+func (s *Server) registerRoutes(mux *http.ServeMux) {
+	for _, rt := range s.routes() {
+		var h http.Handler = rt.handler
+		if !rt.public {
+			h = s.auth.Require(h)
+		}
+		mux.Handle(rt.method+" "+rt.pattern, h)
+	}
 }
 
 func (s *Server) handleTree(w http.ResponseWriter, r *http.Request) {
-	entries, err := s.vault.Tree()
+	entries, err := s.soma.Tree()
 	if err != nil {
-		s.vaultError(w, r, err)
+		s.somaError(w, r, err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"entries": entries})
 }
 
 func (s *Server) handleReadNote(w http.ResponseWriter, r *http.Request) {
-	n, err := s.vault.ReadNote(r.PathValue("path"))
+	n, err := s.soma.ReadNote(r.PathValue("path"))
 	if err != nil {
-		s.vaultError(w, r, err)
+		s.somaError(w, r, err)
 		return
 	}
 	w.Header().Set("ETag", quoteETag(n.ETag))
@@ -55,7 +76,7 @@ type noteMeta struct {
 	MTime int64  `json:"mtime"`
 }
 
-func metaOf(n vault.Note) noteMeta {
+func metaOf(n soma.Note) noteMeta {
 	return noteMeta{Path: n.Path, ETag: n.ETag, Size: n.Size, MTime: n.MTime}
 }
 
@@ -78,9 +99,9 @@ func (s *Server) handleWriteNote(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "content_required")
 		return
 	}
-	n, err := s.vault.WriteNote(r.PathValue("path"), []byte(*body.Content), etag)
+	n, err := s.soma.WriteNote(r.PathValue("path"), []byte(*body.Content), etag)
 	if err != nil {
-		s.vaultError(w, r, err)
+		s.somaError(w, r, err)
 		return
 	}
 	w.Header().Set("ETag", quoteETag(n.ETag))
@@ -95,9 +116,9 @@ func (s *Server) handleCreateNote(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteDecodeError(w, err)
 		return
 	}
-	n, err := s.vault.CreateNote(r.PathValue("path"), []byte(body.Content))
+	n, err := s.soma.CreateNote(r.PathValue("path"), []byte(body.Content))
 	if err != nil {
-		s.vaultError(w, r, err)
+		s.somaError(w, r, err)
 		return
 	}
 	w.Header().Set("ETag", quoteETag(n.ETag))
@@ -105,9 +126,9 @@ func (s *Server) handleCreateNote(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleMkdir(w http.ResponseWriter, r *http.Request) {
-	e, err := s.vault.Mkdir(r.PathValue("path"))
+	e, err := s.soma.Mkdir(r.PathValue("path"))
 	if err != nil {
-		s.vaultError(w, r, err)
+		s.somaError(w, r, err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusCreated, e)
@@ -122,18 +143,18 @@ func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteDecodeError(w, err)
 		return
 	}
-	to, err := s.vault.Move(body.From, body.To)
+	to, err := s.soma.Move(body.From, body.To)
 	if err != nil {
-		s.vaultError(w, r, err)
+		s.somaError(w, r, err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"path": to})
 }
 
 func (s *Server) handleTrash(w http.ResponseWriter, r *http.Request) {
-	dst, err := s.vault.Trash(r.PathValue("path"))
+	dst, err := s.soma.Trash(r.PathValue("path"))
 	if err != nil {
-		s.vaultError(w, r, err)
+		s.somaError(w, r, err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"trashedTo": dst})
@@ -143,35 +164,35 @@ func (s *Server) handleTrash(w http.ResponseWriter, r *http.Request) {
 // up text by up to 6× (\uXXXX).
 func (s *Server) maxNoteBody() int64 { return s.cfg.MaxNoteBytes*6 + 4096 }
 
-// vaultError maps vault errors to HTTP responses with stable error codes.
-func (s *Server) vaultError(w http.ResponseWriter, r *http.Request, err error) {
-	var ce *vault.ConflictError
+// somaError maps soma errors to HTTP responses with stable error codes.
+func (s *Server) somaError(w http.ResponseWriter, r *http.Request, err error) {
+	var ce *soma.ConflictError
 	switch {
 	case errors.As(err, &ce):
 		w.Header().Set("ETag", quoteETag(ce.ETag))
 		httpx.WriteJSON(w, http.StatusPreconditionFailed, map[string]string{"error": "conflict", "etag": ce.ETag})
-	case errors.Is(err, vault.ErrInvalidPath):
+	case errors.Is(err, soma.ErrInvalidPath):
 		httpx.Error(w, http.StatusBadRequest, "invalid_path")
-	case errors.Is(err, vault.ErrInvalidName):
+	case errors.Is(err, soma.ErrInvalidName):
 		httpx.Error(w, http.StatusBadRequest, "invalid_name")
-	case errors.Is(err, vault.ErrNotFound):
+	case errors.Is(err, soma.ErrNotFound):
 		httpx.Error(w, http.StatusNotFound, "not_found")
-	case errors.Is(err, vault.ErrExists):
+	case errors.Is(err, soma.ErrExists):
 		httpx.Error(w, http.StatusConflict, "exists")
-	case errors.Is(err, vault.ErrNotNote):
+	case errors.Is(err, soma.ErrNotNote):
 		httpx.Error(w, http.StatusUnsupportedMediaType, "not_a_note")
-	case errors.Is(err, vault.ErrReadOnly):
+	case errors.Is(err, soma.ErrReadOnly):
 		httpx.Error(w, http.StatusForbidden, "read_only")
-	case errors.Is(err, vault.ErrTooLarge):
+	case errors.Is(err, soma.ErrTooLarge):
 		httpx.Error(w, http.StatusRequestEntityTooLarge, "too_large")
-	case errors.Is(err, vault.ErrIsDir):
+	case errors.Is(err, soma.ErrIsDir):
 		httpx.Error(w, http.StatusBadRequest, "is_directory")
-	case errors.Is(err, vault.ErrNotDir):
+	case errors.Is(err, soma.ErrNotDir):
 		httpx.Error(w, http.StatusBadRequest, "not_a_directory")
-	case errors.Is(err, vault.ErrMoveIntoSelf):
+	case errors.Is(err, soma.ErrMoveIntoSelf):
 		httpx.Error(w, http.StatusBadRequest, "move_into_self")
 	default:
-		s.log.Error("vault operation failed", "method", r.Method, "path", r.URL.Path, "err", err)
+		s.log.Error("soma operation failed", "method", r.Method, "path", r.URL.Path, "err", err)
 		httpx.Error(w, http.StatusInternalServerError, "internal_error")
 	}
 }

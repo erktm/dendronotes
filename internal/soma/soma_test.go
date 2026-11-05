@@ -1,4 +1,4 @@
-package vault
+package soma
 
 import (
 	"errors"
@@ -9,12 +9,12 @@ import (
 	"testing"
 )
 
-// setup creates <tmp>/vault and a sibling <tmp>/outside/secret.md that must
-// never be reachable through the vault.
-func setup(t *testing.T) (v *Vault, dir, outside string) {
+// setup creates <tmp>/soma and a sibling <tmp>/outside/secret.md that must
+// never be reachable through the soma.
+func setup(t *testing.T) (s *Soma, dir, outside string) {
 	t.Helper()
 	base := t.TempDir()
-	dir = filepath.Join(base, "vault")
+	dir = filepath.Join(base, "soma")
 	outside = filepath.Join(base, "outside")
 	for _, d := range []string{dir, outside} {
 		if err := os.Mkdir(d, 0o755); err != nil {
@@ -24,12 +24,12 @@ func setup(t *testing.T) (v *Vault, dir, outside string) {
 	if err := os.WriteFile(filepath.Join(outside, "secret.md"), []byte("TOP SECRET"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	v, err := Open(dir, Options{MaxNoteBytes: 1 << 20, Ignore: []string{"node_modules"}})
+	s, err := Open(dir, Options{MaxNoteBytes: 1 << 20, Ignore: []string{"node_modules"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { v.Close() })
-	return v, dir, outside
+	t.Cleanup(func() { s.Close() })
+	return s, dir, outside
 }
 
 func write(t *testing.T, path, content string) {
@@ -97,7 +97,7 @@ func FuzzCleanPath(f *testing.F) {
 	for _, s := range []string{"a.md", "../outside/secret.md", "a/../../outside/secret.md", "%2e%2e/x", ".trash/x", "a\\..\\b", "x/./y"} {
 		f.Add(s)
 	}
-	v, _, _ := setupFuzz(f)
+	s, _, _ := setupFuzz(f)
 	f.Fuzz(func(t *testing.T, p string) {
 		clean, err := CleanPath(p)
 		if err != nil {
@@ -111,31 +111,31 @@ func FuzzCleanPath(f *testing.F) {
 				t.Fatalf("accepted bad segment in %q", p)
 			}
 		}
-		if n, err := v.ReadNote(clean); err == nil && strings.Contains(n.Content, "TOP SECRET") {
+		if n, err := s.ReadNote(clean); err == nil && strings.Contains(n.Content, "TOP SECRET") {
 			t.Fatalf("read outside secret via %q", p)
 		}
 	})
 }
 
-func setupFuzz(f *testing.F) (*Vault, string, string) {
+func setupFuzz(f *testing.F) (*Soma, string, string) {
 	base := f.TempDir()
-	dir := filepath.Join(base, "vault")
+	dir := filepath.Join(base, "soma")
 	outside := filepath.Join(base, "outside")
 	os.Mkdir(dir, 0o755)
 	os.Mkdir(outside, 0o755)
 	os.WriteFile(filepath.Join(outside, "secret.md"), []byte("TOP SECRET"), 0o644)
 	os.Symlink("../outside", filepath.Join(dir, "link"))
 	os.Symlink("../outside/secret.md", filepath.Join(dir, "s.md"))
-	v, err := Open(dir, Options{})
+	s, err := Open(dir, Options{})
 	if err != nil {
 		f.Fatal(err)
 	}
-	f.Cleanup(func() { v.Close() })
-	return v, dir, outside
+	f.Cleanup(func() { s.Close() })
+	return s, dir, outside
 }
 
 func TestSymlinkEscapesAreBlocked(t *testing.T) {
-	v, dir, outside := setup(t)
+	s, dir, outside := setup(t)
 	write(t, filepath.Join(dir, "real.md"), "inside")
 	symlink(t, "../outside/secret.md", filepath.Join(dir, "escape.md"))           // relative, escaping
 	symlink(t, filepath.Join(outside, "secret.md"), filepath.Join(dir, "abs.md")) // absolute
@@ -143,40 +143,40 @@ func TestSymlinkEscapesAreBlocked(t *testing.T) {
 	symlink(t, "real.md", filepath.Join(dir, "alias.md"))                         // inside, allowed read-only
 
 	for _, p := range []string{"escape.md", "abs.md", "linkdir/secret.md"} {
-		n, err := v.ReadNote(p)
+		n, err := s.ReadNote(p)
 		if err == nil || strings.Contains(n.Content, "TOP SECRET") {
-			t.Errorf("ReadNote(%q) escaped the vault: %q %v", p, n.Content, err)
+			t.Errorf("ReadNote(%q) escaped the soma: %q %v", p, n.Content, err)
 		}
-		if _, err := v.WriteNote(p, []byte("pwned"), ""); err == nil {
+		if _, err := s.WriteNote(p, []byte("pwned"), ""); err == nil {
 			t.Errorf("WriteNote(%q) succeeded", p)
 		}
 	}
-	if _, err := v.CreateNote("linkdir/new.md", []byte("pwned")); err == nil {
+	if _, err := s.CreateNote("linkdir/new.md", []byte("pwned")); err == nil {
 		t.Error("CreateNote through an escaping directory symlink succeeded")
 	}
-	if _, err := v.Mkdir("linkdir/sub"); err == nil {
+	if _, err := s.Mkdir("linkdir/sub"); err == nil {
 		t.Error("Mkdir through an escaping directory symlink succeeded")
 	}
-	if _, err := v.Move("real.md", "linkdir/real.md"); err == nil {
+	if _, err := s.Move("real.md", "linkdir/real.md"); err == nil {
 		t.Error("Move through an escaping directory symlink succeeded")
 	}
 	if got, _ := os.ReadFile(filepath.Join(outside, "secret.md")); string(got) != "TOP SECRET" {
 		t.Fatalf("outside file was modified: %q", got)
 	}
 	if entries, _ := os.ReadDir(outside); len(entries) != 1 {
-		t.Fatalf("files were created outside the vault: %v", entries)
+		t.Fatalf("files were created outside the soma: %v", entries)
 	}
 
-	// The in-vault alias is readable but read-only.
-	n, err := v.ReadNote("alias.md")
+	// The in-soma alias is readable but read-only.
+	n, err := s.ReadNote("alias.md")
 	if err != nil || n.Content != "inside" || !n.ReadOnly {
 		t.Errorf("alias.md: %+v %v", n, err)
 	}
-	if _, err := v.WriteNote("alias.md", []byte("x"), n.ETag); !errors.Is(err, ErrReadOnly) {
+	if _, err := s.WriteNote("alias.md", []byte("x"), n.ETag); !errors.Is(err, ErrReadOnly) {
 		t.Errorf("writing through a symlink: %v, want ErrReadOnly", err)
 	}
 
-	tree, err := v.Tree()
+	tree, err := s.Tree()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func TestSymlinkEscapesAreBlocked(t *testing.T) {
 		}
 	}
 	if !slices.Contains(paths, "alias.md") {
-		t.Error("tree misses the in-vault alias")
+		t.Error("tree misses the in-soma alias")
 	}
 }
 
@@ -200,7 +200,7 @@ func treePaths(entries []Entry) []string {
 }
 
 func TestTreeHidesIgnoredEntries(t *testing.T) {
-	v, dir, _ := setup(t)
+	s, dir, _ := setup(t)
 	write(t, filepath.Join(dir, "Projects", "Idea.md"), "x")
 	write(t, filepath.Join(dir, "image.png"), "png")
 	write(t, filepath.Join(dir, ".obsidian", "app.json"), "{}")
@@ -209,7 +209,7 @@ func TestTreeHidesIgnoredEntries(t *testing.T) {
 	write(t, filepath.Join(dir, "node_modules", "x.md"), "x")
 	write(t, filepath.Join(dir, "bad\\name.md"), "x")
 
-	tree, err := v.Tree()
+	tree, err := s.Tree()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,17 +224,17 @@ func TestTreeHidesIgnoredEntries(t *testing.T) {
 }
 
 func TestReadWriteWithETag(t *testing.T) {
-	v, dir, _ := setup(t)
+	s, dir, _ := setup(t)
 	write(t, filepath.Join(dir, "note.md"), "v1")
 	if err := os.Chmod(filepath.Join(dir, "note.md"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
-	n, err := v.ReadNote("note.md")
+	n, err := s.ReadNote("note.md")
 	if err != nil || n.Content != "v1" || n.ETag == "" {
 		t.Fatalf("read: %+v %v", n, err)
 	}
-	n2, err := v.WriteNote("note.md", []byte("v2"), n.ETag)
+	n2, err := s.WriteNote("note.md", []byte("v2"), n.ETag)
 	if err != nil || n2.ETag == n.ETag {
 		t.Fatalf("write: %+v %v", n2, err)
 	}
@@ -246,7 +246,7 @@ func TestReadWriteWithETag(t *testing.T) {
 	}
 
 	// Stale ETag → conflict carrying the current version.
-	_, err = v.WriteNote("note.md", []byte("v3"), n.ETag)
+	_, err = s.WriteNote("note.md", []byte("v3"), n.ETag)
 	var ce *ConflictError
 	if !errors.As(err, &ce) || ce.ETag != n2.ETag || !errors.Is(err, ErrConflict) {
 		t.Fatalf("stale write: %v", err)
@@ -254,7 +254,7 @@ func TestReadWriteWithETag(t *testing.T) {
 
 	// External change → conflict as well.
 	write(t, filepath.Join(dir, "note.md"), "changed elsewhere")
-	if _, err := v.WriteNote("note.md", []byte("v4"), n2.ETag); !errors.Is(err, ErrConflict) {
+	if _, err := s.WriteNote("note.md", []byte("v4"), n2.ETag); !errors.Is(err, ErrConflict) {
 		t.Fatalf("write after external change: %v", err)
 	}
 
@@ -268,7 +268,7 @@ func TestReadWriteWithETag(t *testing.T) {
 }
 
 func TestReadNoteRejections(t *testing.T) {
-	v, dir, _ := setup(t)
+	s, dir, _ := setup(t)
 	write(t, filepath.Join(dir, "image.png"), "png")
 	write(t, filepath.Join(dir, "latin1.md"), "caf\xe9")
 	write(t, filepath.Join(dir, "big.md"), strings.Repeat("x", (1<<20)+1))
@@ -284,47 +284,47 @@ func TestReadNoteRejections(t *testing.T) {
 		"../x.md":    ErrInvalidPath,
 	}
 	for p, want := range cases {
-		if _, err := v.ReadNote(p); !errors.Is(err, want) {
+		if _, err := s.ReadNote(p); !errors.Is(err, want) {
 			t.Errorf("ReadNote(%q) = %v, want %v", p, err, want)
 		}
 	}
-	if _, err := v.WriteNote("note.md", make([]byte, (1<<20)+1), ""); !errors.Is(err, ErrTooLarge) {
+	if _, err := s.WriteNote("note.md", make([]byte, (1<<20)+1), ""); !errors.Is(err, ErrTooLarge) {
 		t.Errorf("oversized write: %v", err)
 	}
 }
 
 func TestCreateAndMkdir(t *testing.T) {
-	v, dir, _ := setup(t)
-	n, err := v.CreateNote("New/Deep/Idea.md", []byte("# Idea"))
+	s, dir, _ := setup(t)
+	n, err := s.CreateNote("New/Deep/Idea.md", []byte("# Idea"))
 	if err != nil || n.Path != "New/Deep/Idea.md" {
 		t.Fatalf("create: %+v %v", n, err)
 	}
 	if got, _ := os.ReadFile(filepath.Join(dir, "New", "Deep", "Idea.md")); string(got) != "# Idea" {
 		t.Fatalf("content %q", got)
 	}
-	if _, err := v.CreateNote("New/Deep/Idea.md", nil); !errors.Is(err, ErrExists) {
+	if _, err := s.CreateNote("New/Deep/Idea.md", nil); !errors.Is(err, ErrExists) {
 		t.Errorf("duplicate create: %v", err)
 	}
-	if _, err := v.CreateNote("bad:name.md", nil); !errors.Is(err, ErrInvalidName) {
+	if _, err := s.CreateNote("bad:name.md", nil); !errors.Is(err, ErrInvalidName) {
 		t.Errorf("invalid name: %v", err)
 	}
-	if _, err := v.CreateNote("script.js", nil); !errors.Is(err, ErrNotNote) {
+	if _, err := s.CreateNote("script.js", nil); !errors.Is(err, ErrNotNote) {
 		t.Errorf("non-note create: %v", err)
 	}
-	if n, err := v.CreateNote("Café.md", nil); err != nil || n.Path != "Café.md" {
+	if n, err := s.CreateNote("Café.md", nil); err != nil || n.Path != "Café.md" {
 		t.Errorf("NFC normalization on create: %+v %v", n, err)
 	}
 
-	if _, err := v.Mkdir("Archive/2026"); err != nil {
+	if _, err := s.Mkdir("Archive/2026"); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	if _, err := v.Mkdir("Archive/2026"); !errors.Is(err, ErrExists) {
+	if _, err := s.Mkdir("Archive/2026"); !errors.Is(err, ErrExists) {
 		t.Errorf("duplicate mkdir: %v", err)
 	}
 }
 
 func TestMove(t *testing.T) {
-	v, dir, _ := setup(t)
+	s, dir, _ := setup(t)
 	write(t, filepath.Join(dir, "a.md"), "a")
 	write(t, filepath.Join(dir, "b.md"), "b")
 	write(t, filepath.Join(dir, "Folder", "inner.md"), "i")
@@ -332,92 +332,92 @@ func TestMove(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if to, err := v.Move("a.md", "Target/a.md"); err != nil || to != "Target/a.md" {
+	if to, err := s.Move("a.md", "Target/a.md"); err != nil || to != "Target/a.md" {
 		t.Fatalf("move file: %q %v", to, err)
 	}
-	if _, err := v.Move("Folder", "Target/Folder"); err != nil {
+	if _, err := s.Move("Folder", "Target/Folder"); err != nil {
 		t.Fatalf("move folder: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "Target", "Folder", "inner.md")); err != nil {
 		t.Fatal("folder content not moved")
 	}
-	if _, err := v.Move("b.md", "Target/a.md"); !errors.Is(err, ErrExists) {
+	if _, err := s.Move("b.md", "Target/a.md"); !errors.Is(err, ErrExists) {
 		t.Errorf("move onto existing: %v", err)
 	}
-	if _, err := v.Move("Target", "Target/Sub/Target"); !errors.Is(err, ErrMoveIntoSelf) {
+	if _, err := s.Move("Target", "Target/Sub/Target"); !errors.Is(err, ErrMoveIntoSelf) {
 		t.Errorf("move into itself: %v", err)
 	}
-	if _, err := v.Move("b.md", "Missing/b.md"); !errors.Is(err, ErrNotFound) {
+	if _, err := s.Move("b.md", "Missing/b.md"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("move into missing folder: %v", err)
 	}
-	if _, err := v.Move("b.md", "Target/a.md/b.md"); err == nil {
+	if _, err := s.Move("b.md", "Target/a.md/b.md"); err == nil {
 		t.Error("move below a file succeeded")
 	}
-	if _, err := v.Move("b.md", ".trash/b.md"); err == nil {
+	if _, err := s.Move("b.md", ".trash/b.md"); err == nil {
 		t.Error("move into a hidden folder succeeded")
 	}
-	if to, err := v.Move("b.md", "B.md"); err != nil || to != "B.md" {
+	if to, err := s.Move("b.md", "B.md"); err != nil || to != "B.md" {
 		t.Errorf("case-only rename: %q %v", to, err)
 	}
 }
 
 func TestTrash(t *testing.T) {
-	v, dir, _ := setup(t)
+	s, dir, _ := setup(t)
 	write(t, filepath.Join(dir, "Projects", "Idea.md"), "one")
-	got, err := v.Trash("Projects/Idea.md")
+	got, err := s.Trash("Projects/Idea.md")
 	if err != nil || got != ".trash/Projects/Idea.md" {
 		t.Fatalf("trash: %q %v", got, err)
 	}
 	write(t, filepath.Join(dir, "Projects", "Idea.md"), "two")
-	got, err = v.Trash("Projects/Idea.md")
+	got, err = s.Trash("Projects/Idea.md")
 	if err != nil || got != ".trash/Projects/Idea (1).md" {
 		t.Fatalf("trash with clash: %q %v", got, err)
 	}
 	if b, _ := os.ReadFile(filepath.Join(dir, ".trash", "Projects", "Idea.md")); string(b) != "one" {
 		t.Errorf("first trashed version lost: %q", b)
 	}
-	if _, err := v.Trash("Projects"); err != nil {
+	if _, err := s.Trash("Projects"); err != nil {
 		t.Fatalf("trash folder: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".trash", "Projects (1)")); err != nil {
 		t.Errorf("trashed folder clash not resolved: %v", err)
 	}
-	if _, err := v.Trash("missing.md"); !errors.Is(err, ErrNotFound) {
+	if _, err := s.Trash("missing.md"); !errors.Is(err, ErrNotFound) {
 		t.Errorf("trash missing: %v", err)
 	}
-	if _, err := v.Trash(".trash"); !errors.Is(err, ErrInvalidPath) {
+	if _, err := s.Trash(".trash"); !errors.Is(err, ErrInvalidPath) {
 		t.Errorf("trashing the trash: %v", err)
 	}
 }
 
 func TestCheck(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "vault")
+	dir := filepath.Join(t.TempDir(), "soma")
 	if err := os.Mkdir(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	v, err := Open(dir, Options{})
+	s, err := Open(dir, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer v.Close()
+	defer s.Close()
 
-	if err := v.Check(); err != nil {
-		t.Fatalf("fresh vault: %v", err)
+	if err := s.Check(); err != nil {
+		t.Fatalf("fresh soma: %v", err)
 	}
 	// Remove the directory: the open handle still refers to the deleted
 	// directory, but the path does not – Check must report that.
 	if err := os.Remove(dir); err != nil {
 		t.Fatal(err)
 	}
-	if err := v.Check(); err == nil {
-		t.Fatal("removed vault was not detected")
+	if err := s.Check(); err == nil {
+		t.Fatal("removed soma was not detected")
 	}
-	// A new, different directory at the same path is not a valid vault either.
+	// A new, different directory at the same path is not a valid soma either.
 	if err := os.Mkdir(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := v.Check(); !errors.Is(err, ErrReplaced) {
-		t.Fatalf("replaced vault: expected ErrReplaced, got %v", err)
+	if err := s.Check(); !errors.Is(err, ErrReplaced) {
+		t.Fatalf("replaced soma: expected ErrReplaced, got %v", err)
 	}
 }
 

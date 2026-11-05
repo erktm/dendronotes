@@ -13,11 +13,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"leafnotes/internal/auth"
-	"leafnotes/internal/clientip"
-	"leafnotes/internal/config"
-	"leafnotes/internal/httpx"
-	"leafnotes/internal/vault"
+	"dendronotes/internal/auth"
+	"dendronotes/internal/clientip"
+	"dendronotes/internal/config"
+	"dendronotes/internal/httpx"
+	"dendronotes/internal/soma"
 )
 
 // hashParams are the argon2id parameters for a plaintext AUTH_PASSWORD_FILE.
@@ -28,7 +28,7 @@ var hashParams auth.Params
 type Server struct {
 	cfg     config.Config
 	log     *slog.Logger
-	vault   *vault.Vault
+	soma    *soma.Soma
 	auth    *auth.Authenticator
 	assets  *assets
 	version string
@@ -64,21 +64,21 @@ func New(cfg config.Config, log *slog.Logger, webFS fs.FS, version string) (*Ser
 	if err != nil {
 		return nil, fmt.Errorf("auth: %w", err)
 	}
-	v, err := vault.Open(cfg.VaultDir, vault.Options{Ignore: cfg.Ignore, MaxNoteBytes: cfg.MaxNoteBytes})
+	sm, err := soma.Open(cfg.SomaDir, soma.Options{Ignore: cfg.Ignore, MaxNoteBytes: cfg.MaxNoteBytes})
 	if err != nil {
 		return nil, err
 	}
 	a, err := newAssets(webFS)
 	if err != nil {
-		v.Close()
+		sm.Close()
 		return nil, err
 	}
 	if !a.hasIndex() {
 		log.Warn("frontend not built: web/dist/index.html missing, UI will answer 503")
 	}
 
-	s := &Server{cfg: cfg, log: log, vault: v, auth: authn, assets: a, version: version}
-	s.addCloser("vault", v.Close)
+	s := &Server{cfg: cfg, log: log, soma: sm, auth: authn, assets: a, version: version}
+	s.addCloser("soma", sm.Close)
 	s.httpSrv = &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
 		Handler:           s.Handler(),
@@ -97,9 +97,7 @@ func (s *Server) addCloser(name string, fn func() error) {
 // Handler returns the complete HTTP handler including middleware.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", s.handleHealthz)
-	mux.HandleFunc("GET /readyz", s.handleReadyz)
-	s.apiRoutes(mux)
+	s.registerRoutes(mux)
 	mux.HandleFunc("/api/", s.handleAPINotFound)
 	mux.Handle("/", s.assets)
 
@@ -137,7 +135,7 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 	s.log.Info("listening",
 		"addr", ln.Addr().String(),
 		"auth", s.cfg.Auth.Mode,
-		"vault", s.cfg.VaultDir,
+		"soma", s.cfg.SomaDir,
 		"data", s.cfg.DataDir,
 		"version", s.version,
 	)
