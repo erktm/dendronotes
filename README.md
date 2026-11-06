@@ -5,10 +5,11 @@ everything else – search index, sessions – is a derived cache that can be re
 
 One container, one process, no external services, no external requests (air-gap friendly).
 
-> **Status: milestone 3** – soma access, authentication, file tree, an editor with live
+> **Status: milestone 4** – soma access, authentication, file tree, an editor with live
 > preview and optional Vim key bindings, a reading view, synapses with backlinks, full-text
-> search with tags, live updates when files change on disk, and synapses that follow renamed
-> notes. Attachments follow in M4, Kubernetes manifests in M5.
+> search with tags, live updates when files change on disk, synapses that follow renamed
+> notes, and attachments: images, audio, video and other files, uploaded by paste or drag &
+> drop and shown in notes, plus embedded notes. Kubernetes manifests follow in M5.
 
 ## Vocabulary
 
@@ -56,6 +57,15 @@ make run-image    # run the image hardened (read-only, no capabilities)
   `#garden/beds`; case and accents are ignored. A result opens the note at the matching line.
   With an empty search field, the panel lists all tags.
 - **Tags.** `#tag` anywhere in the text (not in code) or a `tags:` list in the front matter.
+- **Attachments.** Paste an image or drop files into the editor: they are uploaded next to the
+  note and embedded as `![[photo.png]]`. Files dropped on a folder in the tree (or picked with
+  the upload button) go into that folder. Embeds show images (`![[photo.png|300]]` sets the
+  width), audio and video players; other files, such as PDFs, become links that open them.
+  Standard Markdown works too: `![alt](photo.png)`, `[report](report.pdf)`. Clicking a file in
+  the tree shows it with its size and a download button. Images from other hosts are never
+  loaded.
+- **Embedded notes.** `![[Note]]` shows another note inside this one in the reading view,
+  `![[Note#Heading]]` only that section (up to three levels deep).
 - **Renaming and moving.** Synapses in other notes are rewritten so they keep pointing to the
   renamed or moved note (Markdown links included), unless switched off in the settings. A note
   that was changed by someone else in that moment is left alone and reported.
@@ -78,8 +88,9 @@ make run-image    # run the image hardened (read-only, no capabilities)
 readable line length, note font (sans or serif), theme (system, light, dark), the details
 panel, and whether renaming updates synapses.
 
-Images and embedded files are shown as placeholders until attachments arrive in M4;
-images from other hosts are never loaded.
+Uploads are limited to images (PNG, JPEG, GIF, WebP, AVIF, BMP, ICO, SVG), PDF, audio (MP3,
+WAV, Ogg, FLAC, M4A), video (MP4, WebM, MOV), text (Markdown, TXT, CSV, JSON) and zip files,
+up to `DENDRONOTES_MAX_UPLOAD_MB`. The content must match the extension.
 
 ## Index and live updates
 
@@ -124,6 +135,7 @@ All variables carry the `DENDRONOTES_` prefix. Variables without it are ignored.
 | `DENDRONOTES_LOG_FORMAT`               | `json`             | `json` (stdout) or `text`                                  |
 | `DENDRONOTES_SHUTDOWN_TIMEOUT`         | `20s`              | Maximum time for in-flight requests after SIGTERM          |
 | `DENDRONOTES_MAX_NOTE_MB`              | `5`                | Largest note the editor opens or saves                     |
+| `DENDRONOTES_MAX_UPLOAD_MB`            | `25`               | Largest file that can be uploaded (images, PDFs, media …)  |
 | `DENDRONOTES_IGNORE`                   |                    | Extra name patterns hidden from the tree, e.g. `node_modules,*.tmp` (dot entries are always hidden) |
 | `DENDRONOTES_RESCAN_INTERVAL`          | `5m`               | How often the whole soma is compared with the index, in addition to file system events; `0` turns it off |
 | `DENDRONOTES_TRUSTED_PROXIES`          |                    | IPs/CIDRs of reverse proxies whose `X-Forwarded-*` headers are believed |
@@ -135,7 +147,6 @@ All variables carry the `DENDRONOTES_` prefix. Variables without it are ignored.
 | `DENDRONOTES_COOKIE_SECURE`            | `auto`             | `auto` (secure over HTTPS), `true` or `false`              |
 | `DENDRONOTES_AUTH_PROXY_HEADER`        | `X-Forwarded-User` | Header carrying the user name in proxy mode                |
 | `DENDRONOTES_AUTH_PROXY_ALLOWED_USERS` |                    | Optional comma-separated allow list for proxy mode         |
-| `DENDRONOTES_MAX_UPLOAD_MB`            | `25`               | Largest file that can be uploaded (images, PDFs, media …)  |
 | `DENDRONOTES_AUTH_PROXY_LOGOUT_URL`    |                    | Where "Sign out" leads in proxy mode, e.g. `/oauth2/sign_out` |
 
 Exactly one of the three password variables is required in password mode; without
@@ -179,6 +190,10 @@ sure only the proxy can reach dendronotes (Kubernetes: a NetworkPolicy).
 - Strict Content-Security-Policy with per-response nonce; no inline scripts, no `eval`, no
   external hosts. The only inline style allowed is the exact `tab-size: 4` attribute the
   editor sets (by hash).
+- Uploads must have an allowed extension and content that matches it (a `.png` must be a
+  PNG); HTML, scripts and executables are refused. Files are served with the type of their
+  extension, `nosniff`, and a sandboxing Content-Security-Policy, so a file opened directly in
+  the browser (an SVG, say) can never run scripts. Notes show media only from the soma.
 - The event stream carries only paths and versions, never note content, and ends when the
   session ends. Search snippets mark matches with control characters, not HTML.
 - Note content is untrusted: the reading view renders it with markdown-it and sanitizes the
@@ -202,6 +217,8 @@ is in [`docs/openapi.yaml`](docs/openapi.yaml), which a test keeps in sync with 
 | `POST /api/soma/folders/{path}`         | Create a folder                                      |
 | `POST /api/soma/move`                   | Rename or move: `{"from": …, "to": …, "updateSynapses": true}` |
 | `DELETE /api/soma/entries/{path}`       | Move a file or folder to `.trash/` in the soma       |
+| `GET /api/soma/files/{path}`            | Download a file (attachments, images, media)         |
+| `POST /api/soma/files/{path}`           | Upload a file (raw body; `?unique=1` avoids name clashes) |
 | `GET /api/soma/search?q=`               | Full-text search (words, "phrases", #tags)           |
 | `GET /api/soma/backlinks/{path}`        | Notes with synapses to a note                        |
 | `GET /api/soma/tags`                    | All tags with their number of notes                  |
@@ -232,6 +249,7 @@ internal/index/    SQLite cache: versions, synapses, tags, full-text search
 internal/watch/    file system events (fsnotify) for changes made outside dendronotes
 internal/events/   fan-out of live updates to connected browsers
 internal/relink/   rewrites synapses when notes are renamed or moved
+internal/attach/   which files may be uploaded (type allow list, content check) and how they are served
 internal/auth/     password (argon2id), sessions, rate limit, proxy header
 internal/clientip/ client address behind trusted proxies
 internal/httpx/    JSON helpers
