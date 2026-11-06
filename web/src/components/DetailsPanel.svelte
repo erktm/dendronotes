@@ -1,0 +1,161 @@
+<script lang="ts">
+  import type { NoteSession } from '../lib/state/note.svelte'
+  import { app } from '../lib/state/app.svelte'
+  import { outline } from '../lib/outline'
+  import { parseSynapses, synapseLabel } from '../lib/synapses'
+  import { strings } from '../lib/strings'
+
+  let { session }: { session: NoteSession } = $props()
+
+  const headings = $derived(outline(session.content))
+
+  /** One entry per distinct target, in order of first appearance. */
+  const synapses = $derived.by(() => {
+    const seen = new Set<string>()
+    const out: { target: string; markdown: boolean; label: string; resolved: string | null; embed: boolean }[] = []
+    for (const ref of parseSynapses(session.content)) {
+      const resolved = app.resolveSynapse(ref.target, ref.markdown, session.path)
+      const key = resolved ?? `?${ref.target.toLowerCase()}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      out.push({ target: ref.target, markdown: ref.markdown, label: synapseLabel({ target: ref.target }), resolved, embed: ref.embed })
+    }
+    return out
+  })
+</script>
+
+<aside class="panel" aria-label={strings.details.label}>
+  <section>
+    <h2>{strings.details.outline}</h2>
+    {#if headings.length === 0}
+      <p class="empty">{strings.details.noHeadings}</p>
+    {:else}
+      <ol class="outline">
+        {#each headings as h (h.line)}
+          <li class="level-{Math.min(h.level, 4)}">
+            <button type="button" onclick={() => (app.scrollRequest = { line: h.line, slug: h.slug })}>{h.text}</button>
+          </li>
+        {/each}
+      </ol>
+    {/if}
+  </section>
+
+  <section>
+    <h2>{strings.details.outgoing} <span class="count">{synapses.length}</span></h2>
+    {#if synapses.length === 0}
+      <p class="empty">{strings.details.noSynapses}</p>
+    {:else}
+      <ul class="synapses">
+        {#each synapses as s (s.resolved ?? s.target)}
+          <li>
+            <button
+              type="button"
+              class:unresolved={!s.resolved}
+              onclick={() => void app.openSynapse(s.target, s.markdown, session.path)}
+            >
+              <span class="dot" aria-hidden="true"></span>
+              <span class="label">{s.label}</span>
+              {#if !s.resolved}<span class="hint">· {strings.details.notCreated}</span>{:else if s.embed}<span class="hint">· {strings.details.embed}</span>{/if}
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </section>
+</aside>
+
+<style>
+  .panel {
+    width: 280px;
+    flex: none;
+    overflow: auto;
+    padding: 20px 14px;
+    border-left: 1px solid var(--line);
+    background: var(--bg-raised);
+    font-size: var(--text-sm);
+  }
+  section + section {
+    margin-top: 24px;
+  }
+  h2 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .count {
+    padding: 0 6px;
+    border-radius: 999px;
+    background: var(--bg-sunken);
+    font-size: 11px;
+    letter-spacing: 0;
+  }
+  .empty {
+    margin: 0 0 0 6px;
+    color: var(--text-faint);
+  }
+  ol,
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 28px;
+    padding: 3px 8px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    text-align: left;
+    cursor: pointer;
+  }
+  button:hover {
+    background: var(--bg-hover);
+    color: var(--text);
+  }
+  .level-2 button {
+    padding-left: 20px;
+  }
+  .level-3 button {
+    padding-left: 32px;
+  }
+  .level-4 button {
+    padding-left: 44px;
+  }
+  .dot {
+    width: 7px;
+    height: 7px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .unresolved .dot {
+    border: 1px dashed var(--text-faint);
+    background: transparent;
+  }
+  .label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .hint {
+    flex: none;
+    color: var(--text-faint);
+  }
+  @media (max-width: 1100px) {
+    .panel {
+      display: none;
+    }
+  }
+</style>

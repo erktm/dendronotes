@@ -10,6 +10,9 @@ const dist = new URL('../dist/', import.meta.url).pathname
 const allowed = [
   /^http:\/\/www\.w3\.org\/(1999\/xhtml|2000\/svg|1999\/xlink|XML\/1998\/namespace|1998\/Math\/MathML)$/,
   /^https:\/\/svelte\.dev\/e\/[a-z_]+$/,
+  // markdown-it's linkify builds "http://${host}" for bare domains in notes;
+  // a template in code, never a request.
+  /^https?:\/\/\$\{[\w.]+\}$/,
 ]
 const urlPattern = /\bhttps?:\/\/[^\s"'`<>)\\]+/g
 const textFile = /\.(html|js|css|svg|json|txt|webmanifest)$/

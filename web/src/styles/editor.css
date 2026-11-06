@@ -1,0 +1,394 @@
+/*
+ * Editor (CodeMirror, live preview) and reading view.
+ * Design variant A: Inter for note text, synapses as underlined accent text.
+ */
+
+.note-surface {
+  --note-font: var(--font-ui);
+  --note-size: 16px;
+  --note-leading: 1.72;
+  --note-measure: none;
+}
+.note-surface.serif {
+  --note-font: var(--font-serif);
+  --note-size: 18px;
+  --note-leading: 1.66;
+}
+.note-surface.readable {
+  --note-measure: 68ch;
+}
+
+/* --- CodeMirror ---------------------------------------------------------- */
+
+.cm-editor {
+  height: 100%;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--note-size);
+}
+.cm-editor.cm-focused {
+  outline: none;
+}
+.cm-editor .cm-scroller {
+  font-family: var(--note-font);
+  line-height: var(--note-leading);
+}
+.cm-editor .cm-content {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: calc(var(--note-measure) + 96px);
+  margin: 0 auto;
+  padding: 40px 48px 120px;
+  caret-color: var(--accent);
+  tab-size: 4;
+}
+.cm-editor .cm-line {
+  padding: 0 2px;
+}
+.cm-editor .cm-cursor,
+.cm-editor .cm-dropCursor {
+  border-left: 2px solid var(--accent);
+}
+.cm-editor .cm-selectionLayer .cm-selectionBackground,
+.cm-editor.cm-focused .cm-selectionLayer .cm-selectionBackground {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+}
+.cm-editor .cm-placeholder {
+  color: var(--text-faint);
+}
+.cm-editor .cm-md-active {
+  background: color-mix(in srgb, var(--accent-soft) 50%, transparent);
+}
+
+/* Tokens (source and live preview) */
+.tok-heading,
+.tok-strong {
+  font-weight: 650;
+}
+.tok-em {
+  font-style: italic;
+}
+.tok-strike {
+  text-decoration: line-through;
+}
+.tok-link {
+  color: var(--accent);
+}
+.tok-code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+}
+.tok-quote {
+  color: var(--text-muted);
+}
+.tok-mark {
+  color: var(--text-faint);
+  font-weight: 400;
+  font-style: normal;
+}
+
+/* Headings */
+.cm-editor .cm-line.cm-h {
+  font-family: var(--note-font);
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+}
+.cm-editor .cm-line.cm-h1 {
+  padding-bottom: 6px;
+  font-size: 1.85em;
+}
+.cm-editor .cm-line.cm-h2 {
+  padding-top: 18px;
+  font-size: 1.32em;
+}
+.cm-editor .cm-line.cm-h3 {
+  padding-top: 12px;
+  font-size: 1.15em;
+}
+.cm-editor .cm-line.cm-h4,
+.cm-editor .cm-line.cm-h5,
+.cm-editor .cm-line.cm-h6 {
+  padding-top: 8px;
+  font-size: 1.02em;
+}
+
+/* Inline */
+.cm-em {
+  font-style: italic;
+}
+.cm-strong {
+  font-weight: 650;
+}
+.cm-strike {
+  text-decoration: line-through;
+}
+.cm-inline-code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--code-bg);
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+}
+.cm-synapse,
+.cm-link {
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  cursor: pointer;
+}
+.cm-link {
+  font-weight: inherit;
+}
+.cm-synapse.cm-unresolved {
+  color: var(--text-muted);
+  text-decoration-style: dashed;
+  text-decoration-color: var(--text-faint);
+}
+.cm-md-active .cm-synapse,
+.cm-md-active .cm-link {
+  cursor: text;
+}
+.cm-attachment {
+  color: var(--text-muted);
+}
+
+/* Blocks */
+.cm-editor .cm-line.cm-quote {
+  padding-left: 16px;
+  border-left: 3px solid var(--line-strong);
+  color: var(--text-muted);
+  font-style: italic;
+}
+.cm-editor .cm-line.cm-codeblock {
+  padding: 0 16px;
+  background: var(--code-bg);
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  line-height: 1.65;
+}
+.cm-editor .cm-line.cm-codeblock-start {
+  padding-top: 8px;
+  border-radius: 8px 8px 0 0;
+}
+.cm-editor .cm-line.cm-codeblock-end {
+  padding-bottom: 8px;
+  border-radius: 0 0 8px 8px;
+}
+.cm-fence-label {
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+.cm-bullet {
+  display: inline-block;
+  width: 1ch;
+  color: var(--text-faint);
+}
+.cm-rule {
+  display: inline-block;
+  width: 100%;
+  height: 1px;
+  background: var(--line);
+  vertical-align: middle;
+}
+.cm-task-box {
+  width: 15px;
+  height: 15px;
+  margin: 0 8px 0 0;
+  vertical-align: -2px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.cm-task-done {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+.cm-chip {
+  display: inline-block;
+  padding: 0 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 0.85em;
+}
+
+/* Autocomplete, search panel */
+.cm-editor .cm-tooltip {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  font-family: var(--font-ui);
+  font-size: 13.5px;
+}
+.cm-editor .cm-tooltip-autocomplete > ul > li {
+  padding: 4px 10px;
+}
+.cm-editor .cm-tooltip-autocomplete > ul > li[aria-selected] {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.cm-editor .cm-completionDetail {
+  margin-left: 10px;
+  color: var(--text-faint);
+  font-style: normal;
+}
+.cm-editor .cm-completionMatchedText {
+  color: var(--accent-strong);
+  font-weight: 650;
+  text-decoration: none;
+}
+.cm-editor .cm-panels {
+  border-color: var(--line);
+  background: var(--bg-raised);
+  color: var(--text);
+  font-family: var(--font-ui);
+}
+.cm-editor .cm-panel.cm-search input,
+.cm-editor .cm-panel.cm-search button {
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.cm-editor .cm-searchMatch {
+  background: color-mix(in srgb, var(--warn-text) 22%, transparent);
+}
+.cm-editor .cm-searchMatch-selected,
+.cm-editor .cm-selectionMatch {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* --- Reading view -------------------------------------------------------- */
+
+.reading {
+  box-sizing: border-box;
+  max-width: calc(var(--note-measure) + 96px);
+  margin: 0 auto;
+  padding: 40px 48px 120px;
+  font-family: var(--note-font);
+  font-size: var(--note-size);
+  line-height: var(--note-leading);
+  overflow-wrap: anywhere;
+}
+.reading :is(h1, h2, h3, h4, h5, h6) {
+  margin: 1.4em 0 0.4em;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+  scroll-margin-top: 24px;
+}
+.reading h1 {
+  margin-top: 0;
+  font-size: 1.85em;
+}
+.reading h2 {
+  font-size: 1.32em;
+}
+.reading h3 {
+  font-size: 1.15em;
+}
+.reading :is(h4, h5, h6) {
+  font-size: 1.02em;
+}
+.reading p,
+.reading ul,
+.reading ol,
+.reading blockquote,
+.reading pre,
+.reading table {
+  margin: 0 0 0.9em;
+}
+.reading ul,
+.reading ol {
+  padding-left: 1.4em;
+}
+.reading li.task {
+  margin-left: -1.4em;
+  list-style: none;
+}
+.reading li.task.done {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+.reading .task-box {
+  width: 15px;
+  height: 15px;
+  margin: 0 8px 0 0;
+  vertical-align: -2px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.reading a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.reading a.synapse {
+  font-weight: 500;
+}
+.reading a.synapse.unresolved {
+  color: var(--text-muted);
+  text-decoration-style: dashed;
+  text-decoration-color: var(--text-faint);
+}
+.reading blockquote {
+  padding: 2px 0 2px 16px;
+  border-left: 3px solid var(--line-strong);
+  color: var(--text-muted);
+  font-style: italic;
+}
+.reading code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--code-bg);
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+}
+.reading pre {
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--code-bg);
+  overflow-x: auto;
+}
+.reading pre code {
+  padding: 0;
+  background: none;
+  line-height: 1.65;
+}
+.reading hr {
+  margin: 1.6em 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+.reading table {
+  border-collapse: collapse;
+  font-size: 0.92em;
+}
+.reading th,
+.reading td {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  text-align: left;
+}
+.reading .attachment,
+.reading .embedded-note {
+  display: inline-block;
+  padding: 0 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 0.85em;
+}

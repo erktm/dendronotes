@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig, type Plugin } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 import { writeFileSync } from 'node:fs'
@@ -22,7 +23,13 @@ export default defineConfig({
     // No data: URIs for fonts/images: the CSP only allows fonts from 'self'.
     assetsInlineLimit: 0,
     modulePreload: { polyfill: false },
+    // CodeMirror dominates the main chunk (~300 kB gzipped); Vim is split off.
+    chunkSizeWarningLimit: 1024,
     sourcemap: false,
+  },
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.ts'],
   },
   server: {
     port: 5173,

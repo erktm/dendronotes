@@ -26,6 +26,8 @@ export class NoteSession {
   readOnly = $state(false)
   /** ETag of the version on disk when a save hit a conflict. */
   conflict = $state<string | null>(null)
+  /** Content of the version on disk during a conflict (for the comparison). */
+  disk = $state<string | null>(null)
   saving = $state(false)
   failed = $state(false)
   /** Put the cursor into the editor once loaded (e.g. for a new note). */
@@ -57,6 +59,7 @@ export class NoteSession {
       this.saved = n.content
       this.readOnly = !!n.readOnly
       this.conflict = null
+      this.disk = null
       this.failed = false
       this.status = 'ready'
     } catch (err) {
@@ -92,6 +95,7 @@ export class NoteSession {
         this.etag = meta.etag
         this.saved = text
         this.conflict = null
+        this.disk = null
         this.failed = false
       } catch (err) {
         if (err instanceof ApiError && err.status === 412 && typeof err.body.etag === 'string') {
@@ -115,6 +119,21 @@ export class NoteSession {
     clearTimeout(this.timer)
     if (this.inflight) await this.inflight
     if (this.dirty && this.conflict === null) await this.save()
+  }
+
+  /**
+   * Loads the version on disk for the comparison. Its ETag becomes the
+   * conflict version, so "Keep mine" replaces exactly what was shown.
+   */
+  async loadDisk(): Promise<void> {
+    try {
+      const n = await readNote(this.path)
+      if (this.closed || this.conflict === null) return
+      this.disk = n.content
+      this.conflict = n.etag
+    } catch (err) {
+      if (!this.closed) this.host.toast(errorMessage(err))
+    }
   }
 
   /** Throws away local changes and loads the version on disk. */

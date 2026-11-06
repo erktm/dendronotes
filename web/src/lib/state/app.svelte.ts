@@ -17,6 +17,7 @@ import {
 } from '../paths'
 import { router } from '../router.svelte'
 import { strings } from '../strings'
+import { newNotePath, normalizePath, resolveSynapse } from '../synapses'
 import { buildTree } from '../tree'
 import { NoteSession } from './note.svelte'
 
@@ -62,9 +63,17 @@ class App {
   expanded = new SvelteSet<string>(loadExpanded())
   edit = $state<TreeEdit | null>(null)
 
+  /** Paths of all notes in the soma (for synapses and the quick switcher). */
+  notePaths = $derived(this.entries.filter((e) => e.type === 'file' && isNote(e.path)).map((e) => e.path))
+
   note = $state.raw<NoteSession | null>(null)
   /** A note that should get the cursor when it opens. */
   private focusNext: string | null = null
+
+  switcherOpen = $state(false)
+  settingsOpen = $state(false)
+  /** A heading the open view should scroll to (set by the outline). */
+  scrollRequest = $state.raw<{ line: number; slug: string } | null>(null)
 
   toasts = $state<Toast[]>([])
   confirmRequest = $state.raw<ConfirmRequest | null>(null)
@@ -266,6 +275,44 @@ class App {
       if (!ok) return
     }
     router.go(path)
+  }
+
+  // --- Synapses ----------------------------------------------------------
+
+  /** The note a synapse in fromPath points to, or null if it does not exist yet. */
+  resolveSynapse(target: string, markdown: boolean, fromPath: string): string | null {
+    return resolveSynapse({ target, markdown }, fromPath, this.notePaths)
+  }
+
+  /** Follows a synapse; an unresolved one creates its note first. */
+  async openSynapse(target: string, markdown: boolean, fromPath: string): Promise<void> {
+    const resolved = this.resolveSynapse(target, markdown, fromPath)
+    if (resolved) {
+      await this.navigate(resolved)
+      return
+    }
+    const path = markdown ? normalizePath(join(dirname(fromPath), target)) : newNotePath(target, fromPath)
+    if (!path) {
+      this.toast(strings.errors.byCode.invalid_path!)
+      return
+    }
+    const problem = nameProblem(basename(path))
+    if (problem) {
+      this.toast(problem)
+      return
+    }
+    try {
+      await api.createNote(path)
+    } catch (err) {
+      if (!(err instanceof ApiError && err.code === 'exists')) {
+        this.toast(errorMessage(err))
+        return
+      }
+    }
+    for (const dir of ancestors(path)) this.expanded.add(dir)
+    await this.refresh()
+    this.focusNext = path
+    await this.navigate(path)
   }
 
   /** Follows the URL: opens the note it names (or none). */

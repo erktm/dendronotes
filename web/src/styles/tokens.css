@@ -92,3 +92,34 @@
   --focus: #79c98b;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px rgb(0 0 0 / 0.25);
 }
+
+/* Added for the editor, reading view and conflict view (M2). */
+:root {
+  --font-serif: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --code-bg: #e9eee3;
+  --add-bg: #d9eadb;
+  --del-bg: #f6e0dc;
+  --warn-soft: #f4e9d4;
+  --warn-text: #8a5a0e;
+  --scrim: rgb(20 30 24 / 0.34);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --code-bg: #0a0f0c;
+    --add-bg: #19301f;
+    --del-bg: #3a201e;
+    --warn-soft: #2a2414;
+    --warn-text: #e3b65c;
+    --scrim: rgb(0 0 0 / 0.5);
+  }
+}
+
+:root[data-theme='dark'] {
+  --code-bg: #0a0f0c;
+  --add-bg: #19301f;
+  --del-bg: #3a201e;
+  --warn-soft: #2a2414;
+  --warn-text: #e3b65c;
+  --scrim: rgb(0 0 0 / 0.5);
+}

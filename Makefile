@@ -78,8 +78,8 @@ test-go: ## go vet + Go tests with the race detector
 	go vet ./...
 	go test -race -count=1 ./...
 
-test-web: $(NPM_DEPS) ## Type-check the frontend
-	cd web && npm run check
+test-web: $(NPM_DEPS) ## Type-check the frontend and run its unit tests
+	cd web && npm run check && npm test
 
 fuzz: ## Fuzz the soma path validation for 60 seconds
 	go test -run='^$$' -fuzz=FuzzCleanPath -fuzztime=60s ./internal/soma/

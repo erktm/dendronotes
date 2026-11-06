@@ -10,10 +10,96 @@ export const brand = {
   tagline: 'Self-hosted Markdown notes',
 } as const
 
+/** The platform's main modifier key, for shortcut hints. */
+export const modKey =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+'
+
 export const strings = {
   app: {
     loading: 'Loading',
     title: (note?: string) => (note ? `${note} – ${brand.name}` : brand.name),
+  },
+
+  view: {
+    label: 'View',
+    edit: 'Edit',
+    read: 'Read',
+    editHint: `Edit (${modKey}E)`,
+    readHint: `Read (${modKey}E)`,
+    showDetails: 'Show details panel',
+    hideDetails: 'Hide details panel',
+  },
+
+  editor: {
+    toggleTask: 'Toggle task',
+    openSynapseHint: `${modKey}click to open`,
+    lineCol: (line: number, col: number) => `Ln ${line}, Col ${col}`,
+    words: (n: number) => (n === 1 ? '1 word' : `${n.toLocaleString('en')} words`),
+  },
+
+  reading: {
+    attachment: (name: string) => `Attachment: ${name}`,
+    externalImage: (alt: string) => `External image not loaded: ${alt}`,
+    embeddedNote: 'Embedded note:',
+  },
+
+  details: {
+    label: 'Note details',
+    outline: 'Outline',
+    noHeadings: 'No headings yet',
+    outgoing: 'Synapses',
+    noSynapses: 'No synapses yet',
+    notCreated: 'not created yet',
+    embed: 'embedded',
+  },
+
+  switcher: {
+    title: 'Open a note',
+    open: `Open a note (${modKey}O)`,
+    placeholder: 'Find or create a note …',
+    results: 'Matching notes',
+    empty: 'No matching notes',
+    create: (q: string) => `Create note “${q}”`,
+    inFolder: (folder: string) => (folder ? `in ${folder}` : 'in the soma'),
+    navigate: 'navigate',
+    openKey: 'open',
+    createKey: 'create',
+    close: 'close',
+  },
+
+  conflict: {
+    text: 'Compare both versions and choose one.',
+    yours: 'Your version',
+    yoursHint: 'not saved',
+    disk: 'On disk',
+    diskHint: 'changed elsewhere',
+    loading: 'Loading the version on disk …',
+    explain: 'Both sides show their changes against the version you opened. Nothing is overwritten until you choose.',
+  },
+
+  settings: {
+    title: 'Settings',
+    open: `Settings (${modKey},)`,
+    close: 'Close settings',
+    editor: 'Editor',
+    livePreview: 'Live preview',
+    livePreviewDesc: 'Render Markdown as you type; the line with the cursor shows its syntax.',
+    vim: 'Vim key bindings',
+    vimDesc: 'Normal, insert and visual mode in the editor.',
+    readable: 'Readable line length',
+    readableDesc: 'Keep lines to about 70 characters.',
+    noteFont: 'Note font',
+    sans: 'Sans',
+    serif: 'Serif',
+    appearance: 'Appearance',
+    theme: 'Theme',
+    system: 'System',
+    light: 'Light',
+    dark: 'Dark',
+    details: 'Show details panel',
+    detailsDesc: 'Outline and synapses next to the note.',
+    soma: 'Soma',
+    stored: 'Settings are stored in this browser. Your notes stay plain Markdown files; nothing is written into the soma.',
   },
 
   auth: {
@@ -40,10 +126,8 @@ export const strings = {
     files: 'Files',
     showFiles: 'Show files',
     hideFiles: 'Hide files',
-    search: 'Search',
-    searchSoon: 'Search (coming soon)',
+    search: 'Open a note',
     settings: 'Settings',
-    settingsSoon: 'Settings (coming soon)',
   },
 
   soma: {
