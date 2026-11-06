@@ -5,9 +5,10 @@ everything else – search index, sessions – is a derived cache that can be re
 
 One container, one process, no external services, no external requests (air-gap friendly).
 
-> **Status: milestone 1** – soma access, authentication, file tree (create, rename, move by
-> drag & drop, delete to `.trash`) and a plain editor with autosave and conflict detection.
-> Live preview, search, synapses (wiki links and backlinks) and live sync follow in M2–M5.
+> **Status: milestone 2** – soma access, authentication, file tree, an editor with live
+> preview and optional Vim key bindings, a reading view, synapses (click to open or create),
+> quick switcher, outline and a side-by-side conflict view. Search, backlinks and live sync
+> follow in M3, attachments in M4, Kubernetes manifests in M5.
 
 ## Vocabulary
 
@@ -27,7 +28,7 @@ Requirements: Go ≥ 1.26, Node 26 / npm, Docker (for the image).
 
 ```bash
 make dev          # Go server :8080 + Vite dev server :5173 (soma: ./dev/soma)
-make test         # go vet, Go tests (-race), Svelte type check
+make test         # go vet, Go tests (-race), Svelte type check, frontend unit tests (Vitest)
 make fuzz         # fuzz the path validation for 60 s
 make build        # bin/dendronotes with the embedded frontend
 make image        # build the container image and load it into Docker
@@ -35,6 +36,36 @@ make run-image    # run the image hardened (read-only, no capabilities)
 ```
 
 `make dev` creates a random password in `dev/password` on first start and prints it.
+
+## Writing notes
+
+- **Edit and Read.** The editor renders Markdown as you type (live preview); the line with
+  the cursor shows its syntax. The reading view shows the finished note. Switch with the
+  toggle in the top bar or ⌘E / Ctrl+E.
+- **Synapses.** Type `[[` for suggestions from the soma. Click a synapse to open the note –
+  in the editor, on the line you are editing, hold ⌘ / Ctrl while clicking. A synapse whose
+  note does not exist yet is shown dashed; clicking it creates the note next to the current
+  one (or at the path given, e.g. `[[Projects/Idea]]`). Markdown links to notes, such as
+  `[Text](Other.md)`, are synapses too.
+- **Tasks.** Checkboxes (`- [ ]`) can be ticked in both views; the file changes accordingly.
+- **Details panel.** Outline of the note and its outgoing synapses (on wide screens).
+- **Saving.** Notes save automatically while you type (⌘S / Ctrl+S saves at once). If the
+  file was changed elsewhere in the meantime, nothing is overwritten: a comparison of both
+  versions appears and you choose "Keep mine" or "Use version on disk".
+
+| Shortcut         | Action                         |
+|------------------|--------------------------------|
+| ⌘O / Ctrl+O      | Quick switcher: open or create a note (Shift+Enter creates) |
+| ⌘E / Ctrl+E      | Switch between edit and read   |
+| ⌘S / Ctrl+S      | Save now                       |
+| ⌘, / Ctrl+,      | Settings                       |
+
+**Settings** (stored in the browser, never in the soma): live preview, Vim key bindings,
+readable line length, note font (sans or serif), theme (system, light, dark) and the
+details panel.
+
+Images and embedded files are shown as placeholders until attachments arrive in M4;
+images from other hosts are never loaded.
 
 ## Running the container
 
@@ -113,7 +144,12 @@ sure only the proxy can reach dendronotes (Kubernetes: a NetworkPolicy).
 - State-changing requests from other origins are rejected (`Sec-Fetch-Site`/`Origin`); the API
   only accepts JSON bodies.
 - Strict Content-Security-Policy with per-response nonce; no inline scripts, no `eval`, no
-  external hosts.
+  external hosts. The only inline style allowed is the exact `tab-size: 4` attribute the
+  editor sets (by hash).
+- Note content is untrusted: the reading view renders it with markdown-it and sanitizes the
+  result with DOMPurify (no scripts, event handlers, style attributes, forms, frames, SVG or
+  `javascript:` URLs). External links open with `rel="noopener noreferrer"`. A test corpus of
+  XSS payloads guards this.
 
 ## API
 
@@ -157,6 +193,8 @@ internal/clientip/ client address behind trusted proxies
 internal/httpx/    JSON helpers
 internal/server/   route table, middleware (CSP with nonce, logging, recovery), health, assets
 web/               Svelte 5 frontend (Vite), embedded into the binary via go:embed
+  src/lib/editor/  CodeMirror 6 setup, live preview, synapse syntax
+  src/lib/         Markdown rendering + sanitizing, synapse resolution, state, UI strings
 docs/openapi.yaml  API description
 ```
 
