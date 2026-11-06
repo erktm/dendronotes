@@ -135,6 +135,7 @@ All variables carry the `DENDRONOTES_` prefix. Variables without it are ignored.
 | `DENDRONOTES_COOKIE_SECURE`            | `auto`             | `auto` (secure over HTTPS), `true` or `false`              |
 | `DENDRONOTES_AUTH_PROXY_HEADER`        | `X-Forwarded-User` | Header carrying the user name in proxy mode                |
 | `DENDRONOTES_AUTH_PROXY_ALLOWED_USERS` |                    | Optional comma-separated allow list for proxy mode         |
+| `DENDRONOTES_MAX_UPLOAD_MB`            | `25`               | Largest file that can be uploaded (images, PDFs, media …)  |
 | `DENDRONOTES_AUTH_PROXY_LOGOUT_URL`    |                    | Where "Sign out" leads in proxy mode, e.g. `/oauth2/sign_out` |
 
 Exactly one of the three password variables is required in password mode; without

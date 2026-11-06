@@ -38,6 +38,8 @@ func (s *Server) routes() []route {
 		{"PUT", "/api/soma/notes/{path...}", s.handleWriteNote, false},
 		{"POST", "/api/soma/notes/{path...}", s.handleCreateNote, false},
 		{"POST", "/api/soma/folders/{path...}", s.handleMkdir, false},
+		{"GET", "/api/soma/files/{path...}", s.handleReadFile, false},
+		{"POST", "/api/soma/files/{path...}", s.handleUpload, false},
 		{"POST", "/api/soma/move", s.handleMove, false},
 		{"DELETE", "/api/soma/entries/{path...}", s.handleTrash, false},
 		{"GET", "/api/soma/search", s.handleSearch, false},
@@ -282,6 +284,8 @@ func (s *Server) somaError(w http.ResponseWriter, r *http.Request, err error) {
 		httpx.Error(w, http.StatusBadRequest, "not_a_directory")
 	case errors.Is(err, soma.ErrMoveIntoSelf):
 		httpx.Error(w, http.StatusBadRequest, "move_into_self")
+	case errors.Is(err, soma.ErrType):
+		httpx.Error(w, http.StatusUnsupportedMediaType, "unsupported_type")
 	default:
 		s.log.Error("soma operation failed", "method", r.Method, "path", r.URL.Path, "err", err)
 		httpx.Error(w, http.StatusInternalServerError, "internal_error")

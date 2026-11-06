@@ -33,6 +33,7 @@ const (
 	EnvShutdownTimeout  = Prefix + "SHUTDOWN_TIMEOUT"
 	EnvTrustedProxies   = Prefix + "TRUSTED_PROXIES"
 	EnvMaxNoteMB        = Prefix + "MAX_NOTE_MB"
+	EnvMaxUploadMB      = Prefix + "MAX_UPLOAD_MB"
 	EnvIgnore           = Prefix + "IGNORE"
 	EnvRescanInterval   = Prefix + "RESCAN_INTERVAL"
 	EnvAuthMode         = Prefix + "AUTH_MODE"
@@ -50,7 +51,7 @@ const (
 // (enforced by a test).
 var Vars = []string{
 	EnvSomaDir, EnvDataDir, EnvHTTPPort, EnvLogLevel, EnvLogFormat, EnvShutdownTimeout,
-	EnvTrustedProxies, EnvMaxNoteMB, EnvIgnore, EnvRescanInterval, EnvAuthMode, EnvPasswordHash,
+	EnvTrustedProxies, EnvMaxNoteMB, EnvMaxUploadMB, EnvIgnore, EnvRescanInterval, EnvAuthMode, EnvPasswordHash,
 	EnvPasswordHashFile, EnvPasswordFile, EnvSessionTTL, EnvCookieSecure,
 	EnvProxyHeader, EnvProxyAllowed, EnvProxyLogoutURL,
 }
@@ -65,6 +66,7 @@ type Config struct {
 	ShutdownTimeout time.Duration  // max. time to drain on shutdown
 	TrustedProxies  []netip.Prefix // reverse proxies whose X-Forwarded-* headers are believed
 	MaxNoteBytes    int64          // largest note the editor opens or saves
+	MaxUploadBytes  int64          // largest file that can be uploaded
 	Ignore          []string       // extra name patterns hidden from the tree
 	RescanInterval  time.Duration  // periodic full comparison of soma and index; 0 = off
 	Auth            Auth
@@ -100,6 +102,7 @@ const (
 	DefaultRescanInterval  = 5 * time.Minute
 	DefaultSessionTTL      = 30 * 24 * time.Hour
 	DefaultMaxNoteMB       = 5
+	DefaultMaxUploadMB     = 25
 	DefaultProxyHeader     = "X-Forwarded-User"
 	minPasswordLen         = 8
 )
@@ -116,6 +119,7 @@ func Load(getenv func(string) string) (Config, error) {
 		ShutdownTimeout: DefaultShutdownTimeout,
 		RescanInterval:  DefaultRescanInterval,
 		MaxNoteBytes:    DefaultMaxNoteMB << 20,
+		MaxUploadBytes:  DefaultMaxUploadMB << 20,
 		Auth: Auth{
 			Mode:         "password",
 			SessionTTL:   DefaultSessionTTL,
@@ -188,6 +192,15 @@ func Load(getenv func(string) string) (Config, error) {
 			add(fmt.Errorf("%s: %q must be a whole number between 1 and 100", EnvMaxNoteMB, v))
 		} else {
 			c.MaxNoteBytes = int64(mb) << 20
+		}
+	}
+
+	if v := getenv(EnvMaxUploadMB); v != "" {
+		mb, err := strconv.Atoi(v)
+		if err != nil || mb < 1 || mb > 4096 {
+			add(fmt.Errorf("%s: %q must be a whole number between 1 and 4096", EnvMaxUploadMB, v))
+		} else {
+			c.MaxUploadBytes = int64(mb) << 20
 		}
 	}
 

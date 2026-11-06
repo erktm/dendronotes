@@ -189,6 +189,50 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409": { $ref: "#/components/responses/Error" }
+  /api/soma/files/{path}:
+    parameters:
+      - $ref: "#/components/parameters/path"
+    get:
+      summary: Download a file (attachments, images, media)
+      description: >
+        The content type follows the file extension; types not on the upload
+        allow list are served as downloads. Responses carry a sandboxing CSP
+        and `nosniff`, support range and conditional requests.
+      responses:
+        "200": { description: The file. }
+        "206": { description: Part of the file (range request). }
+        "304": { description: Not modified. }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/Error" }
+    post:
+      summary: Upload a file
+      description: >
+        The request body is the raw file content (any Content-Type). The
+        extension must be on the allow list and the content must match it
+        (images, PDF, audio, video, text, zip). At most
+        DENDRONOTES_MAX_UPLOAD_MB. Missing parent folders are created.
+      parameters:
+        - name: unique
+          in: query
+          description: With 1, a taken name gets a " (n)" suffix instead of failing with 409.
+          schema: { type: string, enum: ["1"] }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        "201":
+          description: Stored; `path` may differ from the requested one with unique=1.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Entry" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Error" }
+        "413": { $ref: "#/components/responses/Error" }
+        "415": { $ref: "#/components/responses/Error" }
   /api/soma/move:
     post:
       summary: Rename or move a file or folder
@@ -362,7 +406,7 @@ components:
             read_only, too_large, is_directory, not_a_directory, move_into_self,
             if_match_required, content_required, bad_request,
             unsupported_media_type, cross_origin_request, query_too_long,
-            invalid_limit, too_many_streams, internal_error.
+            invalid_limit, too_many_streams, unsupported_type, internal_error.
     Readiness:
       type: object
       properties:

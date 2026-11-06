@@ -22,13 +22,15 @@ const nonceKey ctxKey = iota
 // only with a nonce (for CodeMirror's fallback without adoptedStyleSheets).
 // Inline style attributes are blocked, except exactly one: CodeMirror sets
 // style="tab-size: 4" on its content element (allowed by its hash).
-// img-src allows no foreign hosts: external images in notes stay blocked
-// (air-gap friendly, no tracking pixels).
+// img-src and media-src allow no foreign hosts: external images in notes stay
+// blocked (air-gap friendly, no tracking pixels); attachments come from
+// /api/soma/files/.
 const cspTemplate = "default-src 'none'; " +
 	"script-src 'self'; " +
 	"style-src 'self' 'nonce-%s'; " +
 	"style-src-attr 'unsafe-hashes' '" + codeMirrorTabSizeHash + "'; " +
 	"img-src 'self' data: blob:; " +
+	"media-src 'self'; " +
 	"font-src 'self'; " +
 	"connect-src 'self'; " +
 	"manifest-src 'self'; " +

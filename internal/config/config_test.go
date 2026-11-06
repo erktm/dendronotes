@@ -47,7 +47,7 @@ func TestDefaults(t *testing.T) {
 		c.RescanInterval != 5*time.Minute {
 		t.Errorf("unexpected defaults: %+v", c)
 	}
-	if c.MaxNoteBytes != 5<<20 || c.Auth.Mode != "password" || c.Auth.SessionTTL != 30*24*time.Hour ||
+	if c.MaxNoteBytes != 5<<20 || c.MaxUploadBytes != 25<<20 || c.Auth.Mode != "password" || c.Auth.SessionTTL != 30*24*time.Hour ||
 		c.Auth.CookieSecure != "auto" || c.Auth.ProxyHeader != "X-Forwarded-User" {
 		t.Errorf("unexpected defaults: %+v", c)
 	}
@@ -117,7 +117,7 @@ func TestValuesParsed(t *testing.T) {
 		EnvHTTPPort: "9000", EnvLogLevel: "debug", EnvLogFormat: "TEXT", EnvShutdownTimeout: "5s",
 		EnvTrustedProxies: "10.0.0.0/8, 192.168.1.10", EnvMaxNoteMB: "12",
 		EnvIgnore: "node_modules, *.tmp", EnvSessionTTL: "12h", EnvCookieSecure: "true",
-		EnvRescanInterval: "0",
+		EnvRescanInterval: "0", EnvMaxUploadMB: "100",
 	}))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -129,7 +129,7 @@ func TestValuesParsed(t *testing.T) {
 	if len(c.TrustedProxies) != 2 || c.TrustedProxies[1].String() != "192.168.1.10/32" {
 		t.Errorf("trusted proxies: %v", c.TrustedProxies)
 	}
-	if c.MaxNoteBytes != 12<<20 || len(c.Ignore) != 2 || c.Ignore[1] != "*.tmp" {
+	if c.MaxNoteBytes != 12<<20 || c.MaxUploadBytes != 100<<20 || len(c.Ignore) != 2 || c.Ignore[1] != "*.tmp" {
 		t.Errorf("max note size / ignore: %d %v", c.MaxNoteBytes, c.Ignore)
 	}
 	if c.Auth.SessionTTL != 12*time.Hour || c.Auth.CookieSecure != "true" {
@@ -148,6 +148,7 @@ func TestInvalidValues(t *testing.T) {
 		EnvMaxNoteMB:       "0",
 		EnvIgnore:          "a/b",
 		EnvRescanInterval:  "1s",
+		EnvMaxUploadMB:     "0",
 		EnvSessionTTL:      "1m",
 		EnvCookieSecure:    "maybe",
 		EnvAuthMode:        "ldap",

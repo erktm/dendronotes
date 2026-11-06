@@ -20,6 +20,7 @@ var (
 	ErrNotDir       = errors.New("not a directory")
 	ErrIsDir        = errors.New("is a directory")
 	ErrMoveIntoSelf = errors.New("cannot move a folder into itself")
+	ErrType         = errors.New("file type not allowed")
 )
 
 // ConflictError is returned when a write is based on an outdated version.

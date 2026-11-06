@@ -454,3 +454,76 @@ func TestStat(t *testing.T) {
 		}
 	}
 }
+
+func TestCreateFile(t *testing.T) {
+	s, dir, _ := setup(t)
+	allowAll := func([]byte) error { return nil }
+	png := "\x89PNG\r\n\x1a\nrest of the image"
+
+	e, err := s.CreateFile("Projects/photo.png", strings.NewReader(png), 1<<20, false, allowAll)
+	if err != nil || e.Path != "Projects/photo.png" || e.Size != int64(len(png)) {
+		t.Fatalf("CreateFile: %+v, %v", e, err)
+	}
+	if _, err := s.CreateFile("Projects/photo.png", strings.NewReader(png), 1<<20, false, allowAll); !errors.Is(err, ErrExists) {
+		t.Errorf("existing name: %v", err)
+	}
+	if e, err := s.CreateFile("Projects/photo.png", strings.NewReader(png), 1<<20, true, allowAll); err != nil || e.Path != "Projects/photo (1).png" {
+		t.Errorf("unique name: %+v, %v", e, err)
+	}
+
+	// Too large: nothing remains, not even the temporary file.
+	if _, err := s.CreateFile("big.bin", strings.NewReader(strings.Repeat("x", 2000)), 1000, false, allowAll); !errors.Is(err, ErrTooLarge) {
+		t.Errorf("too large: %v", err)
+	}
+	// Exactly the limit is fine.
+	if _, err := s.CreateFile("limit.bin", strings.NewReader(strings.Repeat("x", 1000)), 1000, false, allowAll); err != nil {
+		t.Errorf("at the limit: %v", err)
+	}
+	// The check sees the first bytes and can refuse.
+	var seen string
+	refuse := func(head []byte) error { seen = string(head); return errors.New("no") }
+	if _, err := s.CreateFile("evil.png", strings.NewReader("<html>"), 1000, false, refuse); !errors.Is(err, ErrType) || seen != "<html>" {
+		t.Errorf("refused type: %v (saw %q)", err, seen)
+	}
+	for _, p := range []string{"../outside.png", ".hidden/x.png", "node_modules/x.png", "a/.x.png", "/abs.png"} {
+		if _, err := s.CreateFile(p, strings.NewReader(png), 1000, false, allowAll); err == nil {
+			t.Errorf("CreateFile(%q) succeeded", p)
+		}
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	if want := []string{"Projects", "limit.bin"}; !slices.Equal(names, want) {
+		t.Errorf("soma contains %v, want %v (no temporary or refused files)", names, want)
+	}
+}
+
+func TestOpenFile(t *testing.T) {
+	s, dir, outside := setup(t)
+	write(t, filepath.Join(dir, "a.png"), "png")
+	write(t, filepath.Join(dir, ".git", "x"), "hidden")
+	symlink(t, filepath.Join(outside, "secret.md"), filepath.Join(dir, "escape.md"))
+	f, e, err := s.OpenFile("a.png")
+	if err != nil || e.Size != 3 {
+		t.Fatalf("OpenFile: %+v %v", e, err)
+	}
+	f.Close()
+	for _, p := range []string{".git/x", "escape.md", "missing.png", "../outside/secret.md"} {
+		if f, _, err := s.OpenFile(p); err == nil {
+			f.Close()
+			t.Errorf("OpenFile(%q) succeeded", p)
+		}
+	}
+	if err := os.Mkdir(filepath.Join(dir, "folder"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.OpenFile("folder"); !errors.Is(err, ErrIsDir) {
+		t.Errorf("folder: %v", err)
+	}
+}

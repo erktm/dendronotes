@@ -51,6 +51,7 @@ func testConfig(t *testing.T) config.Config {
 		LogFormat:       "json",
 		ShutdownTimeout: 5 * time.Second,
 		MaxNoteBytes:    1 << 20,
+		MaxUploadBytes:  1 << 20,
 		Auth: config.Auth{
 			Mode:         "password",
 			Password:     testPassword,
