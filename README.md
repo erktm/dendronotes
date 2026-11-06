@@ -9,7 +9,8 @@ One container, one process, no external services, no external requests (air-gap 
 > preview and optional Vim key bindings, a reading view, synapses with backlinks, full-text
 > search with tags, live updates when files change on disk, synapses that follow renamed
 > notes, and attachments: images, audio, video and other files, uploaded by paste or drag &
-> drop and shown in notes, plus embedded notes. Kubernetes manifests follow in M5.
+> drop and shown in notes, plus embedded notes, and a graph of all notes and synapses.
+> Kubernetes manifests follow in M5.
 
 ## Vocabulary
 
@@ -64,6 +65,11 @@ make run-image    # run the image hardened (read-only, no capabilities)
   Standard Markdown works too: `![alt](photo.png)`, `[report](report.pdf)`. Clicking a file in
   the tree shows it with its size and a download button. Images from other hosts are never
   loaded.
+- **Graph** (⌘⇧G / Ctrl+Shift+G, or the graph button in the left rail). All notes as
+  nodes, synapses as lines, sized by their number of synapses; unresolved synapses point to
+  dashed nodes. Hover a note to see its neighborhood, click to open it, drag to arrange, scroll
+  or use the buttons to zoom. "Around …" shows only the neighborhood of the note opened last,
+  one to three steps deep; notes without synapses and unresolved synapses can be hidden.
 - **Embedded notes.** `![[Note]]` shows another note inside this one in the reading view,
   `![[Note#Heading]]` only that section (up to three levels deep).
 - **Renaming and moving.** Synapses in other notes are rewritten so they keep pointing to the
@@ -80,6 +86,7 @@ make run-image    # run the image hardened (read-only, no capabilities)
 |------------------|--------------------------------|
 | ⌘O / Ctrl+O      | Quick switcher: open or create a note (Shift+Enter creates) |
 | ⌘⇧F / Ctrl+Shift+F | Search notes                 |
+| ⌘⇧G / Ctrl+Shift+G | Graph (again: back to the note) |
 | ⌘E / Ctrl+E      | Switch between edit and read   |
 | ⌘S / Ctrl+S      | Save now                       |
 | ⌘, / Ctrl+,      | Settings                       |
@@ -222,6 +229,7 @@ is in [`docs/openapi.yaml`](docs/openapi.yaml), which a test keeps in sync with 
 | `GET /api/soma/search?q=`               | Full-text search (words, "phrases", #tags)           |
 | `GET /api/soma/backlinks/{path}`        | Notes with synapses to a note                        |
 | `GET /api/soma/tags`                    | All tags with their number of notes                  |
+| `GET /api/soma/graph`                   | All notes and the synapses between them              |
 | `GET /api/soma/events`                  | Live updates (Server-Sent Events)                    |
 
 ## Air gap and reproducible builds
