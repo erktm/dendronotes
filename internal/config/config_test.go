@@ -43,7 +43,8 @@ func TestDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if c.Port != 8080 || c.LogLevel != slog.LevelInfo || c.LogFormat != "json" || c.ShutdownTimeout != 20*time.Second {
+	if c.Port != 8080 || c.LogLevel != slog.LevelInfo || c.LogFormat != "json" || c.ShutdownTimeout != 20*time.Second ||
+		c.RescanInterval != 5*time.Minute {
 		t.Errorf("unexpected defaults: %+v", c)
 	}
 	if c.MaxNoteBytes != 5<<20 || c.Auth.Mode != "password" || c.Auth.SessionTTL != 30*24*time.Hour ||
@@ -116,11 +117,13 @@ func TestValuesParsed(t *testing.T) {
 		EnvHTTPPort: "9000", EnvLogLevel: "debug", EnvLogFormat: "TEXT", EnvShutdownTimeout: "5s",
 		EnvTrustedProxies: "10.0.0.0/8, 192.168.1.10", EnvMaxNoteMB: "12",
 		EnvIgnore: "node_modules, *.tmp", EnvSessionTTL: "12h", EnvCookieSecure: "true",
+		EnvRescanInterval: "0",
 	}))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if c.Port != 9000 || c.LogLevel != slog.LevelDebug || c.LogFormat != "text" || c.ShutdownTimeout != 5*time.Second {
+	if c.Port != 9000 || c.LogLevel != slog.LevelDebug || c.LogFormat != "text" || c.ShutdownTimeout != 5*time.Second ||
+		c.RescanInterval != 0 {
 		t.Errorf("values not applied: %+v", c)
 	}
 	if len(c.TrustedProxies) != 2 || c.TrustedProxies[1].String() != "192.168.1.10/32" {
@@ -144,6 +147,7 @@ func TestInvalidValues(t *testing.T) {
 		EnvTrustedProxies:  "10.0.0.0/99",
 		EnvMaxNoteMB:       "0",
 		EnvIgnore:          "a/b",
+		EnvRescanInterval:  "1s",
 		EnvSessionTTL:      "1m",
 		EnvCookieSecure:    "maybe",
 		EnvAuthMode:        "ldap",

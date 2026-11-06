@@ -125,6 +125,7 @@ docker run --rm -it dendronotes:<version> hash-password
 
 Login attempts are rate-limited per client IP and globally; sessions are stored only as
 SHA-256 hashes in `$DENDRONOTES_DATA_DIR/sessions.json` and sent as `HttpOnly`,
+| `DENDRONOTES_RESCAN_INTERVAL`          | `5m`               | How often the whole soma is compared with the index, in addition to file system events; `0` turns it off |
 `SameSite=Strict` cookies (`__Host-` prefixed and `Secure` over HTTPS).
 
 **Behind an authenticating proxy** (e.g. oauth2-proxy with Keycloak): set

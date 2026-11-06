@@ -202,6 +202,12 @@ paths:
               properties:
                 from: { type: string }
                 to: { type: string }
+                updateSynapses:
+                  type: boolean
+                  description: >
+                    Rewrite synapses in other notes (and relative links in moved
+                    notes) so that they keep pointing to the moved notes. Notes
+                    changed concurrently are skipped and listed in `failed`.
       responses:
         "200":
           description: Moved; `path` is the new location.
@@ -209,8 +215,12 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [path]
                 properties:
                   path: { type: string }
+                  updatedNotes: { type: integer }
+                  updatedSynapses: { type: integer }
+                  failed: { type: array, items: { type: string } }
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/Error" }
@@ -231,6 +241,84 @@ paths:
                   trashedTo: { type: string, example: .trash/Projects/Idea.md }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/Error" }
+  /api/soma/search:
+    get:
+      summary: Full-text search
+      description: >
+        Words match as prefixes, "quoted text" as a phrase, `#tag` filters by tag
+        (nested tags included); everything must match. Case and diacritics are
+        ignored.
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, maxLength: 512 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: Hits, best first. `complete` is false while the index is still being built.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [hits, complete]
+                properties:
+                  hits: { type: array, items: { $ref: "#/components/schemas/Hit" } }
+                  complete: { type: boolean }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/soma/backlinks/{path}:
+    parameters:
+      - $ref: "#/components/parameters/path"
+    get:
+      summary: Notes with synapses to this note ("Incoming synapses")
+      responses:
+        "200":
+          description: Referring notes in path order; a note's synapses to itself are left out.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [backlinks]
+                properties:
+                  backlinks: { type: array, items: { $ref: "#/components/schemas/Backlink" } }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/soma/tags:
+    get:
+      summary: All tags with the number of notes using them
+      responses:
+        "200":
+          description: Tags, most used first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tags]
+                properties:
+                  tags:
+                    type: array
+                    items:
+                      type: object
+                      required: [tag, count]
+                      properties:
+                        tag: { type: string, example: garden/beds }
+                        count: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/soma/events:
+    get:
+      summary: Live updates (Server-Sent Events)
+      description: >
+        A `hello` event starts every stream, also after a reconnect; clients then
+        reload what they show. `change` events report what changed in the soma,
+        whoever changed it. The stream ends on sign-out and on shutdown.
+      responses:
+        "200":
+          description: >
+            `event: hello` with `{"ready": bool}`, then `event: change` with a
+            Change object per change, and comment lines as heartbeat.
+          content:
+            text/event-stream:
+              schema: { $ref: "#/components/schemas/Change" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "503": { $ref: "#/components/responses/Error" }
 components:
   securitySchemes:
     session:
@@ -273,7 +361,8 @@ components:
             One of invalid_path, invalid_name, not_found, exists, not_a_note,
             read_only, too_large, is_directory, not_a_directory, move_into_self,
             if_match_required, content_required, bad_request,
-            unsupported_media_type, cross_origin_request, internal_error.
+            unsupported_media_type, cross_origin_request, query_too_long,
+            invalid_limit, too_many_streams, internal_error.
     Readiness:
       type: object
       properties:
@@ -282,6 +371,7 @@ components:
           type: object
           properties:
             server: { type: string, enum: [ok, starting, shutting_down] }
+            index: { type: string, enum: [ok, building] }
             soma: { type: string, enum: [ok, unavailable] }
     Me:
       type: object
@@ -317,3 +407,44 @@ components:
         etag: { type: string }
         size: { type: integer }
         mtime: { type: integer }
+    Hit:
+      type: object
+      required: [path, snippet, line]
+      properties:
+        path: { type: string }
+        snippet:
+          type: string
+          description: >
+            Text around the match; matched words are enclosed in U+0002 and
+            U+0003 (never HTML).
+        line: { type: integer, description: First line with a match (0-based), -1 if only the name matched. }
+        tags: { type: array, items: { type: string } }
+    Backlink:
+      type: object
+      required: [path, synapses]
+      properties:
+        path: { type: string }
+        synapses:
+          type: array
+          items:
+            type: object
+            required: [line, context]
+            properties:
+              line: { type: integer, description: 0-based line in the referring note }
+              context: { type: string, description: That line, shortened. }
+              embed: { type: boolean }
+    Change:
+      type: object
+      required: [tree, notes, removed]
+      properties:
+        tree: { type: boolean, description: Files or folders appeared or disappeared; reload the tree. }
+        notes:
+          type: array
+          description: Notes with new content, with their new ETag.
+          items:
+            type: object
+            required: [path, etag]
+            properties:
+              path: { type: string }
+              etag: { type: string }
+        removed: { type: array, items: { type: string } }

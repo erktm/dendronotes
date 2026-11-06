@@ -10,13 +10,16 @@ import (
 	"net"
 	"net/http"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"dendronotes/internal/auth"
 	"dendronotes/internal/clientip"
 	"dendronotes/internal/config"
+	"dendronotes/internal/events"
 	"dendronotes/internal/httpx"
+	"dendronotes/internal/index"
 	"dendronotes/internal/soma"
 )
 
@@ -29,6 +32,8 @@ type Server struct {
 	cfg     config.Config
 	log     *slog.Logger
 	soma    *soma.Soma
+	index   *index.Index
+	hub     *events.Hub
 	auth    *auth.Authenticator
 	assets  *assets
 	version string
@@ -37,8 +42,11 @@ type Server struct {
 	ready    atomic.Bool // true only after a complete startup
 	draining atomic.Bool // true from SIGTERM on
 
+	// moveMu serializes moves that rewrite synapses in other notes.
+	moveMu sync.Mutex
+
 	// closers run in reverse order during shutdown, once no requests are in
-	// flight anymore (later: watcher, index database).
+	// flight anymore (background work, index database, soma).
 	closers []namedCloser
 }
 
@@ -77,8 +85,15 @@ func New(cfg config.Config, log *slog.Logger, webFS fs.FS, version string) (*Ser
 		log.Warn("frontend not built: web/dist/index.html missing, UI will answer 503")
 	}
 
-	s := &Server{cfg: cfg, log: log, soma: sm, auth: authn, assets: a, version: version}
+	ix, err := index.Open(cfg.DataDir, sm, log)
+	if err != nil {
+		sm.Close()
+		return nil, fmt.Errorf("index: %w", err)
+	}
+
+	s := &Server{cfg: cfg, log: log, soma: sm, index: ix, hub: events.NewHub(maxStreams), auth: authn, assets: a, version: version}
 	s.addCloser("soma", sm.Close)
+	s.addCloser("index", ix.Close)
 	s.httpSrv = &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
 		Handler:           s.Handler(),
@@ -87,6 +102,8 @@ func New(cfg config.Config, log *slog.Logger, webFS fs.FS, version string) (*Ser
 		MaxHeaderBytes:    64 << 10,
 		ErrorLog:          slog.NewLogLogger(log.Handler(), slog.LevelWarn),
 	}
+	// Event streams never become idle; end them as soon as shutdown begins.
+	s.httpSrv.RegisterOnShutdown(s.hub.Close)
 	return s, nil
 }
 
@@ -130,6 +147,11 @@ func (s *Server) Run(ctx context.Context) error {
 func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 	errCh := make(chan error, 1)
 	go func() { errCh <- s.httpSrv.Serve(ln) }()
+
+	bgCtx, stopBackground := context.WithCancel(ctx)
+	bgDone := make(chan struct{})
+	go func() { defer close(bgDone); s.runIndex(bgCtx) }()
+	s.addCloser("background", func() error { stopBackground(); <-bgDone; return nil })
 
 	s.ready.Store(true)
 	s.log.Info("listening",

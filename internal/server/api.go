@@ -1,11 +1,15 @@
 package server
 
 import (
+	"context"
 	"errors"
+	"maps"
 	"net/http"
+	"slices"
 	"strings"
 
 	"dendronotes/internal/httpx"
+	"dendronotes/internal/relink"
 	"dendronotes/internal/soma"
 )
 
@@ -36,6 +40,10 @@ func (s *Server) routes() []route {
 		{"POST", "/api/soma/folders/{path...}", s.handleMkdir, false},
 		{"POST", "/api/soma/move", s.handleMove, false},
 		{"DELETE", "/api/soma/entries/{path...}", s.handleTrash, false},
+		{"GET", "/api/soma/search", s.handleSearch, false},
+		{"GET", "/api/soma/backlinks/{path...}", s.handleBacklinks, false},
+		{"GET", "/api/soma/tags", s.handleTags, false},
+		{"GET", "/api/soma/events", s.handleEvents, false},
 	}
 }
 
@@ -104,6 +112,11 @@ func (s *Server) handleWriteNote(w http.ResponseWriter, r *http.Request) {
 		s.somaError(w, r, err)
 		return
 	}
+	if ch, err := s.index.Put(context.WithoutCancel(r.Context()), n); err != nil {
+		s.log.Error("index update after save failed", "path", n.Path, "err", err)
+	} else {
+		s.publish(ch)
+	}
 	w.Header().Set("ETag", quoteETag(n.ETag))
 	httpx.WriteJSON(w, http.StatusOK, metaOf(n))
 }
@@ -121,6 +134,7 @@ func (s *Server) handleCreateNote(w http.ResponseWriter, r *http.Request) {
 		s.somaError(w, r, err)
 		return
 	}
+	s.syncAfterWrite(r)
 	w.Header().Set("ETag", quoteETag(n.ETag))
 	httpx.WriteJSON(w, http.StatusCreated, metaOf(n))
 }
@@ -131,16 +145,36 @@ func (s *Server) handleMkdir(w http.ResponseWriter, r *http.Request) {
 		s.somaError(w, r, err)
 		return
 	}
+	s.syncAfterWrite(r)
 	httpx.WriteJSON(w, http.StatusCreated, e)
 }
 
 func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		From string `json:"from"`
-		To   string `json:"to"`
+		From           string `json:"from"`
+		To             string `json:"to"`
+		UpdateSynapses bool   `json:"updateSynapses"`
 	}
 	if err := httpx.DecodeJSON(w, r, &body, 16<<10); err != nil {
 		httpx.WriteDecodeError(w, err)
+		return
+	}
+	if !body.UpdateSynapses {
+		to, err := s.soma.Move(body.From, body.To)
+		if err != nil {
+			s.somaError(w, r, err)
+			return
+		}
+		s.syncAfterWrite(r)
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"path": to})
+		return
+	}
+
+	s.moveMu.Lock()
+	defer s.moveMu.Unlock()
+	edits, err := s.planRelink(r, body.From, body.To)
+	if err != nil {
+		s.somaError(w, r, err)
 		return
 	}
 	to, err := s.soma.Move(body.From, body.To)
@@ -148,7 +182,63 @@ func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 		s.somaError(w, r, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]string{"path": to})
+	res := moveResult{Path: to, Failed: []string{}}
+	for _, e := range edits {
+		// Based on the version read before the move: a note edited in the
+		// meantime is reported, never overwritten.
+		if _, err := s.soma.WriteNote(e.Path, []byte(e.Content), e.ETag); err != nil {
+			s.log.Warn("synapse update skipped", "path", e.Path, "err", err)
+			res.Failed = append(res.Failed, e.Path)
+			continue
+		}
+		res.Notes++
+		res.Synapses += e.Synapses
+	}
+	s.syncAfterWrite(r)
+	httpx.WriteJSON(w, http.StatusOK, res)
+}
+
+// moveResult reports a move and the synapses rewritten for it.
+type moveResult struct {
+	Path     string   `json:"path"`
+	Notes    int      `json:"updatedNotes"`
+	Synapses int      `json:"updatedSynapses"`
+	Failed   []string `json:"failed"`
+}
+
+// planRelink computes the synapse rewrites for moving from to to: a single
+// note or a folder with all notes inside it.
+func (s *Server) planRelink(r *http.Request, from, to string) ([]relink.Edit, error) {
+	from, err := soma.CleanPath(from)
+	if err != nil {
+		return nil, err
+	}
+	to, err = soma.CleanPath(to)
+	if err != nil {
+		return nil, err
+	}
+	notes := s.index.Resolver().Notes()
+	moves := map[string]string{}
+	for _, n := range notes {
+		switch {
+		case n == from:
+			moves[n] = to
+		case strings.HasPrefix(n, from+"/"):
+			moves[n] = to + n[len(from):]
+		}
+	}
+	if len(moves) == 0 {
+		return nil, nil // no notes involved (an attachment or an empty folder)
+	}
+	sources, err := s.index.Referrers(r.Context(), slices.Collect(maps.Keys(moves)))
+	if err != nil {
+		return nil, err
+	}
+	read := func(p string) (string, string, error) {
+		n, err := s.soma.ReadNote(p)
+		return n.Content, n.ETag, err
+	}
+	return relink.Plan(read, sources, notes, moves)
 }
 
 func (s *Server) handleTrash(w http.ResponseWriter, r *http.Request) {
@@ -157,6 +247,7 @@ func (s *Server) handleTrash(w http.ResponseWriter, r *http.Request) {
 		s.somaError(w, r, err)
 		return
 	}
+	s.syncAfterWrite(r)
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"trashedTo": dst})
 }
 

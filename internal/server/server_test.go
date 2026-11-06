@@ -252,10 +252,16 @@ func TestReadyzLifecycle(t *testing.T) {
 	s := newTestServer(t, testFS())
 	h := s.Handler()
 
-	if code, checks := readyStatus(t, h); code != 503 || checks["server"] != "starting" {
+	if code, checks := readyStatus(t, h); code != 503 || checks["server"] != "starting" || checks["index"] != "building" {
 		t.Fatalf("before start: %d %v", code, checks)
 	}
 	s.ready.Store(true)
+	if code, checks := readyStatus(t, h); code != 503 || checks["index"] != "building" {
+		t.Fatalf("before the first index sync: %d %v", code, checks)
+	}
+	if _, err := s.index.Sync(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 	if code, _ := readyStatus(t, h); code != 200 {
 		t.Fatalf("after start: %d", code)
 	}

@@ -142,6 +142,13 @@ func (a *Authenticator) Require(next http.Handler) http.Handler {
 	})
 }
 
+// Authenticated reports whether r still carries a valid session (or a trusted
+// proxy identity). Long-lived streams use it to end when the session ends.
+func (a *Authenticator) Authenticated(r *http.Request) bool {
+	_, ok := a.authenticate(r)
+	return ok
+}
+
 func (a *Authenticator) authenticate(r *http.Request) (string, bool) {
 	if a.cfg.Mode == ModeProxy {
 		if !a.ips.FromTrustedProxy(r) {

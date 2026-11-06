@@ -34,6 +34,7 @@ const (
 	EnvTrustedProxies   = Prefix + "TRUSTED_PROXIES"
 	EnvMaxNoteMB        = Prefix + "MAX_NOTE_MB"
 	EnvIgnore           = Prefix + "IGNORE"
+	EnvRescanInterval   = Prefix + "RESCAN_INTERVAL"
 	EnvAuthMode         = Prefix + "AUTH_MODE"
 	EnvPasswordHash     = Prefix + "AUTH_PASSWORD_HASH"
 	EnvPasswordHashFile = Prefix + "AUTH_PASSWORD_HASH_FILE"
@@ -49,7 +50,7 @@ const (
 // (enforced by a test).
 var Vars = []string{
 	EnvSomaDir, EnvDataDir, EnvHTTPPort, EnvLogLevel, EnvLogFormat, EnvShutdownTimeout,
-	EnvTrustedProxies, EnvMaxNoteMB, EnvIgnore, EnvAuthMode, EnvPasswordHash,
+	EnvTrustedProxies, EnvMaxNoteMB, EnvIgnore, EnvRescanInterval, EnvAuthMode, EnvPasswordHash,
 	EnvPasswordHashFile, EnvPasswordFile, EnvSessionTTL, EnvCookieSecure,
 	EnvProxyHeader, EnvProxyAllowed, EnvProxyLogoutURL,
 }
@@ -65,6 +66,7 @@ type Config struct {
 	TrustedProxies  []netip.Prefix // reverse proxies whose X-Forwarded-* headers are believed
 	MaxNoteBytes    int64          // largest note the editor opens or saves
 	Ignore          []string       // extra name patterns hidden from the tree
+	RescanInterval  time.Duration  // periodic full comparison of soma and index; 0 = off
 	Auth            Auth
 }
 
@@ -95,6 +97,7 @@ const (
 	DefaultDataDir         = "/data"
 	DefaultPort            = 8080
 	DefaultShutdownTimeout = 20 * time.Second
+	DefaultRescanInterval  = 5 * time.Minute
 	DefaultSessionTTL      = 30 * 24 * time.Hour
 	DefaultMaxNoteMB       = 5
 	DefaultProxyHeader     = "X-Forwarded-User"
@@ -111,6 +114,7 @@ func Load(getenv func(string) string) (Config, error) {
 		LogLevel:        slog.LevelInfo,
 		LogFormat:       "json",
 		ShutdownTimeout: DefaultShutdownTimeout,
+		RescanInterval:  DefaultRescanInterval,
 		MaxNoteBytes:    DefaultMaxNoteMB << 20,
 		Auth: Auth{
 			Mode:         "password",
@@ -155,6 +159,18 @@ func Load(getenv func(string) string) (Config, error) {
 			add(fmt.Errorf("%s: %q is not a positive duration (e.g. 20s)", EnvShutdownTimeout, v))
 		} else {
 			c.ShutdownTimeout = d
+		}
+	}
+
+	if v := getenv(EnvRescanInterval); v != "" {
+		d, err := time.ParseDuration(v)
+		switch {
+		case err != nil || d < 0:
+			add(fmt.Errorf("%s: %q is not a duration (e.g. 5m, or 0 to disable)", EnvRescanInterval, v))
+		case d > 0 && d < 10*time.Second:
+			add(fmt.Errorf("%s: %q is too short (minimum 10s)", EnvRescanInterval, v))
+		default:
+			c.RescanInterval = d
 		}
 	}
 

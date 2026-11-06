@@ -31,6 +31,15 @@ func (s *Server) handleReadyz(w http.ResponseWriter, _ *http.Request) {
 		checks["server"] = "ok"
 	}
 
+	// Traffic only once the index has caught up with the soma, so that search
+	// and backlinks are complete.
+	if s.index.Ready() {
+		checks["index"] = "ok"
+	} else {
+		checks["index"] = "building"
+		ok = false
+	}
+
 	if err := s.soma.Check(); err != nil {
 		s.log.Warn("readiness: soma unavailable", "err", err)
 		checks["soma"] = "unavailable"
