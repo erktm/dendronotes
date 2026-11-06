@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { isNoteTarget, maskCode, newNotePath, normalizePath, parseSynapses, resolveSynapse, synapseLabel } from './synapses'
+import shared from './testdata/synapses.json'
 
 const targets = (src: string) => parseSynapses(src).map((s) => s.target)
 
@@ -89,4 +90,26 @@ describe('helpers', () => {
     expect(synapseLabel({ target: 'Plan', heading: 'Tasks' })).toBe('Plan › Tasks')
     expect(synapseLabel({ target: 'Plan', alias: 'the plan' })).toBe('the plan')
   })
+})
+
+// The same cases run in internal/mdparse: frontend and server must agree.
+describe('shared synapse cases', () => {
+  for (const c of shared.parse) {
+    it(`parses: ${c.name}`, () => {
+      const got = parseSynapses(c.src).map((s) => ({
+        target: s.target,
+        ...(s.heading ? { heading: s.heading } : {}),
+        ...(s.alias ? { alias: s.alias } : {}),
+        embed: s.embed,
+        markdown: s.markdown,
+        line: c.src.slice(0, s.from).split('\n').length - 1,
+      }))
+      expect(got).toEqual(c.synapses)
+    })
+  }
+  for (const c of shared.resolve.cases) {
+    it(`resolves ${c.target} from ${c.from}`, () => {
+      expect(resolveSynapse({ target: c.target, markdown: c.markdown }, c.from, shared.resolve.notes)).toBe(c.expected)
+    })
+  }
 })

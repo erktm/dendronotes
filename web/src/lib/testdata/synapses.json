@@ -1,0 +1,320 @@
+{
+  "comment": "Shared by web/src/lib/synapses.test.ts and internal/mdparse: frontend and server must find and resolve synapses identically.",
+  "parse": [
+    {
+      "name": "wiki links with alias and heading",
+      "src": "See [[Soil types]], [[Garden log 2025|last year]] and [[Plan#Tasks]].",
+      "synapses": [
+        {
+          "target": "Soil types",
+          "embed": false,
+          "markdown": false,
+          "line": 0
+        },
+        {
+          "target": "Garden log 2025",
+          "alias": "last year",
+          "embed": false,
+          "markdown": false,
+          "line": 0
+        },
+        {
+          "target": "Plan",
+          "heading": "Tasks",
+          "embed": false,
+          "markdown": false,
+          "line": 0
+        }
+      ]
+    },
+    {
+      "name": "embeds count, attachments and same-note headings not",
+      "src": "![[Weekly review]] ![[north-bed.jpg]] [[manual.pdf]] [[#Tasks]]\n[[Meeting 12.5]]",
+      "synapses": [
+        {
+          "target": "Weekly review",
+          "embed": true,
+          "markdown": false,
+          "line": 0
+        },
+        {
+          "target": "Meeting 12.5",
+          "embed": false,
+          "markdown": false,
+          "line": 1
+        }
+      ]
+    },
+    {
+      "name": "code is ignored",
+      "src": "`[[inline code]]` and ``[[double `tick`]]``\n```\n[[fenced]]\n```\n~~~md\n[[tilde]]\n~~~\n````\n```\n[[still fenced]]\n````\n[[real]]",
+      "synapses": [
+        {
+          "target": "real",
+          "embed": false,
+          "markdown": false,
+          "line": 11
+        }
+      ]
+    },
+    {
+      "name": "a backtick line with backticks after it is no fence",
+      "src": "```js `x`\n[[after]]",
+      "synapses": [
+        {
+          "target": "after",
+          "embed": false,
+          "markdown": false,
+          "line": 1
+        }
+      ]
+    },
+    {
+      "name": "unbalanced backticks: the regex backtracks to a single one",
+      "src": "``a`[[one]] b ` [[two]]",
+      "synapses": [
+        {
+          "target": "one",
+          "embed": false,
+          "markdown": false,
+          "line": 0
+        },
+        {
+          "target": "two",
+          "embed": false,
+          "markdown": false,
+          "line": 0
+        }
+      ]
+    },
+    {
+      "name": "Markdown links to notes, not external ones",
+      "src": "[a](Other.md) [b](./sub/My%20Note.md#Part) [c](https://example.org/x.md) [d](mailto:x@y) [e](#local) [f](image.png) [g](//host/x.md)",
+      "synapses": [
+        {
+          "target": "Other.md",
+          "alias": "a",
+          "embed": false,
+          "markdown": true,
+          "line": 0
+        },
+        {
+          "target": "./sub/My Note.md",
+          "heading": "Part",
+          "alias": "b",
+          "embed": false,
+          "markdown": true,
+          "line": 0
+        }
+      ]
+    },
+    {
+      "name": "angle brackets, titles, embeds and bad escapes",
+      "src": "[x](<Garden plan.md> \"title\")\n![y](Notes.txt)\n[](Bad%zz.md)",
+      "synapses": [
+        {
+          "target": "Garden plan.md",
+          "alias": "x",
+          "embed": false,
+          "markdown": true,
+          "line": 0
+        },
+        {
+          "target": "Notes.txt",
+          "alias": "y",
+          "embed": true,
+          "markdown": true,
+          "line": 1
+        },
+        {
+          "target": "Bad%zz.md",
+          "embed": false,
+          "markdown": true,
+          "line": 2
+        }
+      ]
+    },
+    {
+      "name": "windows line endings and unicode",
+      "src": "# Über\r\n[[Café]] and [[Ünïcode|ü]]\r\n```\r\n[[no]]\r\n```\r\n[[yes]]",
+      "synapses": [
+        {
+          "target": "Café",
+          "embed": false,
+          "markdown": false,
+          "line": 1
+        },
+        {
+          "target": "Ünïcode",
+          "alias": "ü",
+          "embed": false,
+          "markdown": false,
+          "line": 1
+        },
+        {
+          "target": "yes",
+          "embed": false,
+          "markdown": false,
+          "line": 5
+        }
+      ]
+    },
+    {
+      "name": "whitespace inside wiki links",
+      "src": "[[ Plan # Tasks | the plan ]] [[x|]] [[|y]]",
+      "synapses": [
+        {
+          "target": "Plan",
+          "heading": "Tasks",
+          "alias": "the plan",
+          "embed": false,
+          "markdown": false,
+          "line": 0
+        },
+        {
+          "target": "x",
+          "embed": false,
+          "markdown": false,
+          "line": 0
+        }
+      ]
+    },
+    {
+      "name": "unclosed angle brackets",
+      "src": "[](<) [x](<abc.md) [y](<ok.md>)",
+      "synapses": [
+        {
+          "target": "ok.md",
+          "alias": "y",
+          "embed": false,
+          "markdown": true,
+          "line": 0
+        }
+      ]
+    }
+  ],
+  "resolve": {
+    "notes": [
+      "Soil types.md",
+      "Projects/Plan.md",
+      "Archive/Plan.md",
+      "Archive/Old/Plan.md",
+      "Journal/Garden log 2025.md",
+      "Projects/Sub/Deep.md",
+      "Café.md",
+      "B/Twin.md",
+      "A/Twin.md",
+      "Readme.txt"
+    ],
+    "cases": [
+      {
+        "target": "soil TYPES",
+        "markdown": false,
+        "from": "Projects/Plan.md",
+        "expected": "Soil types.md"
+      },
+      {
+        "target": "Garden log 2025",
+        "markdown": false,
+        "from": "x.md",
+        "expected": "Journal/Garden log 2025.md"
+      },
+      {
+        "target": "Café",
+        "markdown": false,
+        "from": "x.md",
+        "expected": "Café.md"
+      },
+      {
+        "target": "Café",
+        "markdown": false,
+        "from": "x.md",
+        "expected": "Café.md"
+      },
+      {
+        "target": "Plan",
+        "markdown": false,
+        "from": "Archive/Old/Notes.md",
+        "expected": "Archive/Old/Plan.md"
+      },
+      {
+        "target": "Plan",
+        "markdown": false,
+        "from": "Journal/x.md",
+        "expected": "Archive/Plan.md"
+      },
+      {
+        "target": "Twin",
+        "markdown": false,
+        "from": "x.md",
+        "expected": "A/Twin.md"
+      },
+      {
+        "target": "Projects/Plan",
+        "markdown": false,
+        "from": "x.md",
+        "expected": "Projects/Plan.md"
+      },
+      {
+        "target": "/Projects/Plan",
+        "markdown": false,
+        "from": "x.md",
+        "expected": "Projects/Plan.md"
+      },
+      {
+        "target": "Sub/Deep",
+        "markdown": false,
+        "from": "x.md",
+        "expected": "Projects/Sub/Deep.md"
+      },
+      {
+        "target": "Old/Plan",
+        "markdown": false,
+        "from": "Archive/x.md",
+        "expected": "Archive/Old/Plan.md"
+      },
+      {
+        "target": "Readme.txt",
+        "markdown": false,
+        "from": "x.md",
+        "expected": "Readme.txt"
+      },
+      {
+        "target": "Readme",
+        "markdown": false,
+        "from": "x.md",
+        "expected": null
+      },
+      {
+        "target": "../Soil types.md",
+        "markdown": true,
+        "from": "Projects/Plan.md",
+        "expected": "Soil types.md"
+      },
+      {
+        "target": "Sub/Deep.md",
+        "markdown": true,
+        "from": "Projects/Plan.md",
+        "expected": "Projects/Sub/Deep.md"
+      },
+      {
+        "target": "Projects/Sub/Deep.md",
+        "markdown": true,
+        "from": "Archive/Plan.md",
+        "expected": "Projects/Sub/Deep.md"
+      },
+      {
+        "target": "../../../etc/passwd.md",
+        "markdown": true,
+        "from": "Projects/Plan.md",
+        "expected": null
+      },
+      {
+        "target": "Compost tea",
+        "markdown": false,
+        "from": "x.md",
+        "expected": null
+      }
+    ]
+  }
+}

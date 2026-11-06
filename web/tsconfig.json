@@ -14,6 +14,7 @@
     "allowJs": true,
     "checkJs": true,
     "moduleDetection": "force",
+    "resolveJsonModule": true,
     "skipLibCheck": true
   },
   "include": ["src/**/*.ts", "src/**/*.svelte"]

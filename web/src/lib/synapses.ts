@@ -57,7 +57,7 @@ export function maskCode(src: string): string {
 }
 
 const WIKI = /(!?)\[\[([^[\]\n]+?)\]\]/g
-const MD_LINK = /(!?)\[([^\]\n]*)\]\(\s*(<[^>\n]+>|[^)\s]+)(?:\s+"[^"\n]*")?\s*\)/g
+const MD_LINK = /(!?)\[([^\]\n]*)\]\(\s*(<[^<>\n]+>|[^)\s]+)(?:\s+"[^"\n]*")?\s*\)/g
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i
 
 /** Splits the inside of [[…]] into target, heading and alias. */
@@ -91,7 +91,10 @@ export function parseSynapses(src: string): SynapseRef[] {
 
   for (const m of masked.matchAll(MD_LINK)) {
     let href = m[3]!
-    if (href.startsWith('<')) href = href.slice(1, -1)
+    if (href.startsWith('<')) {
+      if (href.length < 2 || !href.endsWith('>')) continue // unclosed <…: not a link destination
+      href = href.slice(1, -1)
+    }
     if (SCHEME.test(href) || href.startsWith('#') || href.startsWith('//')) continue
     const hash = href.indexOf('#')
     const heading = hash >= 0 ? decodeSafe(href.slice(hash + 1)) || undefined : undefined
@@ -168,7 +171,7 @@ export function resolveSynapse(
     (a, b) =>
       Number(dirname(b) === here) - Number(dirname(a) === here) ||
       a.split('/').length - b.split('/').length ||
-      a.localeCompare(b),
+      (a < b ? -1 : a > b ? 1 : 0), // plain order, as on the server
   )[0]!
 }
 
