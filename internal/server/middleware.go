@@ -20,11 +20,14 @@ const nonceKey ctxKey = iota
 // cspTemplate is the Content-Security-Policy for every response.
 // Scripts only from our own origin, no inline JS, no eval. Inline <style>
 // only with a nonce (for CodeMirror's fallback without adoptedStyleSheets).
+// Inline style attributes are blocked, except exactly one: CodeMirror sets
+// style="tab-size: 4" on its content element (allowed by its hash).
 // img-src allows no foreign hosts: external images in notes stay blocked
 // (air-gap friendly, no tracking pixels).
 const cspTemplate = "default-src 'none'; " +
 	"script-src 'self'; " +
 	"style-src 'self' 'nonce-%s'; " +
+	"style-src-attr 'unsafe-hashes' '" + codeMirrorTabSizeHash + "'; " +
 	"img-src 'self' data: blob:; " +
 	"font-src 'self'; " +
 	"connect-src 'self'; " +
@@ -33,6 +36,9 @@ const cspTemplate = "default-src 'none'; " +
 	"form-action 'self'; " +
 	"frame-ancestors 'none'; " +
 	"object-src 'none'"
+
+// codeMirrorTabSizeHash is the CSP hash of the attribute value "tab-size: 4".
+const codeMirrorTabSizeHash = "sha256-qokx773Tl626SVTuhxQSccr23ixTSkbnBXWRqLjyuIg="
 
 const permissionsPolicy = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), " +
 	"magnetometer=(), microphone=(), payment=(), usb=(), browsing-topics=()"
