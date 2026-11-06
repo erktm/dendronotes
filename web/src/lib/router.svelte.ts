@@ -1,8 +1,9 @@
 import { encodePath } from './paths'
 
-// URLs: "/" shows no note, "/n/<path>" opens a note. The server answers
-// every such URL with index.html, so links and reloads work.
+// URLs: "/" shows no note, "/n/<path>" opens a note, "/graph" the graph.
+// The server answers every such URL with index.html, so links and reloads work.
 const PREFIX = '/n/'
+const GRAPH = '/graph'
 
 function parse(pathname: string): string | null {
   if (!pathname.startsWith(PREFIX)) return null
@@ -16,20 +17,32 @@ function parse(pathname: string): string | null {
 
 class Router {
   notePath = $state<string | null>(parse(location.pathname))
+  /** The graph view is open (instead of a note). */
+  graph = $state(location.pathname === GRAPH)
 
   constructor() {
     window.addEventListener('popstate', () => {
       this.notePath = parse(location.pathname)
+      this.graph = location.pathname === GRAPH
     })
   }
 
   go(path: string | null, replace = false): void {
-    const url = path ? PREFIX + encodePath(path) : '/'
-    if (url !== location.pathname) {
-      if (replace) history.replaceState(null, '', url)
-      else history.pushState(null, '', url)
-    }
+    this.push(path ? PREFIX + encodePath(path) : '/', replace)
     this.notePath = path
+    this.graph = false
+  }
+
+  goGraph(): void {
+    this.push(GRAPH, false)
+    this.notePath = null
+    this.graph = true
+  }
+
+  private push(url: string, replace: boolean): void {
+    if (url === location.pathname) return
+    if (replace) history.replaceState(null, '', url)
+    else history.pushState(null, '', url)
   }
 }
 

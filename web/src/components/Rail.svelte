@@ -1,5 +1,6 @@
 <script lang="ts">
   import Logo from './Logo.svelte'
+  import Icon from './Icon.svelte'
   import { brand, strings } from '../lib/strings'
 
   let {
@@ -7,12 +8,17 @@
     onfiles,
     onsearch,
     onopensettings,
+    graph,
+    ongraph,
   }: {
     /** What the open sidebar shows, or null when it is closed. */
     view: 'files' | 'search' | null
     onfiles: () => void
     onsearch: () => void
     onopensettings: () => void
+    /** The graph view is open. */
+    graph: boolean
+    ongraph: () => void
   } = $props()
 </script>
 
@@ -45,6 +51,18 @@
       <circle cx="10.5" cy="10.5" r="6" />
       <path d="m15 15 5 5" />
     </svg>
+  </button>
+
+  <button
+    class="item"
+    class:active={graph}
+    type="button"
+    aria-label={strings.graph.title}
+    aria-pressed={graph}
+    title={graph ? strings.graph.close : strings.graph.open}
+    onclick={ongraph}
+  >
+    <Icon name="graph" size={20} />
   </button>
 
   <div class="spacer"></div>

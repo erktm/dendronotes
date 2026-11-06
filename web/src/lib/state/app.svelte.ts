@@ -71,6 +71,8 @@ class App {
   filePaths = $derived(this.entries.filter((e) => e.type === 'file').map((e) => e.path))
 
   note = $state.raw<NoteSession | null>(null)
+  /** The note opened last (the center of the local graph). */
+  lastNotePath = $state<string | null>(null)
   /** A note that should get the cursor when it opens. */
   private focusNext: string | null = null
 
@@ -441,6 +443,7 @@ class App {
       this.note = null
       return
     }
+    this.lastNotePath = path
     const session = new NoteSession(path, this)
     session.autofocus = this.focusNext === path
     this.focusNext = null

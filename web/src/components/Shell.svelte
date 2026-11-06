@@ -4,6 +4,7 @@
   import Sidebar from './Sidebar.svelte'
   import NoteView from './NoteView.svelte'
   import DetailsPanel from './DetailsPanel.svelte'
+  import GraphView from './GraphView.svelte'
   import EmptyState from './EmptyState.svelte'
   import ConfirmDialog from './ConfirmDialog.svelte'
   import QuickSwitcher from './QuickSwitcher.svelte'
@@ -32,8 +33,14 @@
   })
 
   $effect(() => {
-    document.title = strings.app.title(app.note ? displayName(app.note.path) : undefined)
+    document.title = strings.app.title(router.graph ? strings.graph.title : app.note ? displayName(app.note.path) : undefined)
   })
+
+  /** Opens the graph, or returns to the last note from it. */
+  function toggleGraph() {
+    if (router.graph) void app.navigate(app.lastNotePath)
+    else router.goGraph()
+  }
 
   const crumbs = $derived(app.note ? app.note.path.split('/') : [])
   /** An editable note is open (not loading, missing or an attachment). */
@@ -56,6 +63,9 @@
     if (key === 's') {
       e.preventDefault()
       void app.note?.save()
+    } else if (key === 'g' && e.shiftKey) {
+      e.preventDefault()
+      toggleGraph()
     } else if (key === 'f' && e.shiftKey) {
       e.preventDefault()
       sidebarOpen = true
@@ -100,6 +110,8 @@
       else ((sidebarOpen = true), app.openSearch())
     }}
     onopensettings={() => (app.settingsOpen = true)}
+    graph={router.graph}
+    ongraph={toggleGraph}
   />
   {#if sidebarOpen}
     <Sidebar />
@@ -107,7 +119,9 @@
   <main class="main">
     <header class="topbar">
       <nav class="crumbs" aria-label={strings.soma.location}>
-        {#if app.note}
+        {#if router.graph}
+          <span class="current" aria-current="page">{strings.graph.title}</span>
+        {:else if app.note}
           {#each crumbs as part, i (i)}
             {#if i > 0}<span class="sep" aria-hidden="true">/</span>{/if}
             {#if i === crumbs.length - 1}
@@ -149,7 +163,9 @@
     </header>
     <div class="workspace">
       <div class="content">
-        {#if app.note}
+        {#if router.graph}
+          <GraphView center={app.lastNotePath} />
+        {:else if app.note}
           {#key app.note}
             <NoteView session={app.note} />
           {/key}

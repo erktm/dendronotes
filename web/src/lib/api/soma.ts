@@ -108,3 +108,18 @@ export interface Change {
   notes: { path: string; etag: string }[]
   removed: string[]
 }
+
+export interface GraphNode {
+  /** Soma path, or "?" + name for a note that synapses point to but that does not exist. */
+  id: string
+  label?: string
+  missing?: boolean
+  tags?: string[]
+}
+
+export interface GraphData {
+  nodes: GraphNode[]
+  edges: { source: string; target: string }[]
+}
+
+export const graph = (signal?: AbortSignal) => request<GraphData>('GET', '/api/soma/graph', { signal })

@@ -4,6 +4,7 @@
 export type ThemeChoice = 'system' | 'light' | 'dark'
 export type ViewMode = 'edit' | 'read'
 export type NoteFont = 'sans' | 'serif'
+export type GraphMode = 'global' | 'local'
 
 const KEY = 'dendronotes.settings'
 
@@ -16,6 +17,10 @@ interface Stored {
   showDetails: boolean
   view: ViewMode
   updateSynapses: boolean
+  graphMode: GraphMode
+  graphDepth: number
+  graphMissing: boolean
+  graphOrphans: boolean
 }
 
 const DEFAULTS: Stored = {
@@ -27,6 +32,10 @@ const DEFAULTS: Stored = {
   showDetails: true,
   view: 'edit',
   updateSynapses: true,
+  graphMode: 'global',
+  graphDepth: 2,
+  graphMissing: true,
+  graphOrphans: true,
 }
 
 function load(): Stored {
@@ -46,6 +55,10 @@ function load(): Stored {
       showDetails: bool('showDetails'),
       view: pick('view', ['edit', 'read'] as const),
       updateSynapses: bool('updateSynapses'),
+      graphMode: pick('graphMode', ['global', 'local'] as const),
+      graphDepth: [1, 2, 3].includes(r.graphDepth as number) ? (r.graphDepth as number) : DEFAULTS.graphDepth,
+      graphMissing: bool('graphMissing'),
+      graphOrphans: bool('graphOrphans'),
     }
   } catch {
     return { ...DEFAULTS }
@@ -61,6 +74,10 @@ class Settings {
   showDetails: boolean
   view: ViewMode
   updateSynapses: boolean
+  graphMode: GraphMode
+  graphDepth: number
+  graphMissing: boolean
+  graphOrphans: boolean
 
   constructor() {
     const s = load()
@@ -72,6 +89,10 @@ class Settings {
     this.showDetails = $state(s.showDetails)
     this.view = $state(s.view)
     this.updateSynapses = $state(s.updateSynapses)
+    this.graphMode = $state(s.graphMode)
+    this.graphDepth = $state(s.graphDepth)
+    this.graphMissing = $state(s.graphMissing)
+    this.graphOrphans = $state(s.graphOrphans)
 
     $effect.root(() => {
       $effect(() => {
@@ -84,6 +105,10 @@ class Settings {
           showDetails: this.showDetails,
           view: this.view,
           updateSynapses: this.updateSynapses,
+          graphMode: this.graphMode,
+          graphDepth: this.graphDepth,
+          graphMissing: this.graphMissing,
+          graphOrphans: this.graphOrphans,
         }
         try {
           localStorage.setItem(KEY, JSON.stringify(snapshot))
