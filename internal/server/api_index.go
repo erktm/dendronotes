@@ -17,6 +17,7 @@ const (
 // handleSearch runs a full-text search. Words match as prefixes, "quoted
 // text" as a phrase, #tag filters by tag (nested tags included).
 func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
+	rt := runtimeOf(r)
 	q := r.URL.Query().Get("q")
 	if len(q) > maxQueryBytes {
 		httpx.Error(w, http.StatusBadRequest, "query_too_long")
@@ -31,22 +32,23 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		}
 		limit = n
 	}
-	hits, err := s.index.Search(r.Context(), q, limit)
+	hits, err := rt.Index.Search(r.Context(), q, limit)
 	if err != nil {
 		s.internalError(w, r, "search", err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"hits": hits, "complete": s.index.Ready()})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"hits": hits, "complete": rt.Index.Ready()})
 }
 
 // handleBacklinks lists the notes with synapses to a note ("Incoming synapses").
 func (s *Server) handleBacklinks(w http.ResponseWriter, r *http.Request) {
+	rt := runtimeOf(r)
 	p, err := soma.CleanPath(r.PathValue("path"))
 	if err != nil {
 		s.somaError(w, r, err)
 		return
 	}
-	bl, err := s.index.Backlinks(r.Context(), p)
+	bl, err := rt.Index.Backlinks(r.Context(), p)
 	if err != nil {
 		s.internalError(w, r, "backlinks", err)
 		return
@@ -56,7 +58,8 @@ func (s *Server) handleBacklinks(w http.ResponseWriter, r *http.Request) {
 
 // handleTags lists all tags with the number of notes using them.
 func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
-	tags, err := s.index.Tags(r.Context())
+	rt := runtimeOf(r)
+	tags, err := rt.Index.Tags(r.Context())
 	if err != nil {
 		s.internalError(w, r, "tags", err)
 		return
@@ -66,7 +69,8 @@ func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 
 // handleGraph returns all notes and the synapses between them.
 func (s *Server) handleGraph(w http.ResponseWriter, r *http.Request) {
-	g, err := s.index.Graph(r.Context())
+	rt := runtimeOf(r)
+	g, err := rt.Index.Graph(r.Context())
 	if err != nil {
 		s.internalError(w, r, "graph", err)
 		return

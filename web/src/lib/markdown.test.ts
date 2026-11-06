@@ -2,12 +2,17 @@
 // DOMPurify is built and tested against jsdom; happy-dom's global window confuses it.
 import { describe, expect, it } from 'vitest'
 import { renderMarkdown } from './markdown'
+import { noteURL } from './router.svelte'
+import { setSoma } from './api/base'
+
+setSoma('soma1')
 
 const notes = ['Soil types.md', 'Projects/Plan.md']
 const files = ['photo.png', 'Projects/north bed.jpg', 'Projects/report.pdf', 'song.mp3', 'clip.mp4', ...notes]
 const find = (list: string[], want: string) =>
   list.find((n) => n.toLowerCase() === want.toLowerCase() || n.toLowerCase().endsWith(`/${want.toLowerCase()}`)) ?? null
 const ctx = {
+  noteURL: (path: string) => noteURL('soma1', path),
   resolve: (target: string, markdown: boolean) => find(notes, (markdown ? target : `${target}.md`).replace(/^\.\.\//, '')),
   resolveFile: (target: string) => find(files, target.replace(/^\.\.\//, '')),
 }
@@ -44,13 +49,13 @@ const XSS = [
   '[[x" onmouseover="alert(1)]]',
   '[[<img src=x onerror=alert(1)>]]',
   '<video src=x onerror=alert(1)></video>',
-  '<img src="//evil.example/api/soma/files/x.png">',
-  '<img src="https://evil.example/api/soma/files/x.png">',
-  '<img src="/api/soma/files/../../x" onerror=alert(1)>',
+  '<img src="//evil.example/api/somas/soma1/files/x.png">',
+  '<img src="https://evil.example/api/somas/soma1/files/x.png">',
+  '<img src="/api/somas/soma1/files/../../x" onerror=alert(1)>',
   '<audio src="javascript:alert(1)" controls></audio>',
   '<video src="data:video/mp4;base64,AAAA"></video>',
   '<img src="/api/soma/files\\..\\x.png">',
-  '<img srcset="https://evil.example/x.png 1x" src="/api/soma/files/photo.png">',
+  '<img srcset="https://evil.example/x.png 1x" src="/api/somas/soma1/files/photo.png">',
 ]
 
 describe('renderMarkdown sanitizing', () => {
@@ -60,7 +65,7 @@ describe('renderMarkdown sanitizing', () => {
       expect(el.querySelector('script, iframe, object, embed, svg, math, style, form, base, meta, link, button, source')).toBeNull()
       // Media may only load from the soma.
       for (const m of el.querySelectorAll('img, audio, video')) {
-        expect(m.getAttribute('src') ?? '').toMatch(/^\/api\/soma\/files\/[^\\]*$/)
+        expect(m.getAttribute('src') ?? '').toMatch(/^\/api\/somas\/soma1\/files\/[^\\]*$/)
         expect(m.hasAttribute('srcset')).toBe(false)
       }
       for (const node of el.querySelectorAll('*')) {
@@ -83,10 +88,10 @@ describe('renderMarkdown features', () => {
   it('renders synapses with in-app links', () => {
     const el = dom('See [[Soil types]], [[Plan|the plan]] and [[Compost tea]].')
     const [soil, plan, compost] = [...el.querySelectorAll('a.synapse')]
-    expect(soil!.getAttribute('href')).toBe('/n/Soil%20types.md')
+    expect(soil!.getAttribute('href')).toBe('/s/soma1/n/Soil%20types.md')
     expect(soil!.textContent).toBe('Soil types')
     expect(plan!.textContent).toBe('the plan')
-    expect(plan!.getAttribute('href')).toBe('/n/Projects/Plan.md')
+    expect(plan!.getAttribute('href')).toBe('/s/soma1/n/Projects/Plan.md')
     expect(compost!.classList.contains('unresolved')).toBe(true)
     expect(compost!.getAttribute('data-synapse')).toBe('Compost tea')
   })
@@ -101,7 +106,7 @@ describe('renderMarkdown features', () => {
   it('turns Markdown links to notes into synapses', () => {
     const a = dom('[soil](Soil%20types.md)').querySelector('a')!
     expect(a.classList.contains('synapse')).toBe(true)
-    expect(a.getAttribute('href')).toBe('/n/Soil%20types.md')
+    expect(a.getAttribute('href')).toBe('/s/soma1/n/Soil%20types.md')
   })
 
   it('renders task lists with their source line', () => {
@@ -123,13 +128,13 @@ describe('renderMarkdown features', () => {
   it('shows images, audio and video from the soma', () => {
     const el = dom('![[photo.png|300]] ![[north bed.jpg|tomatoes]]\n\n![a bed](north%20bed.jpg)\n\n![[song.mp3]] ![[clip.mp4]]')
     const [a, b, c] = [...el.querySelectorAll('img')]
-    expect(a!.getAttribute('src')).toBe('/api/soma/files/photo.png')
+    expect(a!.getAttribute('src')).toBe('/api/somas/soma1/files/photo.png')
     expect(a!.getAttribute('width')).toBe('300')
-    expect(b!.getAttribute('src')).toBe('/api/soma/files/Projects/north%20bed.jpg')
+    expect(b!.getAttribute('src')).toBe('/api/somas/soma1/files/Projects/north%20bed.jpg')
     expect(b!.getAttribute('alt')).toBe('tomatoes')
     expect(c!.getAttribute('alt')).toBe('a bed')
     const audio = el.querySelector('audio')!
-    expect(audio.getAttribute('src')).toBe('/api/soma/files/song.mp3')
+    expect(audio.getAttribute('src')).toBe('/api/somas/soma1/files/song.mp3')
     expect(audio.hasAttribute('controls')).toBe(true)
     expect(el.querySelector('video')!.getAttribute('preload')).toBe('metadata')
   })
@@ -137,7 +142,7 @@ describe('renderMarkdown features', () => {
   it('links other attachments and keeps external images out', () => {
     const el = dom('![[report.pdf]] [the report](Projects/report.pdf) ![x](https://example.org/x.png) ![[gone.png]]')
     const links = [...el.querySelectorAll('a.file')]
-    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/api/soma/files/Projects/report.pdf', '/api/soma/files/Projects/report.pdf'])
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/api/somas/soma1/files/Projects/report.pdf', '/api/somas/soma1/files/Projects/report.pdf'])
     expect(links.every((a) => a.getAttribute('target') === '_blank' && a.getAttribute('rel') === 'noopener')).toBe(true)
     expect(el.textContent).toContain('External image not loaded')
     expect(el.textContent).toContain('Missing attachment: gone.png')
@@ -145,7 +150,7 @@ describe('renderMarkdown features', () => {
   })
 
   it('strips what media must not do', () => {
-    const el = dom('<video src="/api/soma/files/clip.mp4" autoplay loop poster="https://evil.example/p.png" width="50%" onplay="alert(1)"></video>')
+    const el = dom('<video src="/api/somas/soma1/files/clip.mp4" autoplay loop poster="https://evil.example/p.png" width="50%" onplay="alert(1)"></video>')
     const v = el.querySelector('video')!
     expect([...v.attributes].map((a) => a.name).sort()).toEqual(['src'])
   })
@@ -155,7 +160,7 @@ describe('renderMarkdown features', () => {
     const embed = el.querySelector<HTMLElement>('.embed-note')!
     expect(embed.dataset.embed).toBe('Projects/Plan.md')
     expect(embed.dataset.embedHeading).toBe('Tasks')
-    expect(embed.querySelector('.embed-head a.synapse')!.getAttribute('href')).toBe('/n/Projects/Plan.md#tasks')
+    expect(embed.querySelector('.embed-head a.synapse')!.getAttribute('href')).toBe('/s/soma1/n/Projects/Plan.md#tasks')
     expect(el.querySelectorAll('.embed-note')).toHaveLength(1)
     expect(el.querySelector('.embedded-note a.unresolved')).not.toBeNull()
   })

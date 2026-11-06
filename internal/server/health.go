@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"os"
 
 	"dendronotes/internal/httpx"
 )
@@ -16,7 +17,7 @@ func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
 // handleReadyz is the readiness probe: only while it is green does the pod
 // receive traffic. Error details go to the log, not into the response
 // (the endpoint is unauthenticated).
-func (s *Server) handleReadyz(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleReadyz(w http.ResponseWriter, r *http.Request) {
 	checks := map[string]string{}
 	ok := true
 
@@ -31,21 +32,19 @@ func (s *Server) handleReadyz(w http.ResponseWriter, _ *http.Request) {
 		checks["server"] = "ok"
 	}
 
-	// Traffic only once the index has caught up with the soma, so that search
-	// and backlinks are complete.
-	if s.index.Ready() {
-		checks["index"] = "ok"
-	} else {
-		checks["index"] = "building"
+	if err := s.store.Ping(r.Context()); err != nil {
+		s.log.Warn("readiness: state database unavailable", "err", err)
+		checks["state"] = "unavailable"
 		ok = false
+	} else {
+		checks["state"] = "ok"
 	}
-
-	if err := s.soma.Check(); err != nil {
-		s.log.Warn("readiness: soma unavailable", "err", err)
-		checks["soma"] = "unavailable"
+	if st, err := os.Stat(s.cfg.SomasDir); err != nil || !st.IsDir() {
+		s.log.Warn("readiness: somas directory unavailable", "err", err)
+		checks["somas"] = "unavailable"
 		ok = false
 	} else {
-		checks["soma"] = "ok"
+		checks["somas"] = "ok"
 	}
 
 	status, code := "ok", http.StatusOK

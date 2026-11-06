@@ -1,7 +1,8 @@
 import { SvelteSet } from 'svelte/reactivity'
 import { ApiError, onUnauthorized } from '../api/client'
 import * as api from '../api/soma'
-import type { Change, Entry, Me } from '../api/soma'
+import type { Change, Entry, Me, Membership, User } from '../api/soma'
+import { currentSoma, setSoma } from '../api/base'
 import { errorMessage } from '../errors'
 import {
   ancestors,
@@ -34,6 +35,16 @@ export interface Toast {
   kind: 'error' | 'info'
 }
 
+export interface PromptRequest {
+  title: string
+  text?: string
+  label: string
+  value: string
+  placeholder?: string
+  confirmLabel: string
+  resolve: (value: string | null) => void
+}
+
 export interface ConfirmRequest {
   title: string
   message: string
@@ -43,26 +54,44 @@ export interface ConfirmRequest {
 }
 
 const EXPANDED_KEY = 'dendronotes.expanded'
+const LAST_SOMA_KEY = 'dendronotes.lastSoma'
 
-function loadExpanded(): string[] {
+/** Open folders are remembered per soma. */
+function loadExpanded(soma: string): string[] {
   try {
-    const v: unknown = JSON.parse(localStorage.getItem(EXPANDED_KEY) ?? '[]')
+    const v: unknown = JSON.parse(localStorage.getItem(`${EXPANDED_KEY}.${soma}`) ?? '[]')
     return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
   } catch {
     return []
   }
 }
 
+function storage(key: string, value?: string): string | null {
+  try {
+    if (value !== undefined) localStorage.setItem(key, value)
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
 class App {
   auth = $state<AuthState>('checking')
-  mode = $state<'password' | 'proxy'>('password')
-  user = $state('')
+  mode = $state<'local' | 'proxy'>('local')
+  user = $state.raw<User | null>(null)
   logoutUrl = $state('')
+  isAdmin = $derived(this.user?.role === 'admin')
+
+  /** The somas the account can open, and the one that is open. */
+  somas = $state.raw<Membership[]>([])
+  somasLoaded = $state(false)
+  somaId = $state('')
+  soma = $derived(this.somas.find((s) => s.id === this.somaId) ?? null)
 
   entries = $state.raw<Entry[]>([])
   tree = $derived(buildTree(this.entries))
   treeLoaded = $state(false)
-  expanded = new SvelteSet<string>(loadExpanded())
+  expanded = new SvelteSet<string>()
   edit = $state<TreeEdit | null>(null)
 
   /** Paths of all notes in the soma (for synapses and the quick switcher). */
@@ -84,11 +113,13 @@ class App {
 
   switcherOpen = $state(false)
   settingsOpen = $state(false)
+  profileOpen = $state(false)
   /** A heading the open view should scroll to (set by the outline). */
   scrollRequest = $state.raw<{ line: number; slug: string } | null>(null)
 
   toasts = $state<Toast[]>([])
   confirmRequest = $state.raw<ConfirmRequest | null>(null)
+  promptRequest = $state.raw<PromptRequest | null>(null)
   private toastId = 0
   /** A move started here is in progress: its "removed" events are expected. */
   private moving = 0
@@ -105,7 +136,7 @@ class App {
       this.signedIn(await api.me())
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        this.mode = err.body.mode === 'proxy' ? 'proxy' : 'password'
+        this.mode = err.body.mode === 'proxy' ? 'proxy' : 'local'
       } else {
         this.toast(errorMessage(err))
       }
@@ -113,8 +144,8 @@ class App {
     }
   }
 
-  async login(password: string): Promise<void> {
-    this.signedIn(await api.login(password))
+  async login(username: string, password: string): Promise<void> {
+    this.signedIn(await api.login(username, password))
   }
 
   async logout(): Promise<void> {
@@ -127,19 +158,19 @@ class App {
     }
     live.stop()
     this.closeNote()
-    router.go(null, true)
     this.entries = []
     this.treeLoaded = false
+    this.somas = []
+    this.somasLoaded = false
+    this.somaId = ''
+    setSoma('')
+    this.user = null
     this.auth = 'anonymous'
     if (this.mode === 'proxy' && logoutUrl) window.location.assign(logoutUrl)
   }
 
   persistExpanded(): void {
-    try {
-      localStorage.setItem(EXPANDED_KEY, JSON.stringify([...this.expanded]))
-    } catch {
-      // Private mode or storage disabled: the tree just forgets its state.
-    }
+    if (this.somaId) storage(`${EXPANDED_KEY}.${this.somaId}`, JSON.stringify([...this.expanded]))
   }
 
   private signedIn(me: Me): void {
@@ -147,6 +178,53 @@ class App {
     this.mode = me.mode
     this.logoutUrl = me.logoutUrl ?? ''
     this.auth = 'authenticated'
+    void this.loadSomas()
+  }
+
+  /** Updates the signed-in account after a profile change. */
+  setUser(u: User): void {
+    this.user = u
+  }
+
+  // --- Somas -------------------------------------------------------------
+
+  /** Loads the account's somas; without a soma in the URL, opens the last one. */
+  async loadSomas(): Promise<void> {
+    try {
+      this.somas = await api.listSomas()
+      this.somasLoaded = true
+    } catch (err) {
+      if (!(err instanceof ApiError && err.status === 401)) this.toast(errorMessage(err))
+      return
+    }
+    const wanted = router.soma
+    if (wanted && this.somas.some((s) => s.id === wanted)) return // the shell opens it
+    if (router.view === 'admin') return
+    if (wanted) this.toast(strings.somas.notFound)
+    router.goSoma(this.preferredSoma(), true)
+  }
+
+  /** The soma used last on this device, or else the first one; '' without somas. */
+  preferredSoma(): string {
+    const last = storage(LAST_SOMA_KEY)
+    return (this.somas.find((s) => s.id === last) ?? this.somas[0])?.id ?? ''
+  }
+
+  /** Opens a soma: its tree and live updates. Called when the URL names another soma. */
+  useSoma(id: string): void {
+    if (id === this.somaId && currentSoma() === id) return
+    const prev = this.note
+    if (prev) void prev.flush().finally(() => prev.close())
+    this.note = null
+    live.stop()
+    this.somaId = id
+    setSoma(id)
+    this.entries = []
+    this.treeLoaded = false
+    this.expanded.clear()
+    if (!id) return
+    for (const p of loadExpanded(id)) this.expanded.add(p)
+    storage(LAST_SOMA_KEY, id)
     void this.refresh()
     live.start({
       resync: () => {
@@ -158,9 +236,74 @@ class App {
     })
   }
 
+  async createSoma(rawName: string): Promise<boolean> {
+    const name = rawName.trim()
+    if (!name) return false
+    try {
+      const created = await api.createSoma(name)
+      this.somas = await api.listSomas()
+      router.goSoma(created.id)
+      this.toast(strings.somas.created(created.name), 'info')
+      return true
+    } catch (err) {
+      this.toast(errorMessage(err))
+      return false
+    }
+  }
+
+  async renameSoma(id: string, rawName: string): Promise<boolean> {
+    const name = rawName.trim()
+    if (!name) return false
+    try {
+      await api.renameSoma(id, name)
+      this.somas = this.somas.map((s) => (s.id === id ? { ...s, name } : s))
+      return true
+    } catch (err) {
+      this.toast(errorMessage(err))
+      return false
+    }
+  }
+
+  /** Re-reads the soma list after changes made elsewhere (admin area); leaves a soma that is gone. */
+  async refreshSomas(): Promise<void> {
+    try {
+      this.somas = await api.listSomas()
+    } catch {
+      return
+    }
+    if (!this.somaId || this.somas.some((s) => s.id === this.somaId)) return
+    if (router.view === 'admin') this.useSoma(this.preferredSoma())
+    else router.goSoma(this.preferredSoma(), true)
+  }
+
+  async deleteSoma(id: string): Promise<void> {
+    const soma = this.somas.find((s) => s.id === id)
+    if (!soma) return
+    const ok = await this.ask({
+      title: strings.somas.deleteTitle,
+      message: strings.somas.deleteMessage(soma.name),
+      confirmLabel: strings.somas.delete,
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await api.deleteSoma(id)
+    } catch (err) {
+      this.toast(errorMessage(err))
+      return
+    }
+    this.toast(strings.somas.deleted(soma.name), 'info')
+    this.somas = await api.listSomas().catch(() => this.somas.filter((s) => s.id !== id))
+    const next = this.somas[0]
+    if (id === this.somaId) router.goSoma(next?.id ?? '', true)
+  }
+
   private sessionEnded(): void {
     if (this.auth !== 'authenticated') return
     live.stop()
+    this.closeNote()
+    this.somaId = ''
+    setSoma('')
     this.auth = 'anonymous'
     this.toast(strings.auth.sessionEnded, 'info')
   }
@@ -464,6 +607,20 @@ class App {
     return new Promise((resolve) => {
       this.confirmRequest = { ...req, resolve }
     })
+  }
+
+  /** Asks for a line of text (e.g. a name); null if cancelled. */
+  prompt(req: Omit<PromptRequest, 'resolve'>): Promise<string | null> {
+    this.promptRequest?.resolve(null)
+    return new Promise((resolve) => {
+      this.promptRequest = { ...req, resolve }
+    })
+  }
+
+  answerPrompt(value: string | null): void {
+    const req = this.promptRequest
+    this.promptRequest = null
+    req?.resolve(value)
   }
 
   answer(ok: boolean): void {

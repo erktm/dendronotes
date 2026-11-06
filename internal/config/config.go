@@ -25,40 +25,43 @@ const Prefix = "DENDRONOTES_"
 
 // Names of the environment variables.
 const (
-	EnvSomaDir          = Prefix + "SOMA_DIR"
-	EnvDataDir          = Prefix + "DATA_DIR"
-	EnvHTTPPort         = Prefix + "HTTP_PORT"
-	EnvLogLevel         = Prefix + "LOG_LEVEL"
-	EnvLogFormat        = Prefix + "LOG_FORMAT"
-	EnvShutdownTimeout  = Prefix + "SHUTDOWN_TIMEOUT"
-	EnvTrustedProxies   = Prefix + "TRUSTED_PROXIES"
-	EnvMaxNoteMB        = Prefix + "MAX_NOTE_MB"
-	EnvMaxUploadMB      = Prefix + "MAX_UPLOAD_MB"
-	EnvIgnore           = Prefix + "IGNORE"
-	EnvRescanInterval   = Prefix + "RESCAN_INTERVAL"
-	EnvAuthMode         = Prefix + "AUTH_MODE"
-	EnvPasswordHash     = Prefix + "AUTH_PASSWORD_HASH"
-	EnvPasswordHashFile = Prefix + "AUTH_PASSWORD_HASH_FILE"
-	EnvPasswordFile     = Prefix + "AUTH_PASSWORD_FILE"
-	EnvSessionTTL       = Prefix + "SESSION_TTL"
-	EnvCookieSecure     = Prefix + "COOKIE_SECURE"
-	EnvProxyHeader      = Prefix + "AUTH_PROXY_HEADER"
-	EnvProxyAllowed     = Prefix + "AUTH_PROXY_ALLOWED_USERS"
-	EnvProxyLogoutURL   = Prefix + "AUTH_PROXY_LOGOUT_URL"
+	EnvSomasDir        = Prefix + "SOMAS_DIR"
+	EnvSomaDir         = Prefix + "SOMA_DIR"
+	EnvDataDir         = Prefix + "DATA_DIR"
+	EnvHTTPPort        = Prefix + "HTTP_PORT"
+	EnvLogLevel        = Prefix + "LOG_LEVEL"
+	EnvLogFormat       = Prefix + "LOG_FORMAT"
+	EnvShutdownTimeout = Prefix + "SHUTDOWN_TIMEOUT"
+	EnvTrustedProxies  = Prefix + "TRUSTED_PROXIES"
+	EnvMaxNoteMB       = Prefix + "MAX_NOTE_MB"
+	EnvMaxUploadMB     = Prefix + "MAX_UPLOAD_MB"
+	EnvIgnore          = Prefix + "IGNORE"
+	EnvRescanInterval  = Prefix + "RESCAN_INTERVAL"
+	EnvAuthMode        = Prefix + "AUTH_MODE"
+	EnvAdminUsername   = Prefix + "ADMIN_USERNAME"
+	EnvAdminHash       = Prefix + "ADMIN_PASSWORD_HASH"
+	EnvAdminHashFile   = Prefix + "ADMIN_PASSWORD_HASH_FILE"
+	EnvAdminPassword   = Prefix + "ADMIN_PASSWORD_FILE"
+	EnvSessionTTL      = Prefix + "SESSION_TTL"
+	EnvCookieSecure    = Prefix + "COOKIE_SECURE"
+	EnvProxyHeader     = Prefix + "AUTH_PROXY_HEADER"
+	EnvProxyAllowed    = Prefix + "AUTH_PROXY_ALLOWED_USERS"
+	EnvProxyLogoutURL  = Prefix + "AUTH_PROXY_LOGOUT_URL"
 )
 
 // Vars lists every supported variable. README.md documents all of them
 // (enforced by a test).
 var Vars = []string{
-	EnvSomaDir, EnvDataDir, EnvHTTPPort, EnvLogLevel, EnvLogFormat, EnvShutdownTimeout,
-	EnvTrustedProxies, EnvMaxNoteMB, EnvMaxUploadMB, EnvIgnore, EnvRescanInterval, EnvAuthMode, EnvPasswordHash,
-	EnvPasswordHashFile, EnvPasswordFile, EnvSessionTTL, EnvCookieSecure,
+	EnvSomasDir, EnvSomaDir, EnvDataDir, EnvHTTPPort, EnvLogLevel, EnvLogFormat, EnvShutdownTimeout,
+	EnvTrustedProxies, EnvMaxNoteMB, EnvMaxUploadMB, EnvIgnore, EnvRescanInterval, EnvAuthMode, EnvAdminUsername,
+	EnvAdminHash, EnvAdminHashFile, EnvAdminPassword, EnvSessionTTL, EnvCookieSecure,
 	EnvProxyHeader, EnvProxyAllowed, EnvProxyLogoutURL,
 }
 
 // Config holds all runtime settings.
 type Config struct {
-	SomaDir         string         // root of the soma (source of truth)
+	SomasDir        string         // one folder per soma (source of truth)
+	ImportSomaDir   string         // an existing soma to register for the first admin (optional)
 	DataDir         string         // derived caches (index, sessions)
 	Port            int            // HTTP port
 	LogLevel        slog.Level     // debug|info|warn|error
@@ -74,9 +77,10 @@ type Config struct {
 
 // Auth holds the authentication settings.
 type Auth struct {
-	Mode           string        // password|proxy
-	PasswordHash   string        // argon2id hash (from the variable or a file)
-	Password       Secret        // plain password from a file, hashed at startup
+	Mode           string        // local|proxy
+	AdminUsername  string        // the first admin account, created if no admin exists
+	AdminHash      string        // its argon2id hash (from the variable or a file)
+	AdminPassword  Secret        // or its plain password from a file, hashed at startup
 	SessionTTL     time.Duration // sliding session lifetime
 	CookieSecure   string        // auto|true|false
 	ProxyHeader    string        // header carrying the user in proxy mode
@@ -95,7 +99,8 @@ func (s Secret) MarshalText() ([]byte, error) { return []byte("[redacted]"), nil
 
 // Defaults
 const (
-	DefaultSomaDir         = "/soma"
+	DefaultSomasDir        = "/somas"
+	DefaultAdminUsername   = "admin"
 	DefaultDataDir         = "/data"
 	DefaultPort            = 8080
 	DefaultShutdownTimeout = 20 * time.Second
@@ -111,7 +116,8 @@ const (
 // directories. All problems found are returned together.
 func Load(getenv func(string) string) (Config, error) {
 	c := Config{
-		SomaDir:         envOr(getenv, EnvSomaDir, DefaultSomaDir),
+		SomasDir:        envOr(getenv, EnvSomasDir, DefaultSomasDir),
+		ImportSomaDir:   getenv(EnvSomaDir),
 		DataDir:         envOr(getenv, EnvDataDir, DefaultDataDir),
 		Port:            DefaultPort,
 		LogLevel:        slog.LevelInfo,
@@ -121,10 +127,11 @@ func Load(getenv func(string) string) (Config, error) {
 		MaxNoteBytes:    DefaultMaxNoteMB << 20,
 		MaxUploadBytes:  DefaultMaxUploadMB << 20,
 		Auth: Auth{
-			Mode:         "password",
-			SessionTTL:   DefaultSessionTTL,
-			CookieSecure: "auto",
-			ProxyHeader:  envOr(getenv, EnvProxyHeader, DefaultProxyHeader),
+			Mode:          "local",
+			AdminUsername: DefaultAdminUsername,
+			SessionTTL:    DefaultSessionTTL,
+			CookieSecure:  "auto",
+			ProxyHeader:   envOr(getenv, EnvProxyHeader, DefaultProxyHeader),
 		},
 	}
 	var errs []error
@@ -240,40 +247,40 @@ func (c *Config) loadAuth(getenv func(string) string) error {
 		}
 	}
 
+	if v := strings.TrimSpace(getenv(EnvAdminUsername)); v != "" {
+		a.AdminUsername = v
+	}
+	sources := 0
+	if v := getenv(EnvAdminHash); v != "" {
+		a.AdminHash = strings.TrimSpace(v)
+		sources++
+	}
+	if f := getenv(EnvAdminHashFile); f != "" {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", EnvAdminHashFile, err))
+		}
+		a.AdminHash = strings.TrimSpace(string(b))
+		sources++
+	}
+	if f := getenv(EnvAdminPassword); f != "" {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", EnvAdminPassword, err))
+		}
+		pw := strings.TrimRight(string(b), "\r\n")
+		if err == nil && len(pw) < minPasswordLen {
+			errs = append(errs, fmt.Errorf("%s: the password must have at least %d characters", EnvAdminPassword, minPasswordLen))
+		}
+		a.AdminPassword = Secret(pw)
+		sources++
+	}
+	if sources > 1 {
+		errs = append(errs, fmt.Errorf("set only one of %s, %s and %s", EnvAdminHash, EnvAdminHashFile, EnvAdminPassword))
+	}
+
 	switch a.Mode {
-	case "password":
-		sources := 0
-		if v := getenv(EnvPasswordHash); v != "" {
-			a.PasswordHash = strings.TrimSpace(v)
-			sources++
-		}
-		if f := getenv(EnvPasswordHashFile); f != "" {
-			b, err := os.ReadFile(f)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("%s: %w", EnvPasswordHashFile, err))
-			}
-			a.PasswordHash = strings.TrimSpace(string(b))
-			sources++
-		}
-		if f := getenv(EnvPasswordFile); f != "" {
-			b, err := os.ReadFile(f)
-			if err != nil {
-				errs = append(errs, fmt.Errorf("%s: %w", EnvPasswordFile, err))
-			}
-			pw := strings.TrimRight(string(b), "\r\n")
-			if err == nil && len(pw) < minPasswordLen {
-				errs = append(errs, fmt.Errorf("%s: the password must have at least %d characters", EnvPasswordFile, minPasswordLen))
-			}
-			a.Password = Secret(pw)
-			sources++
-		}
-		switch {
-		case sources == 0:
-			errs = append(errs, fmt.Errorf("%s=password needs one of %s, %s or %s (create a hash with `dendronotes hash-password`)",
-				EnvAuthMode, EnvPasswordHash, EnvPasswordHashFile, EnvPasswordFile))
-		case sources > 1:
-			errs = append(errs, fmt.Errorf("set only one of %s, %s and %s", EnvPasswordHash, EnvPasswordHashFile, EnvPasswordFile))
-		}
+	case "local":
 	case "proxy":
 		if len(c.TrustedProxies) == 0 {
 			errs = append(errs, fmt.Errorf("%s=proxy needs %s, otherwise anyone could send the user header", EnvAuthMode, EnvTrustedProxies))
@@ -287,45 +294,64 @@ func (c *Config) loadAuth(getenv func(string) string) error {
 			}
 		}
 	default:
-		errs = append(errs, fmt.Errorf("%s: invalid value %q (password, proxy)", EnvAuthMode, a.Mode))
+		errs = append(errs, fmt.Errorf("%s: invalid value %q (local, proxy)", EnvAuthMode, a.Mode))
 	}
 	return errors.Join(errs...)
 }
 
-// checkDirs normalizes the soma and data directories and checks that they are usable.
+// checkDirs normalizes the somas and data directories and checks that they are usable.
 func (c *Config) checkDirs() error {
 	var errs []error
-
-	soma, err := absClean(c.SomaDir)
-	if err != nil {
-		return fmt.Errorf("%s: %w", EnvSomaDir, err)
-	}
-	c.SomaDir = soma
-	if st, err := os.Stat(soma); err != nil {
-		errs = append(errs, fmt.Errorf("%s: %w", EnvSomaDir, err))
-	} else if !st.IsDir() {
-		errs = append(errs, fmt.Errorf("%s: %s is not a directory", EnvSomaDir, soma))
-	}
-
-	data, err := absClean(c.DataDir)
-	if err != nil {
-		return errors.Join(append(errs, fmt.Errorf("%s: %w", EnvDataDir, err))...)
-	}
-	c.DataDir = data
-	if err := os.MkdirAll(data, 0o750); err != nil {
-		errs = append(errs, fmt.Errorf("%s: %w", EnvDataDir, err))
-	} else if err := probeWritable(data); err != nil {
-		errs = append(errs, fmt.Errorf("%s: %s is not writable: %w", EnvDataDir, data, err))
-	}
-
-	// The cache must not live inside the soma: it would be synced along,
-	// picked up by the watcher and treated as note content.
-	if len(errs) == 0 {
-		inside, err := isWithin(soma, data)
+	usable := func(env, dir string) (string, error) {
+		abs, err := absClean(dir)
 		if err != nil {
-			errs = append(errs, err)
-		} else if inside {
-			errs = append(errs, fmt.Errorf("%s (%s) must not be inside %s (%s)", EnvDataDir, data, EnvSomaDir, soma))
+			return "", fmt.Errorf("%s: %w", env, err)
+		}
+		if err := os.MkdirAll(abs, 0o750); err != nil {
+			return abs, fmt.Errorf("%s: %w", env, err)
+		}
+		if err := probeWritable(abs); err != nil {
+			return abs, fmt.Errorf("%s: %s is not writable: %w", env, abs, err)
+		}
+		return abs, nil
+	}
+
+	somas, err := usable(EnvSomasDir, c.SomasDir)
+	c.SomasDir = somas
+	if err != nil {
+		errs = append(errs, err)
+	}
+	data, err := usable(EnvDataDir, c.DataDir)
+	c.DataDir = data
+	if err != nil {
+		errs = append(errs, err)
+	}
+	if c.ImportSomaDir != "" {
+		imp, err := absClean(c.ImportSomaDir)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", EnvSomaDir, err))
+		} else if st, err := os.Stat(imp); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", EnvSomaDir, err))
+		} else if !st.IsDir() {
+			errs = append(errs, fmt.Errorf("%s: %s is not a directory", EnvSomaDir, imp))
+		}
+		c.ImportSomaDir = imp
+	}
+
+	// The data must not live inside a soma: it would be synced along, picked
+	// up by the watcher and treated as note content.
+	if len(errs) == 0 {
+		roots := map[string]string{EnvSomasDir: somas}
+		if c.ImportSomaDir != "" {
+			roots[EnvSomaDir] = c.ImportSomaDir
+		}
+		for env, root := range roots {
+			inside, err := isWithin(root, data)
+			if err != nil {
+				errs = append(errs, err)
+			} else if inside {
+				errs = append(errs, fmt.Errorf("%s (%s) must not be inside %s (%s)", EnvDataDir, data, env, root))
+			}
 		}
 	}
 	return errors.Join(errs...)
@@ -390,4 +416,64 @@ func isWithin(parent, child string) (bool, error) {
 		return false, nil
 	}
 	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))), nil
+}
+
+// Describe returns the effective value of a variable for display (admin
+// area). Secrets are never shown, only whether they are set.
+func (c Config) Describe(name string) string {
+	secret := func(set bool) string {
+		if set {
+			return "(set)"
+		}
+		return ""
+	}
+	switch name {
+	case EnvSomasDir:
+		return c.SomasDir
+	case EnvSomaDir:
+		return c.ImportSomaDir
+	case EnvDataDir:
+		return c.DataDir
+	case EnvHTTPPort:
+		return strconv.Itoa(c.Port)
+	case EnvLogLevel:
+		return strings.ToLower(c.LogLevel.String())
+	case EnvLogFormat:
+		return c.LogFormat
+	case EnvShutdownTimeout:
+		return c.ShutdownTimeout.String()
+	case EnvTrustedProxies:
+		parts := make([]string, len(c.TrustedProxies))
+		for i, p := range c.TrustedProxies {
+			parts[i] = p.String()
+		}
+		return strings.Join(parts, ", ")
+	case EnvMaxNoteMB:
+		return strconv.FormatInt(c.MaxNoteBytes>>20, 10)
+	case EnvMaxUploadMB:
+		return strconv.FormatInt(c.MaxUploadBytes>>20, 10)
+	case EnvIgnore:
+		return strings.Join(c.Ignore, ", ")
+	case EnvRescanInterval:
+		return c.RescanInterval.String()
+	case EnvAuthMode:
+		return c.Auth.Mode
+	case EnvAdminUsername:
+		return c.Auth.AdminUsername
+	case EnvAdminHash, EnvAdminHashFile:
+		return secret(c.Auth.AdminHash != "")
+	case EnvAdminPassword:
+		return secret(c.Auth.AdminPassword != "")
+	case EnvSessionTTL:
+		return c.Auth.SessionTTL.String()
+	case EnvCookieSecure:
+		return c.Auth.CookieSecure
+	case EnvProxyHeader:
+		return c.Auth.ProxyHeader
+	case EnvProxyAllowed:
+		return strings.Join(c.Auth.ProxyAllowed, ", ")
+	case EnvProxyLogoutURL:
+		return c.Auth.ProxyLogoutURL
+	}
+	return ""
 }

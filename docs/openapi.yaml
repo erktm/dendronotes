@@ -88,7 +88,89 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Me" }
         "401": { $ref: "#/components/responses/Unauthorized" }
-  /api/soma/tree:
+  /api/me:
+    patch:
+      summary: Change your display name or e-mail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName: { type: string }
+                email: { type: string }
+      responses:
+        "200": { description: The updated account., content: { application/json: { schema: { $ref: "#/components/schemas/User" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/me/password:
+    post:
+      summary: Change your password (local accounts); your other sessions end
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current, new]
+              properties:
+                current: { type: string }
+                new: { type: string, minLength: 10 }
+      responses:
+        "200": { description: Changed. }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/somas:
+    get:
+      summary: Your somas (owned and shared with you)
+      responses:
+        "200":
+          description: Somas by name, with your role.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  somas: { type: array, items: { $ref: "#/components/schemas/Membership" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      summary: Create a new, empty soma that you own
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [name], properties: { name: { type: string, maxLength: 100 } } }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/Membership" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+    patch:
+      summary: Rename a soma (owner)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [name], properties: { name: { type: string } } }
+      responses:
+        "200": { description: Renamed; the folder keeps its name. }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Delete a soma (owner); its folder moves to SOMAS_DIR/.trash
+      responses:
+        "200": { description: Deleted. }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/tree:
+    parameters:
+      - $ref: "#/components/parameters/soma"
     get:
       summary: All visible files and folders of the soma
       description: Hidden entries (names starting with a dot, e.g. .trash) and ignored names are not listed.
@@ -105,8 +187,9 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Entry" }
         "401": { $ref: "#/components/responses/Unauthorized" }
-  /api/soma/notes/{path}:
+  /api/somas/{soma}/notes/{path}:
     parameters:
+      - $ref: "#/components/parameters/soma"
       - $ref: "#/components/parameters/path"
     get:
       summary: Read a note
@@ -175,8 +258,9 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409": { $ref: "#/components/responses/Error" }
-  /api/soma/folders/{path}:
+  /api/somas/{soma}/folders/{path}:
     parameters:
+      - $ref: "#/components/parameters/soma"
       - $ref: "#/components/parameters/path"
     post:
       summary: Create a folder
@@ -189,8 +273,9 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409": { $ref: "#/components/responses/Error" }
-  /api/soma/files/{path}:
+  /api/somas/{soma}/files/{path}:
     parameters:
+      - $ref: "#/components/parameters/soma"
       - $ref: "#/components/parameters/path"
     get:
       summary: Download a file (attachments, images, media)
@@ -233,7 +318,9 @@ paths:
         "409": { $ref: "#/components/responses/Error" }
         "413": { $ref: "#/components/responses/Error" }
         "415": { $ref: "#/components/responses/Error" }
-  /api/soma/move:
+  /api/somas/{soma}/move:
+    parameters:
+      - $ref: "#/components/parameters/soma"
     post:
       summary: Rename or move a file or folder
       requestBody:
@@ -269,8 +356,9 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/Error" }
         "409": { $ref: "#/components/responses/Error" }
-  /api/soma/entries/{path}:
+  /api/somas/{soma}/entries/{path}:
     parameters:
+      - $ref: "#/components/parameters/soma"
       - $ref: "#/components/parameters/path"
     delete:
       summary: Move a file or folder to the .trash folder of the soma
@@ -285,7 +373,9 @@ paths:
                   trashedTo: { type: string, example: .trash/Projects/Idea.md }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/Error" }
-  /api/soma/search:
+  /api/somas/{soma}/search:
+    parameters:
+      - $ref: "#/components/parameters/soma"
     get:
       summary: Full-text search
       description: >
@@ -308,8 +398,9 @@ paths:
                   complete: { type: boolean }
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Unauthorized" }
-  /api/soma/backlinks/{path}:
+  /api/somas/{soma}/backlinks/{path}:
     parameters:
+      - $ref: "#/components/parameters/soma"
       - $ref: "#/components/parameters/path"
     get:
       summary: Notes with synapses to this note ("Incoming synapses")
@@ -325,7 +416,9 @@ paths:
                   backlinks: { type: array, items: { $ref: "#/components/schemas/Backlink" } }
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Unauthorized" }
-  /api/soma/tags:
+  /api/somas/{soma}/tags:
+    parameters:
+      - $ref: "#/components/parameters/soma"
     get:
       summary: All tags with the number of notes using them
       responses:
@@ -346,7 +439,9 @@ paths:
                         tag: { type: string, example: garden/beds }
                         count: { type: integer }
         "401": { $ref: "#/components/responses/Unauthorized" }
-  /api/soma/graph:
+  /api/somas/{soma}/graph:
+    parameters:
+      - $ref: "#/components/parameters/soma"
     get:
       summary: All notes and the synapses between them
       description: >
@@ -381,7 +476,9 @@ paths:
                         source: { type: string }
                         target: { type: string }
         "401": { $ref: "#/components/responses/Unauthorized" }
-  /api/soma/events:
+  /api/somas/{soma}/events:
+    parameters:
+      - $ref: "#/components/parameters/soma"
     get:
       summary: Live updates (Server-Sent Events)
       description: >
@@ -398,6 +495,136 @@ paths:
               schema: { $ref: "#/components/schemas/Change" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "503": { $ref: "#/components/responses/Error" }
+  /api/admin/users:
+    get:
+      summary: All accounts (admin)
+      responses:
+        "200": { description: Accounts., content: { application/json: { schema: { type: object, properties: { users: { type: array, items: { $ref: "#/components/schemas/User" } } } } } } }
+        "403": { $ref: "#/components/responses/Error" }
+    post:
+      summary: Create a local account (admin); it gets a first soma
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password, role]
+              properties:
+                username: { type: string }
+                displayName: { type: string }
+                email: { type: string }
+                password: { type: string, minLength: 10 }
+                role: { type: string, enum: [admin, user] }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/User" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/admin/users/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    patch:
+      summary: Change display name, e-mail, role or the disabled flag (admin)
+      description: The last enabled admin can be neither demoted nor disabled (409 last_admin). Disabling ends the account's sessions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName: { type: string }
+                email: { type: string }
+                role: { type: string, enum: [admin, user] }
+                disabled: { type: boolean }
+      responses:
+        "200": { description: Updated., content: { application/json: { schema: { $ref: "#/components/schemas/User" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Delete an account (admin)
+      description: Its somas go to the account in transferTo, or to the trash without it.
+      parameters:
+        - { name: transferTo, in: query, schema: { type: integer } }
+      responses:
+        "200": { description: Deleted. }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/admin/users/{id}/password:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    post:
+      summary: Set a local account's password (admin); its sessions end
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [password], properties: { password: { type: string, minLength: 10 } } }
+      responses:
+        "200": { description: Set. }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/admin/users/{id}/sessions:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    delete:
+      summary: End all sessions of an account (admin; your own current one stays)
+      responses:
+        "200": { description: Ended. }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/admin/somas:
+    get:
+      summary: All somas with owner, members and size (admin)
+      responses:
+        "200": { description: Somas. }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/admin/somas/{soma}:
+    parameters:
+      - { name: soma, in: path, required: true, schema: { type: string } }
+    patch:
+      summary: Transfer a soma to another owner (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [ownerId], properties: { ownerId: { type: integer } } }
+      responses:
+        "200": { description: Transferred; the previous owner stays as editor. }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Delete a soma (admin); its folder moves to SOMAS_DIR/.trash
+      responses:
+        "200": { description: Deleted. }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/admin/sessions:
+    get:
+      summary: All valid sessions (admin); `current` is the caller's
+      responses:
+        "200": { description: Sessions. }
+  /api/admin/sessions/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    delete:
+      summary: End one session (admin)
+      responses:
+        "200": { description: Ended. }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/admin/server:
+    get:
+      summary: Server state, storage, open somas and effective configuration (admin; secrets only as "(set)")
+      responses:
+        "200": { description: Server state. }
+  /api/admin/audit:
+    get:
+      summary: Audit log, newest first (admin)
+      parameters:
+        - { name: before, in: query, schema: { type: integer }, description: Only entries with a smaller id (paging). }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+      responses:
+        "200": { description: Entries. }
 components:
   securitySchemes:
     session:
@@ -408,6 +635,17 @@ components:
         Session cookie (named dendronotes_session over plain HTTP). In proxy
         mode the reverse proxy authenticates every request instead.
   parameters:
+    soma:
+      name: soma
+      in: path
+      required: true
+      description: Id of a soma the caller is a member of (non-members get 404).
+      schema: { type: string, example: k3xq7m2a9b }
+    id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer }
     path:
       name: path
       in: path
@@ -441,7 +679,11 @@ components:
             read_only, too_large, is_directory, not_a_directory, move_into_self,
             if_match_required, content_required, bad_request,
             unsupported_media_type, cross_origin_request, query_too_long,
-            invalid_limit, too_many_streams, unsupported_type, internal_error.
+            invalid_limit, too_many_streams, unsupported_type, forbidden,
+            invalid_credentials, account_disabled, rate_limited, wrong_password,
+            weak_password, not_local, invalid_username, username_taken,
+            invalid_role, invalid_display_name, invalid_email, last_admin, self,
+            invalid_transfer, too_many_somas, shutting_down, internal_error.
     Readiness:
       type: object
       properties:
@@ -450,15 +692,39 @@ components:
           type: object
           properties:
             server: { type: string, enum: [ok, starting, shutting_down] }
-            index: { type: string, enum: [ok, building] }
-            soma: { type: string, enum: [ok, unavailable] }
+            state: { type: string, enum: [ok, unavailable] }
+            somas: { type: string, enum: [ok, unavailable] }
     Me:
       type: object
       required: [user, mode]
       properties:
-        user: { type: string }
-        mode: { type: string, enum: [password, proxy] }
+        user: { $ref: "#/components/schemas/User" }
+        mode: { type: string, enum: [local, proxy] }
         logoutUrl: { type: string }
+    User:
+      type: object
+      properties:
+        id: { type: integer }
+        username: { type: string }
+        displayName: { type: string }
+        email: { type: string }
+        role: { type: string, enum: [admin, user] }
+        source: { type: string, enum: [local, oidc, proxy] }
+        disabled: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        lastLoginAt: { type: string, format: date-time }
+    Membership:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        role: { type: string, enum: [owner, editor, viewer] }
+        owner:
+          type: object
+          properties:
+            id: { type: integer }
+            username: { type: string }
+            displayName: { type: string }
     Entry:
       type: object
       required: [path, type, mtime]

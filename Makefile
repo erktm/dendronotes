@@ -7,10 +7,12 @@ PLATFORM          ?= linux/$(shell uname -m | sed -e 's/x86_64/amd64/' -e 's/aar
 LDFLAGS           := -s -w -X main.version=$(VERSION)
 
 DEV_SOMA     ?= $(CURDIR)/dev/soma
+DEV_SOMAS    ?= $(CURDIR)/dev/somas
 DEV_DATA     ?= $(CURDIR)/dev/data
 DEV_PASSWORD := $(CURDIR)/dev/password
-DEV_ENV       = DENDRONOTES_SOMA_DIR=$(DEV_SOMA) DENDRONOTES_DATA_DIR=$(DEV_DATA) DENDRONOTES_AUTH_PASSWORD_FILE=$(DEV_PASSWORD) \
-                DENDRONOTES_LOG_FORMAT=text DENDRONOTES_LOG_LEVEL=debug
+# dev/soma (the single soma of earlier versions) becomes the admin's first soma.
+DEV_ENV       = DENDRONOTES_SOMAS_DIR=$(DEV_SOMAS) DENDRONOTES_SOMA_DIR=$(DEV_SOMA) DENDRONOTES_DATA_DIR=$(DEV_DATA) \
+                DENDRONOTES_ADMIN_PASSWORD_FILE=$(DEV_PASSWORD) DENDRONOTES_LOG_FORMAT=text DENDRONOTES_LOG_LEVEL=debug
 
 NPM_DEPS := web/node_modules/.package-lock.json
 
@@ -32,11 +34,11 @@ $(DEV_PASSWORD):
 	@chmod 600 $@
 
 dev-setup: $(DEV_PASSWORD)
-	@mkdir -p $(DEV_SOMA) $(DEV_DATA)
+	@mkdir -p $(DEV_SOMA) $(DEV_SOMAS) $(DEV_DATA)
 	@if [ -z "$$(ls -A $(DEV_SOMA))" ]; then \
 	  printf '# Welcome to dendronotes\n\nThis note is a plain Markdown file in your dev soma (dev/soma).\n' > $(DEV_SOMA)/Welcome.md; \
 	fi
-	@echo "Dev password: $$(cat $(DEV_PASSWORD))   (stored in dev/password)"
+	@echo "Dev login: admin / $$(cat $(DEV_PASSWORD))   (password stored in dev/password)"
 
 # Fail early with a clear hint if an earlier `make dev` still holds the ports.
 dev-ports:
@@ -135,10 +137,11 @@ image-offline: ## Rebuild without cache and network (checks air-gap readiness; n
 	docker load -i $(OCI_TAR)
 
 run-image: dev-setup ## Run the image hardened (read-only, no capabilities)
+	@mkdir -p $(CURDIR)/dev/data-image
 	docker run --rm -p 8080:8080 \
 	  --read-only --cap-drop ALL --security-opt no-new-privileges \
-	  -v $(DEV_SOMA):/soma -v $(DEV_DATA):/data \
-	  -v $(DEV_PASSWORD):/run/secrets/password:ro -e DENDRONOTES_AUTH_PASSWORD_FILE=/run/secrets/password \
+	  -v $(DEV_SOMAS):/somas -v $(CURDIR)/dev/data-image:/data \
+	  -v $(DEV_PASSWORD):/run/secrets/password:ro -e DENDRONOTES_ADMIN_PASSWORD_FILE=/run/secrets/password \
 	  $(IMAGE)
 
 clean: ## Remove build artifacts

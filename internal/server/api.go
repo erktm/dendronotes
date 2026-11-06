@@ -11,6 +11,7 @@ import (
 	"dendronotes/internal/httpx"
 	"dendronotes/internal/relink"
 	"dendronotes/internal/soma"
+	"dendronotes/internal/somas"
 )
 
 // route is one endpoint. The table is the single source of truth for the
@@ -19,49 +20,76 @@ type route struct {
 	method  string
 	pattern string
 	handler http.HandlerFunc
-	public  bool // reachable without authentication
+	access  access
 }
 
-// routes lists all endpoints except the frontend assets. Everything that
-// works on the soma lives below /api/soma/ and requires a signed-in user.
 func (s *Server) routes() []route {
 	return []route{
-		{"GET", "/healthz", s.handleHealthz, true},
-		{"GET", "/readyz", s.handleReadyz, true},
+		{"GET", "/healthz", s.handleHealthz, public},
+		{"GET", "/readyz", s.handleReadyz, public},
 
-		{"POST", "/api/auth/login", s.auth.HandleLogin, true},
-		{"POST", "/api/auth/logout", s.auth.HandleLogout, true},
-		{"GET", "/api/auth/me", s.auth.HandleMe, true},
+		{"POST", "/api/auth/login", s.auth.HandleLogin, public},
+		{"POST", "/api/auth/logout", s.auth.HandleLogout, public},
+		{"GET", "/api/auth/me", s.auth.HandleMe, public},
 
-		{"GET", "/api/soma/tree", s.handleTree, false},
-		{"GET", "/api/soma/notes/{path...}", s.handleReadNote, false},
-		{"PUT", "/api/soma/notes/{path...}", s.handleWriteNote, false},
-		{"POST", "/api/soma/notes/{path...}", s.handleCreateNote, false},
-		{"POST", "/api/soma/folders/{path...}", s.handleMkdir, false},
-		{"GET", "/api/soma/files/{path...}", s.handleReadFile, false},
-		{"POST", "/api/soma/files/{path...}", s.handleUpload, false},
-		{"POST", "/api/soma/move", s.handleMove, false},
-		{"DELETE", "/api/soma/entries/{path...}", s.handleTrash, false},
-		{"GET", "/api/soma/search", s.handleSearch, false},
-		{"GET", "/api/soma/backlinks/{path...}", s.handleBacklinks, false},
-		{"GET", "/api/soma/tags", s.handleTags, false},
-		{"GET", "/api/soma/graph", s.handleGraph, false},
-		{"GET", "/api/soma/events", s.handleEvents, false},
+		{"PATCH", "/api/me", s.handleUpdateProfile, signedIn},
+		{"POST", "/api/me/password", s.handleChangePassword, signedIn},
+
+		{"GET", "/api/somas", s.handleListSomas, signedIn},
+		{"POST", "/api/somas", s.handleCreateSoma, signedIn},
+		{"PATCH", "/api/somas/{soma}", s.handleRenameSoma, somaOwner},
+		{"DELETE", "/api/somas/{soma}", s.handleDeleteSoma, somaOwner},
+
+		{"GET", "/api/somas/{soma}/tree", s.handleTree, somaViewer},
+		{"GET", "/api/somas/{soma}/notes/{path...}", s.handleReadNote, somaViewer},
+		{"PUT", "/api/somas/{soma}/notes/{path...}", s.handleWriteNote, somaEditor},
+		{"POST", "/api/somas/{soma}/notes/{path...}", s.handleCreateNote, somaEditor},
+		{"POST", "/api/somas/{soma}/folders/{path...}", s.handleMkdir, somaEditor},
+		{"GET", "/api/somas/{soma}/files/{path...}", s.handleReadFile, somaViewer},
+		{"POST", "/api/somas/{soma}/files/{path...}", s.handleUpload, somaEditor},
+		{"POST", "/api/somas/{soma}/move", s.handleMove, somaEditor},
+		{"DELETE", "/api/somas/{soma}/entries/{path...}", s.handleTrash, somaEditor},
+		{"GET", "/api/somas/{soma}/search", s.handleSearch, somaViewer},
+		{"GET", "/api/somas/{soma}/backlinks/{path...}", s.handleBacklinks, somaViewer},
+		{"GET", "/api/somas/{soma}/tags", s.handleTags, somaViewer},
+		{"GET", "/api/somas/{soma}/graph", s.handleGraph, somaViewer},
+		{"GET", "/api/somas/{soma}/events", s.handleEvents, somaViewer},
+
+		{"GET", "/api/admin/users", s.handleAdminUsers, adminOnly},
+		{"POST", "/api/admin/users", s.handleAdminCreateUser, adminOnly},
+		{"PATCH", "/api/admin/users/{id}", s.handleAdminUpdateUser, adminOnly},
+		{"POST", "/api/admin/users/{id}/password", s.handleAdminSetPassword, adminOnly},
+		{"DELETE", "/api/admin/users/{id}", s.handleAdminDeleteUser, adminOnly},
+		{"DELETE", "/api/admin/users/{id}/sessions", s.handleAdminEndUserSessions, adminOnly},
+		{"GET", "/api/admin/somas", s.handleAdminSomas, adminOnly},
+		{"PATCH", "/api/admin/somas/{soma}", s.handleAdminTransferSoma, adminOnly},
+		{"DELETE", "/api/admin/somas/{soma}", s.handleAdminDeleteSoma, adminOnly},
+		{"GET", "/api/admin/sessions", s.handleAdminSessions, adminOnly},
+		{"DELETE", "/api/admin/sessions/{id}", s.handleAdminEndSession, adminOnly},
+		{"GET", "/api/admin/server", s.handleAdminServer, adminOnly},
+		{"GET", "/api/admin/audit", s.handleAdminAudit, adminOnly},
 	}
 }
 
 func (s *Server) registerRoutes(mux *http.ServeMux) {
 	for _, rt := range s.routes() {
 		var h http.Handler = rt.handler
-		if !rt.public {
+		switch rt.access {
+		case public:
+		case signedIn:
 			h = s.auth.Require(h)
+		case adminOnly:
+			h = s.auth.RequireAdmin(h)
+		default:
+			h = s.auth.Require(s.withSoma(rt.access.somaRole(), h))
 		}
 		mux.Handle(rt.method+" "+rt.pattern, h)
 	}
 }
 
 func (s *Server) handleTree(w http.ResponseWriter, r *http.Request) {
-	entries, err := s.soma.Tree()
+	rt := runtimeOf(r)
+	entries, err := rt.Soma.Tree()
 	if err != nil {
 		s.somaError(w, r, err)
 		return
@@ -70,7 +98,8 @@ func (s *Server) handleTree(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleReadNote(w http.ResponseWriter, r *http.Request) {
-	n, err := s.soma.ReadNote(r.PathValue("path"))
+	rt := runtimeOf(r)
+	n, err := rt.Soma.ReadNote(r.PathValue("path"))
 	if err != nil {
 		s.somaError(w, r, err)
 		return
@@ -94,6 +123,7 @@ func metaOf(n soma.Note) noteMeta {
 // handleWriteNote saves a note. If-Match is mandatory, so a client can never
 // overwrite a version it has not seen (lost update protection).
 func (s *Server) handleWriteNote(w http.ResponseWriter, r *http.Request) {
+	rt := runtimeOf(r)
 	etag, ok := parseIfMatch(r.Header.Get("If-Match"))
 	if !ok {
 		httpx.Error(w, http.StatusPreconditionRequired, "if_match_required")
@@ -110,21 +140,22 @@ func (s *Server) handleWriteNote(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "content_required")
 		return
 	}
-	n, err := s.soma.WriteNote(r.PathValue("path"), []byte(*body.Content), etag)
+	n, err := rt.Soma.WriteNote(r.PathValue("path"), []byte(*body.Content), etag)
 	if err != nil {
 		s.somaError(w, r, err)
 		return
 	}
-	if ch, err := s.index.Put(context.WithoutCancel(r.Context()), n); err != nil {
+	if ch, err := rt.Index.Put(context.WithoutCancel(r.Context()), n); err != nil {
 		s.log.Error("index update after save failed", "path", n.Path, "err", err)
 	} else {
-		s.publish(ch)
+		rt.Publish(ch)
 	}
 	w.Header().Set("ETag", quoteETag(n.ETag))
 	httpx.WriteJSON(w, http.StatusOK, metaOf(n))
 }
 
 func (s *Server) handleCreateNote(w http.ResponseWriter, r *http.Request) {
+	rt := runtimeOf(r)
 	var body struct {
 		Content string `json:"content"`
 	}
@@ -132,27 +163,29 @@ func (s *Server) handleCreateNote(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteDecodeError(w, err)
 		return
 	}
-	n, err := s.soma.CreateNote(r.PathValue("path"), []byte(body.Content))
+	n, err := rt.Soma.CreateNote(r.PathValue("path"), []byte(body.Content))
 	if err != nil {
 		s.somaError(w, r, err)
 		return
 	}
-	s.syncAfterWrite(r)
+	rt.SyncAfterWrite(r.Context())
 	w.Header().Set("ETag", quoteETag(n.ETag))
 	httpx.WriteJSON(w, http.StatusCreated, metaOf(n))
 }
 
 func (s *Server) handleMkdir(w http.ResponseWriter, r *http.Request) {
-	e, err := s.soma.Mkdir(r.PathValue("path"))
+	rt := runtimeOf(r)
+	e, err := rt.Soma.Mkdir(r.PathValue("path"))
 	if err != nil {
 		s.somaError(w, r, err)
 		return
 	}
-	s.syncAfterWrite(r)
+	rt.SyncAfterWrite(r.Context())
 	httpx.WriteJSON(w, http.StatusCreated, e)
 }
 
 func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
+	rt := runtimeOf(r)
 	var body struct {
 		From           string `json:"from"`
 		To             string `json:"to"`
@@ -163,24 +196,24 @@ func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !body.UpdateSynapses {
-		to, err := s.soma.Move(body.From, body.To)
+		to, err := rt.Soma.Move(body.From, body.To)
 		if err != nil {
 			s.somaError(w, r, err)
 			return
 		}
-		s.syncAfterWrite(r)
+		rt.SyncAfterWrite(r.Context())
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{"path": to})
 		return
 	}
 
-	s.moveMu.Lock()
-	defer s.moveMu.Unlock()
-	edits, err := s.planRelink(r, body.From, body.To)
+	rt.MoveMu.Lock()
+	defer rt.MoveMu.Unlock()
+	edits, err := s.planRelink(r, rt, body.From, body.To)
 	if err != nil {
 		s.somaError(w, r, err)
 		return
 	}
-	to, err := s.soma.Move(body.From, body.To)
+	to, err := rt.Soma.Move(body.From, body.To)
 	if err != nil {
 		s.somaError(w, r, err)
 		return
@@ -189,7 +222,7 @@ func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 	for _, e := range edits {
 		// Based on the version read before the move: a note edited in the
 		// meantime is reported, never overwritten.
-		if _, err := s.soma.WriteNote(e.Path, []byte(e.Content), e.ETag); err != nil {
+		if _, err := rt.Soma.WriteNote(e.Path, []byte(e.Content), e.ETag); err != nil {
 			s.log.Warn("synapse update skipped", "path", e.Path, "err", err)
 			res.Failed = append(res.Failed, e.Path)
 			continue
@@ -197,7 +230,7 @@ func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 		res.Notes++
 		res.Synapses += e.Synapses
 	}
-	s.syncAfterWrite(r)
+	rt.SyncAfterWrite(r.Context())
 	httpx.WriteJSON(w, http.StatusOK, res)
 }
 
@@ -211,7 +244,7 @@ type moveResult struct {
 
 // planRelink computes the synapse rewrites for moving from to to: a single
 // note or a folder with all notes inside it.
-func (s *Server) planRelink(r *http.Request, from, to string) ([]relink.Edit, error) {
+func (s *Server) planRelink(r *http.Request, rt *somas.Runtime, from, to string) ([]relink.Edit, error) {
 	from, err := soma.CleanPath(from)
 	if err != nil {
 		return nil, err
@@ -220,7 +253,7 @@ func (s *Server) planRelink(r *http.Request, from, to string) ([]relink.Edit, er
 	if err != nil {
 		return nil, err
 	}
-	notes := s.index.Resolver().Notes()
+	notes := rt.Index.Resolver().Notes()
 	moves := map[string]string{}
 	for _, n := range notes {
 		switch {
@@ -233,24 +266,25 @@ func (s *Server) planRelink(r *http.Request, from, to string) ([]relink.Edit, er
 	if len(moves) == 0 {
 		return nil, nil // no notes involved (an attachment or an empty folder)
 	}
-	sources, err := s.index.Referrers(r.Context(), slices.Collect(maps.Keys(moves)))
+	sources, err := rt.Index.Referrers(r.Context(), slices.Collect(maps.Keys(moves)))
 	if err != nil {
 		return nil, err
 	}
 	read := func(p string) (string, string, error) {
-		n, err := s.soma.ReadNote(p)
+		n, err := rt.Soma.ReadNote(p)
 		return n.Content, n.ETag, err
 	}
 	return relink.Plan(read, sources, notes, moves)
 }
 
 func (s *Server) handleTrash(w http.ResponseWriter, r *http.Request) {
-	dst, err := s.soma.Trash(r.PathValue("path"))
+	rt := runtimeOf(r)
+	dst, err := rt.Soma.Trash(r.PathValue("path"))
 	if err != nil {
 		s.somaError(w, r, err)
 		return
 	}
-	s.syncAfterWrite(r)
+	rt.SyncAfterWrite(r.Context())
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"trashedTo": dst})
 }
 

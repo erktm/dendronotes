@@ -5,6 +5,9 @@
   import NoteView from './NoteView.svelte'
   import DetailsPanel from './DetailsPanel.svelte'
   import GraphView from './GraphView.svelte'
+  import AdminView from './AdminView.svelte'
+  import PromptDialog from './PromptDialog.svelte'
+  import ProfileDialog from './ProfileDialog.svelte'
   import EmptyState from './EmptyState.svelte'
   import ConfirmDialog from './ConfirmDialog.svelte'
   import QuickSwitcher from './QuickSwitcher.svelte'
@@ -19,10 +22,31 @@
   const narrow = window.matchMedia('(max-width: 760px)')
   let sidebarOpen = $state(!narrow.matches)
 
-  // Follow the URL.
+  // Follow the URL: first the soma, then the note in it.
   $effect(() => {
+    const soma = router.soma
     const path = router.notePath
-    untrack(() => app.openPath(path))
+    const view = router.view
+    const loaded = app.somasLoaded
+    untrack(() => {
+      if (!loaded) return
+      if (view === 'admin') {
+        // Keep the sidebar useful in the admin area: open the last soma behind it.
+        if (!app.somaId && app.preferredSoma()) app.useSoma(app.preferredSoma())
+      } else {
+        if (soma && app.somas.some((s) => s.id === soma)) {
+          app.useSoma(soma)
+        } else if (soma) {
+          app.toast(strings.somas.notFound)
+          router.goSoma(app.somas[0]?.id ?? '', true)
+          return
+        } else if (app.somas[0]) {
+          router.goSoma(app.somas[0].id, true)
+          return
+        }
+      }
+      app.openPath(app.somaId && soma === app.somaId && view === 'soma' ? path : null)
+    })
     if (narrow.matches) sidebarOpen = false
   })
 
@@ -33,8 +57,29 @@
   })
 
   $effect(() => {
-    document.title = strings.app.title(router.graph ? strings.graph.title : app.note ? displayName(app.note.path) : undefined)
+    document.title = strings.app.title(
+      router.view === 'admin' ? strings.admin.title : router.graph ? strings.graph.title : app.note ? displayName(app.note.path) : app.soma?.name,
+    )
   })
+
+  /** Opens the admin area, or returns to the notes from it. */
+  function toggleAdmin() {
+    if (router.view === 'admin') {
+      router.goSoma(app.somaId || app.preferredSoma())
+    } else router.goAdmin()
+  }
+
+  async function createSoma() {
+    const name = await app.prompt({
+      title: strings.somas.createTitle,
+      text: strings.somas.createText,
+      label: strings.somas.nameLabel,
+      value: '',
+      placeholder: strings.somas.namePlaceholder,
+      confirmLabel: strings.somas.createButton,
+    })
+    if (name) await app.createSoma(name)
+  }
 
   /** Opens the graph, or returns to the last note from it. */
   function toggleGraph() {
@@ -112,6 +157,8 @@
     onopensettings={() => (app.settingsOpen = true)}
     graph={router.graph}
     ongraph={toggleGraph}
+    admin={router.view === 'admin'}
+    onadmin={toggleAdmin}
   />
   {#if sidebarOpen}
     <Sidebar />
@@ -119,9 +166,13 @@
   <main class="main">
     <header class="topbar">
       <nav class="crumbs" aria-label={strings.soma.location}>
-        {#if router.graph}
+        {#if router.view === 'admin'}
+          <span class="current" aria-current="page">{strings.admin.title}</span>
+        {:else if router.graph}
+          {#if app.soma}<span>{app.soma.name}</span><span class="sep" aria-hidden="true">/</span>{/if}
           <span class="current" aria-current="page">{strings.graph.title}</span>
         {:else if app.note}
+          {#if app.soma}<span class="soma-crumb">{app.soma.name}</span><span class="sep soma-crumb" aria-hidden="true">/</span>{/if}
           {#each crumbs as part, i (i)}
             {#if i > 0}<span class="sep" aria-hidden="true">/</span>{/if}
             {#if i === crumbs.length - 1}
@@ -131,7 +182,7 @@
             {/if}
           {/each}
         {:else}
-          <span>{strings.soma.label}</span>
+          <span class="current">{app.soma?.name ?? strings.soma.label}</span>
         {/if}
       </nav>
       <div class="tools">
@@ -163,12 +214,20 @@
     </header>
     <div class="workspace">
       <div class="content">
-        {#if router.graph}
-          <GraphView center={app.lastNotePath} />
+        {#if router.view === 'admin'}
+          <AdminView />
+        {:else if router.graph}
+          {#key app.somaId}
+            <GraphView center={app.lastNotePath} />
+          {/key}
         {:else if app.note}
           {#key app.note}
             <NoteView session={app.note} />
           {/key}
+        {:else if app.somasLoaded && app.somas.length === 0}
+          <EmptyState title={strings.somas.none} text={strings.somas.noneText}>
+            <button type="button" class="button" onclick={createSoma}>{strings.somas.create}</button>
+          </EmptyState>
         {:else}
           <EmptyState />
         {/if}
@@ -181,6 +240,8 @@
 </div>
 
 <ConfirmDialog />
+<PromptDialog />
+<ProfileDialog />
 <QuickSwitcher />
 <SettingsDialog />
 

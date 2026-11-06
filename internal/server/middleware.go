@@ -24,7 +24,7 @@ const nonceKey ctxKey = iota
 // style="tab-size: 4" on its content element (allowed by its hash).
 // img-src and media-src allow no foreign hosts: external images in notes stay
 // blocked (air-gap friendly, no tracking pixels); attachments come from
-// /api/soma/files/.
+// /api/somas/{soma}/files/.
 const cspTemplate = "default-src 'none'; " +
 	"script-src 'self'; " +
 	"style-src 'self' 'nonce-%s'; " +

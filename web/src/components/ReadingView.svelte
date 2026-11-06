@@ -3,6 +3,7 @@
   import { app } from '../lib/state/app.svelte'
   import { settings } from '../lib/state/settings.svelte'
   import { renderMarkdown, type RenderContext } from '../lib/markdown'
+  import { noteURL } from '../lib/router.svelte'
   import { readNote } from '../lib/api/soma'
   import { live } from '../lib/state/live.svelte'
   import { section } from '../lib/outline'
@@ -16,6 +17,7 @@
   const contextFor = (path: string): RenderContext => ({
     resolve: (target, markdown) => app.resolveSynapse(target, markdown, path),
     resolveFile: (target, markdown) => app.resolveFile(target, markdown, path),
+    noteURL: (p) => noteURL(app.somaId, p),
   })
 
   const html = $derived(renderMarkdown(session.content, contextFor(session.path)))

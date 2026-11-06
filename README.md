@@ -1,22 +1,24 @@
 # dendronotes
 
-Self-hosted Markdown notes. Your notes stay plain `.md` files in a folder, the **soma**;
-everything else – search index, sessions – is a derived cache that can be rebuilt at any time.
+Self-hosted Markdown notes. Your notes stay plain `.md` files in folders, the **somas**.
+Accounts, who owns which soma and sessions live in a small SQLite database next to them; the
+search indexes are caches that can be rebuilt at any time.
 
 One container, one process, no external services, no external requests (air-gap friendly).
 
-> **Status: milestone 4** – soma access, authentication, file tree, an editor with live
-> preview and optional Vim key bindings, a reading view, synapses with backlinks, full-text
-> search with tags, live updates when files change on disk, synapses that follow renamed
-> notes, and attachments: images, audio, video and other files, uploaded by paste or drag &
-> drop and shown in notes, plus embedded notes, and a graph of all notes and synapses.
-> Kubernetes manifests follow in M5.
+> **Status: milestone 6** – accounts with their own somas and an administration area, on top
+> of the notes app: file tree, an editor with live preview and optional Vim key bindings, a
+> reading view, synapses with backlinks, full-text search with tags, live updates when files
+> change on disk, synapses that follow renamed notes, attachments (images, audio, video and
+> other files) and embedded notes, and a graph of all notes and synapses.
+> Next: sharing somas and Keycloak sign-in (M7), editing together in real time (M8),
+> Kubernetes manifests (M5).
 
 ## Vocabulary
 
 | Term        | Meaning                                                                          |
 |-------------|----------------------------------------------------------------------------------|
-| **soma**    | The folder that holds your notes – the cell body everything grows from. Plural: somas. |
+| **soma**    | A folder that holds notes – the cell body everything grows from. Plural: somas. Every account has its own. |
 | **note**    | A Markdown file in the soma.                                                     |
 | **synapse** | A connection between two notes, e.g. the wiki link `[[Note]]`. Plural: synapses. |
 | backlinks   | The synapses pointing *to* a note ("Incoming synapses").                         |
@@ -37,7 +39,9 @@ make image        # build the container image and load it into Docker
 make run-image    # run the image hardened (read-only, no capabilities)
 ```
 
-`make dev` creates a random password in `dev/password` on first start and prints it.
+`make dev` creates a random password for the account `admin` in `dev/password` on first start
+and prints it. The dev server keeps its somas in `dev/somas` and registers `dev/soma` as the
+admin's first soma.
 
 ## Writing notes
 
@@ -99,12 +103,36 @@ Uploads are limited to images (PNG, JPEG, GIF, WebP, AVIF, BMP, ICO, SVG), PDF, 
 WAV, Ogg, FLAC, M4A), video (MP4, WebM, MOV), text (Markdown, TXT, CSV, JSON) and zip files,
 up to `DENDRONOTES_MAX_UPLOAD_MB`. The content must match the extension.
 
+## Accounts, somas and administration
+
+- **Somas.** Every account has its own somas; new accounts start with an empty one called
+  "Notes". The switcher at the top of the sidebar changes the soma ("Switch soma") and creates,
+  renames or deletes one. Each soma is a folder in `DENDRONOTES_SOMAS_DIR`, named after the
+  soma when it is created (renaming the soma keeps the folder). Deleting a soma moves its
+  folder to `DENDRONOTES_SOMAS_DIR/.trash/`, so the notes stay recoverable as files; a soma
+  registered from `DENDRONOTES_SOMA_DIR` keeps its folder where it is.
+- **Profile** (click your name at the bottom of the sidebar): display name, e-mail and, for
+  accounts with a password, a new password. Changing it signs out your other sessions.
+- **Administration** (the shield in the left rail, admins only):
+  - *Users*: create accounts, change role, disable, set a new password, sign out everywhere,
+    delete. A deleted account's somas go to an account you choose or to the trash. The last
+    admin can be neither demoted, disabled nor deleted.
+  - *Somas*: every soma with owner, size and folder; hand it to another owner or delete it.
+  - *Sessions*: who is signed in from where; end single sessions.
+  - *Server*: version, uptime, storage, open somas and the effective configuration (secrets
+    show only whether they are set).
+  - *Audit log*: sign-ins (failed ones too), account and soma changes.
+
+Disabling an account, setting its password or ending its sessions takes effect at once; open
+browser tabs notice within 25 seconds.
+
 ## Index and live updates
 
-dendronotes keeps a search index in `$DENDRONOTES_DATA_DIR/index.db` (SQLite with FTS5,
-compiled into the binary, no extra service). It is a cache: delete it at any time and it is
-rebuilt from the soma on the next start, as it is when its format changes or the file is
-damaged. `/readyz` reports ready once the index has caught up with the soma.
+dendronotes keeps a search index per soma in `$DENDRONOTES_DATA_DIR/index/<soma id>/index.db`
+(SQLite with FTS5, compiled into the binary, no extra service). It is a cache: delete it at
+any time and it is rebuilt from the soma the next time the soma is opened, as it is when its
+format changes or the file is damaged. Somas are opened on first use and closed after 30
+minutes without connected browsers.
 
 Changes on disk are picked up through file system events (inotify on Linux). Every
 `DENDRONOTES_RESCAN_INTERVAL` (default 5 minutes) the whole soma is compared as well, which
@@ -112,7 +140,7 @@ covers file systems without events, such as some network volumes. A very large s
 a higher inotify limit on the host (`fs.inotify.max_user_watches`); without it, changes are
 still found by the rescans.
 
-Browsers receive updates through Server-Sent Events (`/api/soma/events`). Behind a reverse
+Browsers receive updates through Server-Sent Events (`/api/somas/{soma}/events`). Behind a reverse
 proxy, do not buffer that path and allow idle reads of at least 30 seconds (a heartbeat is
 sent every 25 seconds); dendronotes sets `X-Accel-Buffering: no` for nginx.
 
@@ -121,13 +149,23 @@ sent every 25 seconds); dendronotes sets `X-Accel-Buffering: no` for nginx.
 ```bash
 docker run -d --name dendronotes -p 8080:8080 \
   --read-only --cap-drop ALL --security-opt no-new-privileges \
-  -v /path/to/notes:/soma -v dendronotes-data:/data \
-  -e DENDRONOTES_AUTH_PASSWORD_HASH='<output of hash-password>' \
+  -v /path/to/somas:/somas -v dendronotes-data:/data \
+  -e DENDRONOTES_ADMIN_PASSWORD_HASH='<output of hash-password>' \
   dendronotes:<version>
 ```
 
-The image runs as UID 65532. `/soma` holds the notes, `/data` the rebuildable caches; both must
-be writable. Back up the soma – nothing else is needed to restore everything.
+The image runs as UID 65532. `/somas` holds the notes (one folder per soma), `/data` the
+account database `state.db` and the search indexes; both must be writable.
+
+**Backups** need both: the somas directory and `state.db` (accounts, sessions, who owns which
+soma). Stop the container for the backup or use a volume snapshot, since `state.db` is written
+while running. The indexes in `/data/index` are caches and can be left out. Before a new
+release changes the database format, dendronotes copies it to `state.db.v<n>.bak`; it refuses
+to open a database written by a newer release.
+
+**Upgrading from a single soma** (before M6): mount the old notes folder, e.g. at `/soma`, and
+set `DENDRONOTES_SOMA_DIR=/soma`. On the first start with no somas registered, it becomes the
+admin's soma "Notes" and stays in place.
 
 ## Configuration
 
@@ -135,8 +173,9 @@ All variables carry the `DENDRONOTES_` prefix. Variables without it are ignored.
 
 | Variable                               | Default            | Meaning                                                    |
 |----------------------------------------|--------------------|------------------------------------------------------------|
-| `DENDRONOTES_SOMA_DIR`                 | `/soma`            | The soma: folder with the notes (source of truth)          |
-| `DENDRONOTES_DATA_DIR`                 | `/data`            | Cache directory; must be writable and outside the soma     |
+| `DENDRONOTES_SOMAS_DIR`                | `/somas`           | One folder per soma: the notes (source of truth); created if missing |
+| `DENDRONOTES_SOMA_DIR`                 |                    | An existing soma folder, registered once as the first admin's soma (for upgrades) |
+| `DENDRONOTES_DATA_DIR`                 | `/data`            | Account database `state.db` and search indexes; must be writable and outside the somas |
 | `DENDRONOTES_HTTP_PORT`                | `8080`             | HTTP port                                                  |
 | `DENDRONOTES_LOG_LEVEL`                | `info`             | `debug`, `info`, `warn`, `error`                           |
 | `DENDRONOTES_LOG_FORMAT`               | `json`             | `json` (stdout) or `text`                                  |
@@ -146,46 +185,59 @@ All variables carry the `DENDRONOTES_` prefix. Variables without it are ignored.
 | `DENDRONOTES_IGNORE`                   |                    | Extra name patterns hidden from the tree, e.g. `node_modules,*.tmp` (dot entries are always hidden) |
 | `DENDRONOTES_RESCAN_INTERVAL`          | `5m`               | How often the whole soma is compared with the index, in addition to file system events; `0` turns it off |
 | `DENDRONOTES_TRUSTED_PROXIES`          |                    | IPs/CIDRs of reverse proxies whose `X-Forwarded-*` headers are believed |
-| `DENDRONOTES_AUTH_MODE`                | `password`         | `password` or `proxy`                                      |
-| `DENDRONOTES_AUTH_PASSWORD_HASH`       |                    | argon2id hash (see below)                                  |
-| `DENDRONOTES_AUTH_PASSWORD_HASH_FILE`  |                    | File containing the hash (e.g. a mounted secret)           |
-| `DENDRONOTES_AUTH_PASSWORD_FILE`       |                    | File containing the plain password, hashed in memory at start |
+| `DENDRONOTES_AUTH_MODE`                | `local`            | `local` (accounts with passwords) or `proxy`               |
+| `DENDRONOTES_ADMIN_USERNAME`           | `admin`            | The first admin account, created at start while no admin exists |
+| `DENDRONOTES_ADMIN_PASSWORD_HASH`      |                    | Its argon2id hash (see below) – only used to create it     |
+| `DENDRONOTES_ADMIN_PASSWORD_HASH_FILE` |                    | File containing that hash (e.g. a mounted secret)          |
+| `DENDRONOTES_ADMIN_PASSWORD_FILE`      |                    | File containing the plain password, hashed at start        |
 | `DENDRONOTES_SESSION_TTL`              | `720h`             | Session lifetime, extended while in use                    |
 | `DENDRONOTES_COOKIE_SECURE`            | `auto`             | `auto` (secure over HTTPS), `true` or `false`              |
 | `DENDRONOTES_AUTH_PROXY_HEADER`        | `X-Forwarded-User` | Header carrying the user name in proxy mode                |
 | `DENDRONOTES_AUTH_PROXY_ALLOWED_USERS` |                    | Optional comma-separated allow list for proxy mode         |
 | `DENDRONOTES_AUTH_PROXY_LOGOUT_URL`    |                    | Where "Sign out" leads in proxy mode, e.g. `/oauth2/sign_out` |
 
-Exactly one of the three password variables is required in password mode; without
-authentication configured, the server does not start.
+In local mode, one of the three admin password variables is required while no enabled admin
+account exists; without it, the server does not start. Once an admin exists, they are ignored
+(the server says so in its log). Should no enabled admin be left, the next start with one of them
+makes `DENDRONOTES_ADMIN_USERNAME` an enabled admin again with that password.
 
 The port variable is deliberately not called `DENDRONOTES_PORT`: Kubernetes injects
 `DENDRONOTES_PORT` and `DENDRONOTES_SERVICE_*` into every pod when a Service named
 `dendronotes` exists. On Kubernetes, also set `enableServiceLinks: false` in the pod spec.
 
 Operational endpoints: `/healthz` (liveness), `/readyz` (readiness; 503 while starting,
-while shutting down, or when the soma is unreachable).
+while shutting down, or when the account database or the somas directory is unreachable).
 
 ## Authentication
 
-**Single user with a password** (default). Create a hash and pass it as a secret:
+**Accounts with passwords** (default, `local`). On the first start dendronotes creates the
+admin account `DENDRONOTES_ADMIN_USERNAME` with the password from one of the admin password
+variables. Create a hash for it and pass it as a secret:
 
 ```bash
 docker run --rm -it dendronotes:<version> hash-password
 ```
 
-Login attempts are rate-limited per client IP and globally; sessions are stored only as
-SHA-256 hashes in `$DENDRONOTES_DATA_DIR/sessions.json` and sent as `HttpOnly`,
-`SameSite=Strict` cookies (`__Host-` prefixed and `Secure` over HTTPS).
+Further accounts are created by an admin in the administration area. People sign in with user
+name and password (at least 10 characters) and can change the password in their profile.
+Passwords are stored as argon2id hashes. Sign-in attempts are rate-limited per client IP, per
+account and globally; sessions are stored only as SHA-256 hashes in `state.db` and sent as
+`HttpOnly`, `SameSite=Strict` cookies (`__Host-` prefixed and `Secure` over HTTPS).
 
 **Behind an authenticating proxy** (e.g. oauth2-proxy with Keycloak): set
 `DENDRONOTES_AUTH_MODE=proxy`, `DENDRONOTES_TRUSTED_PROXIES` to the proxy's address range and
 `DENDRONOTES_AUTH_PROXY_HEADER` to the header it sets (oauth2-proxy with
 `--set-xauthrequest`: `X-Auth-Request-User`). The header is ignored from any other peer, so make
-sure only the proxy can reach dendronotes (Kubernetes: a NetworkPolicy).
+sure only the proxy can reach dendronotes (Kubernetes: a NetworkPolicy). Each user name gets an
+account on first access; the one named `DENDRONOTES_ADMIN_USERNAME` becomes admin while there is
+no admin yet.
+
+Signing in through Keycloak (OIDC) directly follows in M7.
 
 ## Security notes
 
+- Somas are separated per account: requests for a soma the account is not a member of are
+  answered with 404, as if it did not exist; the administration needs the admin role.
 - Every file access goes through Go's `os.Root`: paths with `..`, absolute paths and symlinks
   pointing out of the soma are refused by the kernel-level lookup. API paths are validated
   beforehand and can never address hidden entries (`.git`, `.trash`, …). Symlinks inside the
@@ -210,27 +262,32 @@ sure only the proxy can reach dendronotes (Kubernetes: a NetworkPolicy).
 
 ## API
 
-All endpoints return JSON. Everything that works on the soma lives below `/api/soma/`;
-paths inside the soma are soma-relative and URL-encoded per segment. The full description
-is in [`docs/openapi.yaml`](docs/openapi.yaml), which a test keeps in sync with the server.
+All endpoints return JSON. Everything that works on a soma lives below
+`/api/somas/{soma}/` (`{soma}` is the soma's id); paths inside the soma are soma-relative and
+URL-encoded per segment. The full description is in [`docs/openapi.yaml`](docs/openapi.yaml),
+which a test keeps in sync with the server.
 
 | Method & path                           | Purpose                                              |
 |-----------------------------------------|------------------------------------------------------|
 | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | Session handling         |
-| `GET /api/soma/tree`                    | All visible files and folders                        |
-| `GET /api/soma/notes/{path}`            | Read a note (with `ETag`)                            |
-| `PUT /api/soma/notes/{path}`            | Save a note; requires `If-Match`, `412` on conflict  |
-| `POST /api/soma/notes/{path}`           | Create a note                                        |
-| `POST /api/soma/folders/{path}`         | Create a folder                                      |
-| `POST /api/soma/move`                   | Rename or move: `{"from": …, "to": …, "updateSynapses": true}` |
-| `DELETE /api/soma/entries/{path}`       | Move a file or folder to `.trash/` in the soma       |
-| `GET /api/soma/files/{path}`            | Download a file (attachments, images, media)         |
-| `POST /api/soma/files/{path}`           | Upload a file (raw body; `?unique=1` avoids name clashes) |
-| `GET /api/soma/search?q=`               | Full-text search (words, "phrases", #tags)           |
-| `GET /api/soma/backlinks/{path}`        | Notes with synapses to a note                        |
-| `GET /api/soma/tags`                    | All tags with their number of notes                  |
-| `GET /api/soma/graph`                   | All notes and the synapses between them              |
-| `GET /api/soma/events`                  | Live updates (Server-Sent Events)                    |
+| `PATCH /api/me`, `POST /api/me/password` | Own profile and password                            |
+| `GET /api/somas`, `POST /api/somas`     | The account's somas; create one                      |
+| `PATCH /api/somas/{soma}`, `DELETE /api/somas/{soma}` | Rename or delete a soma (owner)        |
+| `GET /api/somas/{soma}/tree`            | All visible files and folders                        |
+| `GET /api/somas/{soma}/notes/{path}`    | Read a note (with `ETag`)                            |
+| `PUT /api/somas/{soma}/notes/{path}`    | Save a note; requires `If-Match`, `412` on conflict  |
+| `POST /api/somas/{soma}/notes/{path}`   | Create a note                                        |
+| `POST /api/somas/{soma}/folders/{path}` | Create a folder                                      |
+| `POST /api/somas/{soma}/move`           | Rename or move: `{"from": …, "to": …, "updateSynapses": true}` |
+| `DELETE /api/somas/{soma}/entries/{path}` | Move a file or folder to `.trash/` in the soma     |
+| `GET /api/somas/{soma}/files/{path}`    | Download a file (attachments, images, media)         |
+| `POST /api/somas/{soma}/files/{path}`   | Upload a file (raw body; `?unique=1` avoids name clashes) |
+| `GET /api/somas/{soma}/search?q=`       | Full-text search (words, "phrases", #tags)           |
+| `GET /api/somas/{soma}/backlinks/{path}` | Notes with synapses to a note                       |
+| `GET /api/somas/{soma}/tags`            | All tags with their number of notes                  |
+| `GET /api/somas/{soma}/graph`           | All notes and the synapses between them              |
+| `GET /api/somas/{soma}/events`          | Live updates (Server-Sent Events)                    |
+| `/api/admin/users`, `/somas`, `/sessions`, `/server`, `/audit` | Administration (admins only)  |
 
 ## Air gap and reproducible builds
 
@@ -253,15 +310,18 @@ cmd/dendronotes/   entry point: serve, hash-password, healthcheck, version
 internal/config/   read and validate DENDRONOTES_* environment variables
 internal/soma/     soma access exclusively through os.Root (tree, notes, move, trash)
 internal/mdparse/  synapses and tags of a note (same rules as web/src/lib/synapses.ts)
-internal/index/    SQLite cache: versions, synapses, tags, full-text search
+internal/store/    state.db: accounts, sessions, somas and members, audit log (versioned migrations)
+internal/somas/    soma manager: opens somas on demand (index, watcher, live updates), closes idle ones
+internal/index/    SQLite cache per soma: versions, synapses, tags, full-text search
 internal/watch/    file system events (fsnotify) for changes made outside dendronotes
 internal/events/   fan-out of live updates to connected browsers
 internal/relink/   rewrites synapses when notes are renamed or moved
 internal/attach/   which files may be uploaded (type allow list, content check) and how they are served
-internal/auth/     password (argon2id), sessions, rate limit, proxy header
+internal/auth/     sign-in (argon2id, proxy header), sessions, rate limits, first admin
 internal/clientip/ client address behind trusted proxies
 internal/httpx/    JSON helpers
-internal/server/   route table, middleware (CSP with nonce, logging, recovery), health, assets
+internal/server/   route table with access levels, API and admin handlers, middleware (CSP with nonce,
+                   logging, recovery), health, assets
 web/               Svelte 5 frontend (Vite), embedded into the binary via go:embed
   src/lib/editor/  CodeMirror 6 setup, live preview, synapse syntax
   src/lib/         Markdown rendering + sanitizing, synapse resolution, state, UI strings

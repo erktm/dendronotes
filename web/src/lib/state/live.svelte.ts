@@ -1,4 +1,5 @@
 import type { Change } from '../api/soma'
+import { somaBase } from '../api/base'
 
 export type LiveState = 'connecting' | 'live' | 'offline'
 
@@ -44,7 +45,7 @@ class Live {
   private connect(): void {
     if (!this.handlers || typeof EventSource === 'undefined') return
     this.state = 'connecting'
-    const es = new EventSource('/api/soma/events')
+    const es = new EventSource(`${somaBase()}/events`)
     this.source = es
     es.addEventListener('hello', () => {
       this.state = 'live'

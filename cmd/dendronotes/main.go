@@ -56,7 +56,7 @@ func usage(w io.Writer) {
 Commands:
   serve           Start the server (default)
   hash-password   Read a password from the terminal or stdin and print an
-                  argon2id hash for AUTH_PASSWORD_HASH
+                  argon2id hash for DENDRONOTES_ADMIN_PASSWORD_HASH
   healthcheck     Query /healthz of the running server (for Docker HEALTHCHECK)
   version         Print the version
 

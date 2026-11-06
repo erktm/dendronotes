@@ -21,7 +21,7 @@ func newIndexedServer(t *testing.T, files map[string]string) *Server {
 	t.Helper()
 	cfg := testConfig(t)
 	for p, content := range files {
-		full := filepath.Join(cfg.SomaDir, filepath.FromSlash(p))
+		full := filepath.Join(cfg.SomasDir, "test", filepath.FromSlash(p))
 		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -30,7 +30,7 @@ func newIndexedServer(t *testing.T, files map[string]string) *Server {
 		}
 	}
 	s := newTestServerWith(t, testFS(), cfg)
-	if _, err := s.index.Sync(context.Background()); err != nil {
+	if _, err := rtOf(t, s).Index.Sync(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	return s
@@ -45,10 +45,10 @@ var liveFiles = map[string]string{
 func TestSearchBacklinksTagsAPI(t *testing.T) {
 	s := newIndexedServer(t, liveFiles)
 	c := newClient(t, s)
-	expect(t, c.do("GET", "/api/soma/search?q=clay", ""), 401, "unauthorized")
+	expect(t, c.do("GET", "/api/somas/testsoma01/search?q=clay", ""), 401, "unauthorized")
 	c.login()
 
-	rec := c.do("GET", "/api/soma/search?q=clay", "")
+	rec := c.do("GET", "/api/somas/testsoma01/search?q=clay", "")
 	expect(t, rec, 200, "")
 	res := decode[struct {
 		Hits     []index.Hit `json:"hits"`
@@ -57,24 +57,24 @@ func TestSearchBacklinksTagsAPI(t *testing.T) {
 	if len(res.Hits) != 1 || res.Hits[0].Path != "Soil types.md" || !res.Complete {
 		t.Errorf("search: %+v", res)
 	}
-	expect(t, c.do("GET", "/api/soma/search?q=x&limit=0", ""), 400, "invalid_limit")
-	expect(t, c.do("GET", "/api/soma/search?q="+strings.Repeat("a", 600), ""), 400, "query_too_long")
+	expect(t, c.do("GET", "/api/somas/testsoma01/search?q=x&limit=0", ""), 400, "invalid_limit")
+	expect(t, c.do("GET", "/api/somas/testsoma01/search?q="+strings.Repeat("a", 600), ""), 400, "query_too_long")
 
-	rec = c.do("GET", "/api/soma/backlinks/Projects/Garden%20plan.md", "")
+	rec = c.do("GET", "/api/somas/testsoma01/backlinks/Projects/Garden%20plan.md", "")
 	expect(t, rec, 200, "")
 	bl := decode[struct{ Backlinks []index.Backlink }](t, rec).Backlinks
 	if len(bl) != 1 || bl[0].Path != "Journal/Log.md" || len(bl[0].Synapses) != 2 {
 		t.Errorf("backlinks: %+v", bl)
 	}
-	expect(t, c.do("GET", "/api/soma/backlinks/..%2Fetc%2Fpasswd", ""), 400, "invalid_path")
+	expect(t, c.do("GET", "/api/somas/testsoma01/backlinks/..%2Fetc%2Fpasswd", ""), 400, "invalid_path")
 
-	rec = c.do("GET", "/api/soma/graph", "")
+	rec = c.do("GET", "/api/somas/testsoma01/graph", "")
 	expect(t, rec, 200, "")
 	if g := decode[index.Graph](t, rec); len(g.Nodes) != 3 || len(g.Edges) != 2 { // two synapses Log → plan are one edge
 		t.Errorf("graph: %+v", g)
 	}
 
-	rec = c.do("GET", "/api/soma/tags", "")
+	rec = c.do("GET", "/api/somas/testsoma01/tags", "")
 	expect(t, rec, 200, "")
 	if tags := decode[struct{ Tags []index.TagCount }](t, rec).Tags; len(tags) != 2 {
 		t.Errorf("tags: %+v", tags)
@@ -84,7 +84,7 @@ func TestSearchBacklinksTagsAPI(t *testing.T) {
 // subscribe returns the next change event published by the server.
 func subscribe(t *testing.T, s *Server) func() index.Changes {
 	t.Helper()
-	ch, cancel, ok := s.hub.Subscribe()
+	ch, cancel, ok := rtOf(t, s).Hub.Subscribe()
 	if !ok {
 		t.Fatal("subscribe failed")
 	}
@@ -110,21 +110,21 @@ func TestSaveUpdatesIndexAndPublishes(t *testing.T) {
 	c := newClient(t, s)
 	c.login()
 
-	rec := c.do("GET", "/api/soma/notes/Soil%20types.md", "")
+	rec := c.do("GET", "/api/somas/testsoma01/notes/Soil%20types.md", "")
 	etag := rec.Header().Get("ETag")
-	rec = c.do("PUT", "/api/soma/notes/Soil%20types.md", `{"content":"Now peat. [[Journal/Log]]"}`, "If-Match", etag)
+	rec = c.do("PUT", "/api/somas/testsoma01/notes/Soil%20types.md", `{"content":"Now peat. [[Journal/Log]]"}`, "If-Match", etag)
 	expect(t, rec, 200, "")
 
 	ch := next()
 	if len(ch.Notes) != 1 || ch.Notes[0].Path != "Soil types.md" || `"`+ch.Notes[0].ETag+`"` != rec.Header().Get("ETag") {
 		t.Errorf("change after save: %+v", ch)
 	}
-	hits, _ := s.index.Search(context.Background(), "peat", 10)
+	hits, _ := rtOf(t, s).Index.Search(context.Background(), "peat", 10)
 	if len(hits) != 1 {
 		t.Errorf("search does not see the saved content: %+v", hits)
 	}
 
-	expect(t, c.do("POST", "/api/soma/folders/Archive", ""), 201, "")
+	expect(t, c.do("POST", "/api/somas/testsoma01/folders/Archive", ""), 201, "")
 	if ch := next(); !ch.Tree {
 		t.Errorf("new folder not reported as tree change: %+v", ch)
 	}
@@ -135,27 +135,27 @@ func TestMoveUpdatesSynapses(t *testing.T) {
 	c := newClient(t, s)
 	c.login()
 
-	rec := c.do("POST", "/api/soma/move", `{"from":"Projects/Garden plan.md","to":"Projects/Plan 2026.md","updateSynapses":true}`)
+	rec := c.do("POST", "/api/somas/testsoma01/move", `{"from":"Projects/Garden plan.md","to":"Projects/Plan 2026.md","updateSynapses":true}`)
 	expect(t, rec, 200, "")
 	res := decode[moveResult](t, rec)
 	if res.Path != "Projects/Plan 2026.md" || res.Notes != 1 || res.Synapses != 2 || len(res.Failed) != 0 {
 		t.Errorf("move result: %+v", res)
 	}
-	data, err := os.ReadFile(filepath.Join(s.cfg.SomaDir, "Journal", "Log.md"))
+	data, err := os.ReadFile(filepath.Join(somaDir(s), "Journal", "Log.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if want := "Follow the [[Plan 2026]] and [plan](../Projects/Plan%202026.md)."; string(data) != want {
 		t.Errorf("Log.md = %q, want %q", data, want)
 	}
-	if bl, _ := s.index.Backlinks(context.Background(), "Projects/Plan 2026.md"); len(bl) != 1 {
+	if bl, _ := rtOf(t, s).Index.Backlinks(context.Background(), "Projects/Plan 2026.md"); len(bl) != 1 {
 		t.Errorf("backlinks after move: %+v", bl)
 	}
 
 	// Without the option, nothing else is touched.
-	rec = c.do("POST", "/api/soma/move", `{"from":"Soil types.md","to":"Soil.md"}`)
+	rec = c.do("POST", "/api/somas/testsoma01/move", `{"from":"Soil types.md","to":"Soil.md"}`)
 	expect(t, rec, 200, "")
-	data, _ = os.ReadFile(filepath.Join(s.cfg.SomaDir, "Projects", "Plan 2026.md"))
+	data, _ = os.ReadFile(filepath.Join(somaDir(s), "Projects", "Plan 2026.md"))
 	if !strings.Contains(string(data), "[[Soil types]]") {
 		t.Errorf("synapse rewritten without updateSynapses: %q", data)
 	}
@@ -168,7 +168,7 @@ func TestEventStream(t *testing.T) {
 	c := newClient(t, s)
 	c.login()
 
-	req, _ := http.NewRequest("GET", srv.URL+"/api/soma/events", nil)
+	req, _ := http.NewRequest("GET", srv.URL+"/api/somas/testsoma01/events", nil)
 	req.AddCookie(c.cookie)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -191,27 +191,27 @@ func TestEventStream(t *testing.T) {
 	}
 	readUntil("event: hello")
 
-	s.publish(index.Changes{Notes: []index.NoteChange{{Path: "a.md", ETag: "x"}}})
+	rtOf(t, s).Publish(index.Changes{Notes: []index.NoteChange{{Path: "a.md", ETag: "x"}}})
 	readUntil("event: change")
 	if data := readUntil("data: "); data != `data: {"tree":false,"notes":[{"path":"a.md","etag":"x"}],"removed":[]}` {
 		t.Errorf("change data: %s", data)
 	}
 
 	// Shutdown ends the stream.
-	s.hub.Close()
+	rtOf(t, s).Hub.Close()
 	for lines.Scan() {
 	}
-	if s.hub.Subscribers() != 0 {
+	if rtOf(t, s).Hub.Subscribers() != 0 {
 		t.Error("subscriber left behind")
 	}
 }
 
 func TestEventStreamLimit(t *testing.T) {
 	s := newIndexedServer(t, nil)
-	s.hub = events.NewHub(0)
+	rtOf(t, s).Hub = events.NewHub(0)
 	c := newClient(t, s)
 	c.login()
-	expect(t, c.do("GET", "/api/soma/events", ""), 503, "too_many_streams")
+	expect(t, c.do("GET", "/api/somas/testsoma01/events", ""), 503, "too_many_streams")
 }
 
 // TestExternalChangesAreFollowed runs the real server: a file written by
@@ -233,7 +233,7 @@ func TestExternalChangesAreFollowed(t *testing.T) {
 	}()
 
 	deadline := time.Now().Add(10 * time.Second)
-	for !s.index.Ready() {
+	for !rtOf(t, s).Index.Ready() {
 		if time.Now().After(deadline) {
 			t.Fatal("index not ready")
 		}
@@ -246,7 +246,7 @@ func TestExternalChangesAreFollowed(t *testing.T) {
 	resp.Body.Close()
 
 	next := subscribe(t, s)
-	full := filepath.Join(s.cfg.SomaDir, "Outside edit.md")
+	full := filepath.Join(somaDir(s), "Outside edit.md")
 	if err := os.WriteFile(full, []byte("Written by [[another]] editor"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -254,7 +254,7 @@ func TestExternalChangesAreFollowed(t *testing.T) {
 	if !ch.Tree || len(ch.Notes) != 1 || ch.Notes[0].Path != "Outside edit.md" {
 		t.Errorf("change: %+v", ch)
 	}
-	hits, _ := s.index.Search(context.Background(), "editor", 10)
+	hits, _ := rtOf(t, s).Index.Search(context.Background(), "editor", 10)
 	if len(hits) != 1 {
 		t.Errorf("search after external write: %+v", hits)
 	}

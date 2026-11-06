@@ -99,7 +99,7 @@
       <p>{strings.soma.empty}</p>
       <button type="button" onclick={() => startCreate('new-note', '')}>{strings.soma.createFirstNote}</button>
     </div>
-  {:else if !app.treeLoaded}
+  {:else if app.somaId && !app.treeLoaded}
     <p class="loading">{strings.soma.loading}</p>
   {/if}
 </div>

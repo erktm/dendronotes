@@ -20,7 +20,8 @@ const fileCSP = "default-src 'none'; img-src 'self' data:; media-src 'self'; sty
 // The content type follows the extension, never the content; unknown types
 // are downloads.
 func (s *Server) handleReadFile(w http.ResponseWriter, r *http.Request) {
-	f, e, err := s.soma.OpenFile(r.PathValue("path"))
+	rt := runtimeOf(r)
+	f, e, err := rt.Soma.OpenFile(r.PathValue("path"))
 	if err != nil {
 		s.somaError(w, r, err)
 		return
@@ -47,6 +48,7 @@ func (s *Server) handleReadFile(w http.ResponseWriter, r *http.Request) {
 // file content; its type is checked against the file name. With ?unique=1 a
 // taken name gets a " (n)" suffix; the answer names the stored path.
 func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
+	rt := runtimeOf(r)
 	max := s.cfg.MaxUploadBytes
 	if r.ContentLength > max {
 		httpx.Error(w, http.StatusRequestEntityTooLarge, "too_large")
@@ -54,13 +56,13 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	name := r.PathValue("path")
 	body := http.MaxBytesReader(w, r.Body, max+1)
-	e, err := s.soma.CreateFile(name, body, max, r.URL.Query().Get("unique") == "1", func(head []byte) error {
+	e, err := rt.Soma.CreateFile(name, body, max, r.URL.Query().Get("unique") == "1", func(head []byte) error {
 		return attach.Check(name, head)
 	})
 	if err != nil {
 		s.somaError(w, r, err)
 		return
 	}
-	s.syncAfterWrite(r)
+	rt.SyncAfterWrite(r.Context())
 	httpx.WriteJSON(w, http.StatusCreated, e)
 }

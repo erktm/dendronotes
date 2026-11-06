@@ -4,9 +4,10 @@
   import { ApiError } from '../lib/api/client'
   import { errorMessage } from '../lib/errors'
   import { focusOnMount } from '../lib/actions'
-  import { brand, strings } from '../lib/strings'
+  import { strings } from '../lib/strings'
   import Wordmark from './Wordmark.svelte'
 
+  let username = $state('')
   let password = $state('')
   let busy = $state(false)
   let error = $state('')
@@ -17,14 +18,16 @@
 
   async function submit(e: SubmitEvent) {
     e.preventDefault()
-    if (!password || busy) return
+    if (!username || !password || busy) return
     busy = true
     error = ''
     try {
-      await app.login(password)
+      await app.login(username.trim(), password)
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         error = strings.auth.wrongPassword
+      } else if (err instanceof ApiError && err.code === 'account_disabled') {
+        error = strings.auth.accountDisabled
       } else if (err instanceof ApiError && err.status === 429) {
         const secs = typeof err.body.retryAfter === 'number' ? err.body.retryAfter : 0
         error = secs ? strings.auth.tooManyAttempts(secs) : errorMessage(err)
@@ -53,8 +56,19 @@
       <h1>{strings.auth.welcome}</h1>
       <p class="lead">{strings.auth.lead}</p>
       <form onsubmit={submit}>
-        <!-- Helps password managers that expect a user name. -->
-        <input class="visually-hidden" type="text" name="username" autocomplete="username" value={brand.name} readonly tabindex="-1" aria-hidden="true" />
+        <label for="username">{strings.auth.username}</label>
+        <input
+          id="username"
+          name="username"
+          type="text"
+          autocomplete="username"
+          autocapitalize="none"
+          spellcheck="false"
+          bind:value={username}
+          use:focusOnMount
+          aria-invalid={error ? 'true' : undefined}
+          required
+        />
         <label for="password">{strings.auth.password}</label>
         <input
           id="password"
@@ -62,7 +76,6 @@
           type="password"
           autocomplete="current-password"
           bind:value={password}
-          use:focusOnMount
           aria-invalid={error ? 'true' : undefined}
           aria-describedby={error ? 'login-error' : undefined}
           required
@@ -70,7 +83,7 @@
         {#if error}
           <p class="error" id="login-error" role="alert">{error}</p>
         {/if}
-        <button class="primary" type="submit" disabled={busy || !password}>
+        <button class="primary" type="submit" disabled={busy || !username || !password}>
           {busy ? strings.auth.signingIn : strings.auth.signIn}
         </button>
       </form>
@@ -120,7 +133,8 @@
     font-size: var(--text-sm);
     font-weight: 550;
   }
-  input[type='password'] {
+  input[type='password'],
+  input[type='text'] {
     height: 42px;
     padding: 0 var(--space-3);
     border: 1px solid var(--line-strong);
@@ -129,7 +143,11 @@
     color: var(--text);
     font: inherit;
   }
-  input[type='password']:focus-visible {
+  label[for='password'] {
+    margin-top: var(--space-2);
+  }
+  input[type='password']:focus-visible,
+  input[type='text']:focus-visible {
     outline: 2px solid var(--focus);
     outline-offset: 1px;
     border-color: transparent;

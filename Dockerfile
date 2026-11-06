@@ -40,7 +40,7 @@ COPY --from=web /src/web/dist ./web/dist
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -buildvcs=false \
       -ldflags "-s -w -X main.version=${VERSION}" \
       -o /out/dendronotes ./cmd/dendronotes \
- && mkdir -p /out/soma /out/data
+ && mkdir -p /out/somas /out/data
 
 # --- Runtime: distroless, no shell, UID 65532 --------------------------------
 FROM ${RUNTIME_IMAGE}
@@ -49,10 +49,11 @@ LABEL org.opencontainers.image.title="dendronotes" \
       org.opencontainers.image.description="Self-hosted Markdown notes" \
       org.opencontainers.image.version="${VERSION}"
 COPY --from=build /out/dendronotes /usr/local/bin/dendronotes
-# /soma holds the notes (mount the soma volume here), /data the caches.
-COPY --from=build --chown=65532:65532 /out/soma /soma
+# /somas holds the notes, one folder per soma; /data the accounts (state.db –
+# back it up) and the rebuildable search indexes.
+COPY --from=build --chown=65532:65532 /out/somas /somas
 COPY --from=build --chown=65532:65532 /out/data /data
-ENV DENDRONOTES_SOMA_DIR=/soma \
+ENV DENDRONOTES_SOMAS_DIR=/somas \
     DENDRONOTES_DATA_DIR=/data \
     DENDRONOTES_HTTP_PORT=8080
 USER 65532:65532

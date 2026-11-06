@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net"
@@ -18,6 +19,8 @@ import (
 
 	"dendronotes/internal/auth"
 	"dendronotes/internal/config"
+	"dendronotes/internal/somas"
+	"dendronotes/internal/store"
 )
 
 const testIndex = `<!doctype html><html><head><meta name="csp-nonce" content="__CSP_NONCE__"></head><body>app</body></html>`
@@ -35,6 +38,9 @@ func testFS() fstest.MapFS {
 
 const testPassword = "test password"
 
+// testSoma is a soma with a fixed id, owned by the admin, in SOMAS_DIR/test.
+const testSoma = "testsoma01"
+
 func init() {
 	// Cheap argon2 parameters keep the tests fast.
 	hashParams = auth.Params{Memory: 64, Time: 1, Threads: 1, SaltLen: 16, KeyLen: 32}
@@ -44,7 +50,7 @@ func testConfig(t *testing.T) config.Config {
 	t.Helper()
 	base := t.TempDir()
 	return config.Config{
-		SomaDir:         filepath.Join(base, "soma"),
+		SomasDir:        filepath.Join(base, "somas"),
 		DataDir:         filepath.Join(base, "data"),
 		Port:            0,
 		LogLevel:        slog.LevelInfo,
@@ -53,11 +59,12 @@ func testConfig(t *testing.T) config.Config {
 		MaxNoteBytes:    1 << 20,
 		MaxUploadBytes:  1 << 20,
 		Auth: config.Auth{
-			Mode:         "password",
-			Password:     testPassword,
-			SessionTTL:   time.Hour,
-			CookieSecure: "auto",
-			ProxyHeader:  "X-Forwarded-User",
+			Mode:          "local",
+			AdminUsername: "admin",
+			AdminPassword: testPassword,
+			SessionTTL:    time.Hour,
+			CookieSecure:  "auto",
+			ProxyHeader:   "X-Forwarded-User",
 		},
 	}
 }
@@ -69,7 +76,7 @@ func newTestServer(t *testing.T, fsys fstest.MapFS) *Server {
 
 func newTestServerWith(t *testing.T, fsys fstest.MapFS, cfg config.Config) *Server {
 	t.Helper()
-	for _, d := range []string{cfg.SomaDir, cfg.DataDir} {
+	for _, d := range []string{cfg.SomasDir, cfg.DataDir, filepath.Join(cfg.SomasDir, "test")} {
 		if err := os.MkdirAll(d, 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -79,7 +86,31 @@ func newTestServerWith(t *testing.T, fsys fstest.MapFS, cfg config.Config) *Serv
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { s.close() })
+	ctx := context.Background()
+	if admin, err := s.store.UserByUsername(ctx, cfg.Auth.AdminUsername); err == nil {
+		if _, err := s.store.CreateSoma(ctx, testSoma, "Test", "test", admin.ID); err != nil && !errors.Is(err, store.ErrTaken) {
+			t.Fatal(err)
+		}
+	}
 	return s
+}
+
+// somaDir is the folder of the test soma.
+func somaDir(s *Server) string { return filepath.Join(s.cfg.SomasDir, "test") }
+
+// rtOf opens the test soma for the rest of the test.
+func rtOf(t *testing.T, s *Server) *somas.Runtime {
+	t.Helper()
+	sm, err := s.store.SomaByID(context.Background(), testSoma)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt, err := s.somas.Acquire(sm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(rt.Release)
+	return rt
 }
 
 func get(t *testing.T, h http.Handler, method, path string) *httptest.ResponseRecorder {
@@ -253,28 +284,23 @@ func TestReadyzLifecycle(t *testing.T) {
 	s := newTestServer(t, testFS())
 	h := s.Handler()
 
-	if code, checks := readyStatus(t, h); code != 503 || checks["server"] != "starting" || checks["index"] != "building" {
+	if code, checks := readyStatus(t, h); code != 503 || checks["server"] != "starting" || checks["state"] != "ok" {
 		t.Fatalf("before start: %d %v", code, checks)
 	}
 	s.ready.Store(true)
-	if code, checks := readyStatus(t, h); code != 503 || checks["index"] != "building" {
-		t.Fatalf("before the first index sync: %d %v", code, checks)
-	}
-	if _, err := s.index.Sync(context.Background()); err != nil {
-		t.Fatal(err)
-	}
 	if code, _ := readyStatus(t, h); code != 200 {
 		t.Fatalf("after start: %d", code)
 	}
 
-	// The soma disappears (volume unmounted) → no longer ready.
-	if err := os.Remove(s.cfg.SomaDir); err != nil {
+	// The somas volume disappears (unmounted) → no longer ready.
+	moved := s.cfg.SomasDir + "-away"
+	if err := os.Rename(s.cfg.SomasDir, moved); err != nil {
 		t.Fatal(err)
 	}
-	if code, checks := readyStatus(t, h); code != 503 || checks["soma"] != "unavailable" {
-		t.Fatalf("without soma: %d %v", code, checks)
+	if code, checks := readyStatus(t, h); code != 503 || checks["somas"] != "unavailable" {
+		t.Fatalf("without somas: %d %v", code, checks)
 	}
-	if err := os.Mkdir(s.cfg.SomaDir, 0o755); err != nil {
+	if err := os.Rename(moved, s.cfg.SomasDir); err != nil {
 		t.Fatal(err)
 	}
 

@@ -5,6 +5,7 @@ import '@fontsource-variable/source-serif-4'
 import './styles/tokens.css'
 import './styles/base.css'
 import './styles/editor.css'
+import './styles/admin.css'
 
 import { mount } from 'svelte'
 import App from './App.svelte'

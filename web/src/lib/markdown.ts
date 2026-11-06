@@ -2,13 +2,13 @@
 // removes everything that could execute (scripts, event handlers,
 // javascript: URLs, style attributes, frames, forms, SVG/MathML). Images,
 // audio and video are kept only when they come from the soma
-// (/api/soma/files/…); everything else that would load is removed.
+// (/api/somas/{soma}/files/…); everything else that would load is removed.
 // Note content is untrusted: it may come from any synced source.
 
 import MarkdownIt from 'markdown-it'
 import type { MarkdownIt as MarkdownItInstance, StateCore, StateInline, Token } from 'markdown-it'
 import DOMPurify from 'dompurify'
-import { basename, encodePath, isNote } from './paths'
+import { basename, isNote } from './paths'
 import { fileKind, fileURL, isFileURL } from './files'
 import { isNoteTarget, splitWikiTarget, synapseLabel } from './synapses'
 import { slugger } from './outline'
@@ -19,6 +19,8 @@ export interface RenderContext {
   resolve: (target: string, markdown: boolean) => string | null
   /** Resolves an attachment to a soma path (null: missing). */
   resolveFile: (target: string, markdown: boolean) => string | null
+  /** The app URL of a note. */
+  noteURL: (path: string) => string
 }
 
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i
@@ -28,8 +30,8 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 }
 
-const noteHref = (path: string, heading?: string) =>
-  `/n/${encodePath(path)}${heading ? `#${slugger()(heading)}` : ''}`
+const noteHref = (ctx: RenderContext, path: string, heading?: string) =>
+  `${ctx.noteURL(path)}${heading ? `#${slugger()(heading)}` : ''}`
 
 /** "300" or "300x200" after the pipe of an embedded image: its size. */
 function parseSize(alias: string | undefined): { w: number; h?: number } | null {
@@ -96,7 +98,7 @@ function synapsePlugin(md: MarkdownItInstance): void {
     const resolved = ctx.resolve(target, false)
     const label = escapeHtml(synapseLabel({ target, heading, alias }))
     const cls = resolved ? 'synapse' : 'synapse unresolved'
-    const href = resolved ? noteHref(resolved, heading) : '#'
+    const href = resolved ? noteHref(ctx, resolved, heading) : '#'
     const link = `<a class="${cls}" href="${escapeHtml(href)}" data-synapse="${escapeHtml(target)}">${label}</a>`
     if (!embed) return link
     if (!resolved) return `<span class="embedded-note">${escapeHtml(strings.reading.embeddedNote)} ${link}</span>`
@@ -131,7 +133,7 @@ function linkPlugin(md: MarkdownItInstance): void {
       }
       if (isNote(path)) {
         const resolved = ctx.resolve(path, true)
-        token.attrSet('href', resolved ? noteHref(resolved) : '#')
+        token.attrSet('href', resolved ? noteHref(ctx, resolved) : '#')
         token.attrSet('data-synapse', path)
         token.attrSet('data-markdown', 'true')
         token.attrJoin('class', resolved ? 'synapse' : 'synapse unresolved')

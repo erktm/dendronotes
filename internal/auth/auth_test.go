@@ -1,17 +1,18 @@
 package auth
 
 import (
+	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"dendronotes/internal/clientip"
+	"dendronotes/internal/store"
 )
 
 // cheap parameters keep the tests fast; production uses DefaultParams.
@@ -59,101 +60,6 @@ func TestParseHashRejects(t *testing.T) {
 	}
 }
 
-func TestSessionStore(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "sessions.json")
-	s, err := OpenStore(path, 2*time.Hour)
-	if err != nil {
-		t.Fatal(err)
-	}
-	now := time.Now() // OpenStore prunes against the real clock
-	s.now = func() time.Time { return now }
-
-	token, err := s.Create("owner")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if sess, ok := s.Lookup(token); !ok || sess.User != "owner" {
-		t.Fatal("fresh session not found")
-	}
-	if _, ok := s.Lookup(token + "x"); ok {
-		t.Fatal("wrong token accepted")
-	}
-
-	// The file contains only the token hash, never the token, and is private.
-	data, _ := os.ReadFile(path)
-	if strings.Contains(string(data), token) {
-		t.Fatal("token stored in plain text")
-	}
-	if st, _ := os.Stat(path); st.Mode().Perm()&0o077 != 0 {
-		t.Errorf("sessions file is readable by others: %v", st.Mode().Perm())
-	}
-
-	// Sliding expiry: use after 90 min extends the session.
-	now = now.Add(90 * time.Minute)
-	if _, ok := s.Lookup(token); !ok {
-		t.Fatal("session expired too early")
-	}
-	now = now.Add(90 * time.Minute)
-	if _, ok := s.Lookup(token); !ok {
-		t.Fatal("sliding expiry did not extend the session")
-	}
-
-	// Survives a restart.
-	now = time.Now()
-	if _, ok := s.Lookup(token); !ok { // refresh against the real clock first
-		t.Fatal("session lost")
-	}
-	s2, err := OpenStore(path, 2*time.Hour)
-	if err != nil {
-		t.Fatal(err)
-	}
-	s2.now = s.now
-	if _, ok := s2.Lookup(token); !ok {
-		t.Fatal("session lost after reopening")
-	}
-
-	// Expires after the TTL without use (the sliding refresh above pushed
-	// the expiry to about T0+5h).
-	now = now.Add(6 * time.Hour)
-	if _, ok := s2.Lookup(token); ok {
-		t.Fatal("expired session accepted")
-	}
-
-	// Delete.
-	t2, _ := s2.Create("owner")
-	if err := s2.Delete(t2); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := s2.Lookup(t2); ok {
-		t.Fatal("deleted session accepted")
-	}
-}
-
-func TestSessionStoreCapsAndCorruptFile(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "sessions.json")
-	if err := os.WriteFile(path, []byte("{not json"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	s, err := OpenStore(path, time.Hour)
-	if err != nil || s.Len() != 0 {
-		t.Fatalf("corrupt file should start empty: %v %d", err, s.Len())
-	}
-	tick := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	s.now = func() time.Time { tick = tick.Add(time.Second); return tick }
-	first, _ := s.Create("owner")
-	for range maxSessions + 5 {
-		if _, err := s.Create("owner"); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if s.Len() != maxSessions {
-		t.Fatalf("store holds %d sessions, cap is %d", s.Len(), maxSessions)
-	}
-	if _, ok := s.Lookup(first); ok {
-		t.Fatal("oldest session was not evicted")
-	}
-}
-
 func TestRateLimiter(t *testing.T) {
 	l := newRateLimiter(10*time.Second, 3, time.Millisecond, 1000)
 	now := time.Now()
@@ -183,41 +89,75 @@ func TestRateLimiter(t *testing.T) {
 	}
 }
 
-func newPasswordAuth(t *testing.T) *Authenticator {
+type fixture struct {
+	a  *Authenticator
+	st *store.Store
+}
+
+func newFixture(t *testing.T, mode Mode, trusted ...string) *fixture {
 	t.Helper()
-	a, err := New(Config{
-		Mode:         ModePassword,
-		Password:     "correct horse",
-		HashParams:   cheap,
-		SessionsFile: filepath.Join(t.TempDir(), "sessions.json"),
-		SessionTTL:   time.Hour,
-		CookieSecure: "auto",
-	}, clientip.New(nil), slog.New(slog.DiscardHandler))
+	st, err := store.Open(t.TempDir(), slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}
-	return a
+	t.Cleanup(func() { st.Close() })
+	var prefixes []netip.Prefix
+	for _, p := range trusted {
+		prefixes = append(prefixes, netip.MustParsePrefix(p))
+	}
+	a, err := New(Config{
+		Mode: mode, SessionTTL: time.Hour, CookieSecure: "auto", HashParams: cheap,
+		AdminUsername: "admin", ProxyHeader: "X-Forwarded-User",
+	}, st, clientip.New(prefixes), slog.New(slog.DiscardHandler))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &fixture{a: a, st: st}
 }
 
-func login(a *Authenticator, password string) *httptest.ResponseRecorder {
-	req := httptest.NewRequest("POST", "/api/auth/login", strings.NewReader(`{"password":"`+password+`"}`))
+func (f *fixture) addUser(t *testing.T, name, password string, role store.Role) store.User {
+	t.Helper()
+	hash, _ := HashPassword(password, cheap)
+	u, err := f.st.CreateUser(context.Background(), store.User{Username: name, Role: role, Source: store.SourceLocal, PasswordHash: hash})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return u
+}
+
+func login(a *Authenticator, user, password string) *httptest.ResponseRecorder {
+	body, _ := json.Marshal(map[string]string{"username": user, "password": password})
+	req := httptest.NewRequest("POST", "/api/auth/login", strings.NewReader(string(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	a.HandleLogin(rec, req)
 	return rec
 }
 
-func TestLoginFlow(t *testing.T) {
-	a := newPasswordAuth(t)
-	protected := a.Require(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func whoami(a *Authenticator, cookie *http.Cookie) (int, string) {
+	h := a.Require(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u, _ := UserFrom(r.Context())
-		w.Write([]byte(u))
+		w.Write([]byte(u.Username))
 	}))
-
-	if rec := login(a, "wrong"); rec.Code != 401 {
-		t.Fatalf("wrong password: %d", rec.Code)
+	req := httptest.NewRequest("GET", "/x", nil)
+	if cookie != nil {
+		req.AddCookie(cookie)
 	}
-	rec := login(a, "correct horse")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec.Code, rec.Body.String()
+}
+
+func TestLoginFlow(t *testing.T) {
+	f := newFixture(t, ModeLocal)
+	f.addUser(t, "Anna", "correct horse", store.RoleUser)
+
+	for _, c := range [][2]string{{"anna", "wrong"}, {"nobody", "correct horse"}, {"", "x"}} {
+		if rec := login(f.a, c[0], c[1]); rec.Code != 401 {
+			t.Fatalf("login %v: %d", c, rec.Code)
+		}
+	}
+	rec := login(f.a, "ANNA", "correct horse") // user names ignore case
 	if rec.Code != 200 {
 		t.Fatalf("login: %d %s", rec.Code, rec.Body)
 	}
@@ -225,91 +165,144 @@ func TestLoginFlow(t *testing.T) {
 	if cookie.Name != cookieInsecure || !cookie.HttpOnly || cookie.SameSite != http.SameSiteStrictMode || cookie.Path != "/" {
 		t.Fatalf("cookie attributes: %+v", cookie)
 	}
-
-	req := httptest.NewRequest("GET", "/x", nil)
-	req.AddCookie(cookie)
-	rec = httptest.NewRecorder()
-	protected.ServeHTTP(rec, req)
-	if rec.Code != 200 || rec.Body.String() != OwnerUser {
-		t.Fatalf("authenticated request: %d %q", rec.Code, rec.Body)
+	if code, name := whoami(f.a, cookie); code != 200 || name != "Anna" {
+		t.Fatalf("authenticated request: %d %q", code, name)
 	}
-
-	rec = httptest.NewRecorder()
-	protected.ServeHTTP(rec, httptest.NewRequest("GET", "/x", nil))
-	if rec.Code != 401 {
-		t.Fatalf("anonymous request: %d", rec.Code)
+	if code, _ := whoami(f.a, nil); code != 401 {
+		t.Fatalf("anonymous request: %d", code)
 	}
 
 	// Logout invalidates the token on the server, not just in the browser.
 	logoutReq := httptest.NewRequest("POST", "/api/auth/logout", nil)
 	logoutReq.AddCookie(cookie)
-	a.HandleLogout(httptest.NewRecorder(), logoutReq)
-	rec = httptest.NewRecorder()
-	protected.ServeHTTP(rec, req)
-	if rec.Code != 401 {
-		t.Fatalf("request after logout: %d", rec.Code)
+	f.a.HandleLogout(httptest.NewRecorder(), logoutReq)
+	if code, _ := whoami(f.a, cookie); code != 401 {
+		t.Fatalf("request after logout: %d", code)
+	}
+
+	log, _ := f.st.AuditLog(context.Background(), 0, 10)
+	if len(log) != 4 || log[0].Action != "login" || log[1].Action != "login.failed" {
+		t.Errorf("audit log: %+v", log)
+	}
+}
+
+func TestDisabledAccount(t *testing.T) {
+	f := newFixture(t, ModeLocal)
+	u := f.addUser(t, "anna", "correct horse", store.RoleUser)
+	cookie := login(f.a, "anna", "correct horse").Result().Cookies()[0]
+	disabled := true
+	f.st.UpdateUser(context.Background(), u.ID, store.UserUpdate{Disabled: &disabled})
+	if code, _ := whoami(f.a, cookie); code != 401 {
+		t.Errorf("session of a disabled account: %d", code)
+	}
+	if rec := login(f.a, "anna", "correct horse"); rec.Code != 403 {
+		t.Errorf("login of a disabled account: %d", rec.Code)
 	}
 }
 
 func TestSecureCookieBehindTLSProxy(t *testing.T) {
-	trusted, _ := clientip.ParseList("10.0.0.0/8")
-	a, err := New(Config{
-		Mode: ModePassword, Password: "pw", HashParams: cheap,
-		SessionsFile: filepath.Join(t.TempDir(), "s.json"), SessionTTL: time.Hour, CookieSecure: "auto",
-	}, clientip.New(trusted), slog.New(slog.DiscardHandler))
-	if err != nil {
-		t.Fatal(err)
-	}
-	req := httptest.NewRequest("POST", "/api/auth/login", strings.NewReader(`{"password":"pw"}`))
+	f := newFixture(t, ModeLocal, "10.0.0.0/8")
+	f.addUser(t, "anna", "pw long enough", store.RoleUser)
+	req := httptest.NewRequest("POST", "/api/auth/login", strings.NewReader(`{"username":"anna","password":"pw long enough"}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Forwarded-Proto", "https")
 	req.RemoteAddr = "10.0.0.2:4000"
 	rec := httptest.NewRecorder()
-	a.HandleLogin(rec, req)
+	f.a.HandleLogin(rec, req)
 	c := rec.Result().Cookies()[0]
 	if c.Name != cookieSecure || !c.Secure {
 		t.Fatalf("expected __Host- secure cookie, got %+v", c)
 	}
 }
 
-func TestLoginRateLimit(t *testing.T) {
-	a := newPasswordAuth(t)
+func TestLoginRateLimits(t *testing.T) {
+	f := newFixture(t, ModeLocal)
+	f.addUser(t, "anna", "correct horse", store.RoleUser)
 	for range 5 {
-		login(a, "wrong")
+		login(f.a, "anna", "wrong")
 	}
-	rec := login(a, "correct horse")
+	rec := login(f.a, "anna", "correct horse")
 	if rec.Code != 429 || rec.Header().Get("Retry-After") == "" {
 		t.Fatalf("expected 429 with Retry-After, got %d", rec.Code)
 	}
+	if rec := login(f.a, "anna", "correct horse"+strings.Repeat("x", 2000)); rec.Code == 200 {
+		t.Fatal("overlong password accepted")
+	}
 }
 
-func TestLoginRejectsOverlongPassword(t *testing.T) {
-	a := newPasswordAuth(t)
-	if rec := login(a, "correct horse"+strings.Repeat("x", 2000)); rec.Code != 401 {
-		t.Fatalf("overlong password: %d", rec.Code)
+func TestBootstrap(t *testing.T) {
+	ctx := context.Background()
+	f := newFixture(t, ModeLocal)
+	if err := f.a.Bootstrap(ctx, "", ""); err == nil || !strings.Contains(err.Error(), "DENDRONOTES_ADMIN_PASSWORD_FILE") {
+		t.Fatalf("bootstrap without password: %v", err)
+	}
+	if err := f.a.Bootstrap(ctx, "", "first admin password"); err != nil {
+		t.Fatal(err)
+	}
+	if rec := login(f.a, "admin", "first admin password"); rec.Code != 200 {
+		t.Fatalf("bootstrap admin cannot log in: %d", rec.Code)
+	}
+	// With an admin in place, the configured password changes nothing.
+	if err := f.a.Bootstrap(ctx, "", "another password"); err != nil {
+		t.Fatal(err)
+	}
+	if rec := login(f.a, "admin", "another password"); rec.Code != 401 {
+		t.Fatalf("existing admin's password was replaced: %d", rec.Code)
+	}
+
+	// No enabled admin left: the account is restored with the new password.
+	u, _ := f.st.UserByUsername(ctx, "admin")
+	role, disabled := store.RoleUser, true
+	f.st.UpdateUser(ctx, u.ID, store.UserUpdate{Role: &role, Disabled: &disabled})
+	if err := f.a.Bootstrap(ctx, "", "rescue password long"); err != nil {
+		t.Fatal(err)
+	}
+	if u, _ := f.st.UserByUsername(ctx, "admin"); u.Role != store.RoleAdmin || u.Disabled {
+		t.Errorf("admin not restored: %+v", u)
+	}
+	if rec := login(f.a, "admin", "rescue password long"); rec.Code != 200 {
+		t.Fatalf("restored admin cannot log in: %d", rec.Code)
+	}
+}
+
+func TestRequireAdmin(t *testing.T) {
+	f := newFixture(t, ModeLocal)
+	f.addUser(t, "boss", "correct horse", store.RoleAdmin)
+	f.addUser(t, "anna", "correct horse", store.RoleUser)
+	h := f.a.RequireAdmin(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	for user, want := range map[string]int{"boss": 200, "anna": 403} {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.AddCookie(login(f.a, user, "correct horse").Result().Cookies()[0])
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != want {
+			t.Errorf("%s: %d, want %d", user, rec.Code, want)
+		}
 	}
 }
 
 func TestProxyMode(t *testing.T) {
-	trusted := []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8")}
-	if _, err := New(Config{Mode: ModeProxy, ProxyHeader: "X-Forwarded-User"}, clientip.New(nil), slog.New(slog.DiscardHandler)); err == nil {
+	if _, err := New(Config{Mode: ModeProxy, ProxyHeader: "X-Forwarded-User"}, nil, clientip.New(nil), slog.New(slog.DiscardHandler)); err == nil {
 		t.Fatal("proxy mode without trusted proxies accepted")
 	}
-	a, err := New(Config{Mode: ModeProxy, ProxyHeader: "X-Forwarded-User", ProxyAllowed: []string{"erik"}},
-		clientip.New(trusted), slog.New(slog.DiscardHandler))
-	if err != nil {
-		t.Fatal(err)
-	}
-	h := a.Require(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	f := newFixture(t, ModeProxy, "10.0.0.0/8")
+	f.a.allowed = map[string]bool{"admin": true, "erik": true}
+	h := f.a.Require(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u, _ := UserFrom(r.Context())
+		w.Write([]byte(string(u.Role)))
+	}))
 
 	cases := []struct {
 		remote, user string
 		want         int
+		role         string
 	}{
-		{"10.1.1.1:1", "erik", 200},
-		{"203.0.113.5:1", "erik", 401}, // header from an untrusted peer is ignored
-		{"10.1.1.1:1", "mallory", 401}, // not in the allow list
-		{"10.1.1.1:1", "", 401},
+		{"10.1.1.1:1", "erik", 200, "user"},
+		{"10.1.1.1:1", "admin", 200, "admin"}, // the configured admin name, first admin
+		{"203.0.113.5:1", "erik", 401, ""},    // header from an untrusted peer is ignored
+		{"10.1.1.1:1", "mallory", 401, ""},    // not in the allow list
+		{"10.1.1.1:1", "", 401, ""},
+		{"10.1.1.1:1", "bad name", 401, ""},
 	}
 	for _, c := range cases {
 		req := httptest.NewRequest("GET", "/", nil)
@@ -319,11 +312,24 @@ func TestProxyMode(t *testing.T) {
 		}
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, req)
-		if rec.Code != c.want {
-			t.Errorf("remote %s user %q: %d, want %d", c.remote, c.user, rec.Code, c.want)
+		if rec.Code != c.want || (c.want == 200 && rec.Body.String() != c.role) {
+			t.Errorf("remote %s user %q: %d %q, want %d %q", c.remote, c.user, rec.Code, rec.Body, c.want, c.role)
 		}
 	}
-	if rec := login(a, "x"); rec.Code != 404 {
+	if rec := login(f.a, "erik", "x"); rec.Code != 404 {
 		t.Errorf("password login in proxy mode: %d", rec.Code)
+	}
+}
+
+func TestValidUsername(t *testing.T) {
+	for _, ok := range []string{"anna", "erik.h", "ü-ber_1", "a@b"} {
+		if err := ValidUsername(ok); err != nil {
+			t.Errorf("%q rejected: %v", ok, err)
+		}
+	}
+	for _, bad := range []string{"", "a", "with space", "slash/x", "tab\t", strings.Repeat("x", 65), "<b>"} {
+		if ValidUsername(bad) == nil {
+			t.Errorf("%q accepted", bad)
+		}
 	}
 }

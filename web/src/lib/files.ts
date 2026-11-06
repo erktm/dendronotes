@@ -3,6 +3,7 @@
 // its type list for display.
 
 import { encodePath, extname } from './paths'
+import { somaBase } from './api/base'
 
 export type FileKind = 'image' | 'audio' | 'video' | 'pdf' | 'text' | 'other'
 
@@ -23,14 +24,16 @@ export function fileKind(path: string): FileKind {
 /** Extensions the server accepts for upload. */
 export const UPLOAD_EXTENSIONS = [...Object.keys(KINDS), '.zip']
 
-/** URL of a file's content (same origin, sent with the session cookie). */
+/** URL of a file's content in the current soma (same origin, with the session cookie). */
 export function fileURL(path: string): string {
-  return `/api/soma/files/${encodePath(path)}`
+  return `${somaBase()}/files/${encodePath(path)}`
 }
 
-/** Whether a URL points to a file served from the soma (and nothing else). */
+const FILE_URL = /^\/api\/somas\/[a-z0-9]{1,40}\/files\/[^\\]*$/
+
+/** Whether a URL points to a file served from a soma (and nothing else). */
 export function isFileURL(src: string): boolean {
-  return src.startsWith('/api/soma/files/') && !src.includes('\\')
+  return FILE_URL.test(src)
 }
 
 /** "1.4 MB" */

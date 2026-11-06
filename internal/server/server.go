@@ -9,44 +9,40 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"path/filepath"
-	"sync"
 	"sync/atomic"
 	"time"
 
 	"dendronotes/internal/auth"
 	"dendronotes/internal/clientip"
 	"dendronotes/internal/config"
-	"dendronotes/internal/events"
 	"dendronotes/internal/httpx"
-	"dendronotes/internal/index"
 	"dendronotes/internal/soma"
+	"dendronotes/internal/somas"
+	"dendronotes/internal/store"
 )
 
-// hashParams are the argon2id parameters for a plaintext AUTH_PASSWORD_FILE.
-// The zero value means auth.DefaultParams; tests lower them for speed.
+// hashParams are the argon2id parameters for new passwords. The zero value
+// means auth.DefaultParams; tests lower them for speed.
 var hashParams auth.Params
 
 // Server bundles the HTTP server, its dependencies and the readiness state.
 type Server struct {
 	cfg     config.Config
 	log     *slog.Logger
-	soma    *soma.Soma
-	index   *index.Index
-	hub     *events.Hub
+	store   *store.Store
+	somas   *somas.Manager
 	auth    *auth.Authenticator
+	ips     *clientip.Resolver
 	assets  *assets
 	version string
+	started time.Time
 
 	httpSrv  *http.Server
 	ready    atomic.Bool // true only after a complete startup
 	draining atomic.Bool // true from SIGTERM on
 
-	// moveMu serializes moves that rewrite synapses in other notes.
-	moveMu sync.Mutex
-
 	// closers run in reverse order during shutdown, once no requests are in
-	// flight anymore (background work, index database, soma).
+	// flight anymore (somas, then the state database).
 	closers []namedCloser
 }
 
@@ -57,43 +53,56 @@ type namedCloser struct {
 
 // New builds the server. webFS contains the built frontend (index.html, assets/ …).
 func New(cfg config.Config, log *slog.Logger, webFS fs.FS, version string) (*Server, error) {
-	authn, err := auth.New(auth.Config{
+	st, err := store.Open(cfg.DataDir, log)
+	if err != nil {
+		return nil, err
+	}
+	s := &Server{cfg: cfg, log: log, store: st, ips: clientip.New(cfg.TrustedProxies), version: version, started: time.Now()}
+	s.addCloser("state", st.Close)
+	fail := func(err error) (*Server, error) {
+		s.close()
+		return nil, err
+	}
+
+	s.auth, err = auth.New(auth.Config{
 		Mode:           auth.Mode(cfg.Auth.Mode),
-		PasswordHash:   cfg.Auth.PasswordHash,
-		Password:       cfg.Auth.Password.Reveal(),
-		HashParams:     hashParams,
-		SessionsFile:   filepath.Join(cfg.DataDir, "sessions.json"),
 		SessionTTL:     cfg.Auth.SessionTTL,
 		CookieSecure:   cfg.Auth.CookieSecure,
+		HashParams:     hashParams,
+		AdminUsername:  cfg.Auth.AdminUsername,
 		ProxyHeader:    cfg.Auth.ProxyHeader,
 		ProxyAllowed:   cfg.Auth.ProxyAllowed,
 		ProxyLogoutURL: cfg.Auth.ProxyLogoutURL,
-	}, clientip.New(cfg.TrustedProxies), log)
+		OnProvision:    s.welcome,
+	}, st, s.ips, log)
 	if err != nil {
-		return nil, fmt.Errorf("auth: %w", err)
+		return fail(fmt.Errorf("auth: %w", err))
 	}
-	sm, err := soma.Open(cfg.SomaDir, soma.Options{Ignore: cfg.Ignore, MaxNoteBytes: cfg.MaxNoteBytes})
-	if err != nil {
-		return nil, err
+
+	s.somas = somas.New(st, somas.Options{
+		SomasDir:       cfg.SomasDir,
+		DataDir:        cfg.DataDir,
+		Soma:           soma.Options{Ignore: cfg.Ignore, MaxNoteBytes: cfg.MaxNoteBytes},
+		RescanInterval: cfg.RescanInterval,
+		Log:            log,
+	})
+	s.addCloser("somas", s.somas.Close)
+
+	ctx := context.Background()
+	if err := s.auth.Bootstrap(ctx, cfg.Auth.AdminHash, cfg.Auth.AdminPassword.Reveal()); err != nil {
+		return fail(err)
 	}
-	a, err := newAssets(webFS)
-	if err != nil {
-		sm.Close()
-		return nil, err
+	if err := s.firstSoma(ctx); err != nil {
+		return fail(err)
 	}
-	if !a.hasIndex() {
+
+	if s.assets, err = newAssets(webFS); err != nil {
+		return fail(err)
+	}
+	if !s.assets.hasIndex() {
 		log.Warn("frontend not built: web/dist/index.html missing, UI will answer 503")
 	}
 
-	ix, err := index.Open(cfg.DataDir, sm, log)
-	if err != nil {
-		sm.Close()
-		return nil, fmt.Errorf("index: %w", err)
-	}
-
-	s := &Server{cfg: cfg, log: log, soma: sm, index: ix, hub: events.NewHub(maxStreams), auth: authn, assets: a, version: version}
-	s.addCloser("soma", sm.Close)
-	s.addCloser("index", ix.Close)
 	s.httpSrv = &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
 		Handler:           s.Handler(),
@@ -103,8 +112,44 @@ func New(cfg config.Config, log *slog.Logger, webFS fs.FS, version string) (*Ser
 		ErrorLog:          slog.NewLogLogger(log.Handler(), slog.LevelWarn),
 	}
 	// Event streams never become idle; end them as soon as shutdown begins.
-	s.httpSrv.RegisterOnShutdown(s.hub.Close)
+	s.httpSrv.RegisterOnShutdown(s.somas.Shutdown)
 	return s, nil
+}
+
+// firstSoma gives the first admin a soma when there is none yet: the folder
+// of DENDRONOTES_SOMA_DIR (an upgrade from a single-soma installation), or a
+// new empty one.
+func (s *Server) firstSoma(ctx context.Context) error {
+	if n, err := s.store.CountSomas(ctx); err != nil || n > 0 {
+		return err
+	}
+	admin, err := s.store.UserByUsername(ctx, s.cfg.Auth.AdminUsername)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil // proxy mode: the admin appears with the first request
+	}
+	if err != nil {
+		return err
+	}
+	if s.cfg.ImportSomaDir != "" {
+		sm, err := s.somas.Import(ctx, s.cfg.ImportSomaDir, "Notes", admin.ID)
+		if err != nil {
+			return fmt.Errorf("import %s: %w", s.cfg.ImportSomaDir, err)
+		}
+		s.log.Info("existing soma registered for the admin", "dir", s.cfg.ImportSomaDir, "soma", sm.ID)
+		return nil
+	}
+	return s.welcome(ctx, admin)
+}
+
+// welcome gives a new account its first, empty soma.
+func (s *Server) welcome(ctx context.Context, u store.User) error {
+	sm, err := s.somas.Create(ctx, "Notes", u.ID)
+	if err != nil {
+		s.log.Error("creating the first soma failed", "user", u.Username, "err", err)
+		return err
+	}
+	s.store.Audit(ctx, store.AuditEntry{ActorID: u.ID, Actor: u.Username, Action: "soma.create", Target: sm.ID, Detail: sm.Name})
+	return nil
 }
 
 func (s *Server) addCloser(name string, fn func() error) {
@@ -148,16 +193,11 @@ func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 	errCh := make(chan error, 1)
 	go func() { errCh <- s.httpSrv.Serve(ln) }()
 
-	bgCtx, stopBackground := context.WithCancel(ctx)
-	bgDone := make(chan struct{})
-	go func() { defer close(bgDone); s.runIndex(bgCtx) }()
-	s.addCloser("background", func() error { stopBackground(); <-bgDone; return nil })
-
 	s.ready.Store(true)
 	s.log.Info("listening",
 		"addr", ln.Addr().String(),
 		"auth", s.cfg.Auth.Mode,
-		"soma", s.cfg.SomaDir,
+		"somas", s.cfg.SomasDir,
 		"data", s.cfg.DataDir,
 		"version", s.version,
 	)

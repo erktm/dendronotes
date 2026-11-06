@@ -1,6 +1,7 @@
 <script lang="ts">
   import Logo from './Logo.svelte'
   import Icon from './Icon.svelte'
+  import { app } from '../lib/state/app.svelte'
   import { brand, strings } from '../lib/strings'
 
   let {
@@ -10,6 +11,8 @@
     onopensettings,
     graph,
     ongraph,
+    admin,
+    onadmin,
   }: {
     /** What the open sidebar shows, or null when it is closed. */
     view: 'files' | 'search' | null
@@ -19,6 +22,9 @@
     /** The graph view is open. */
     graph: boolean
     ongraph: () => void
+    /** The admin area is open. */
+    admin: boolean
+    onadmin: () => void
   } = $props()
 </script>
 
@@ -66,6 +72,20 @@
   </button>
 
   <div class="spacer"></div>
+
+  {#if app.isAdmin}
+    <button
+      class="item"
+      class:active={admin}
+      type="button"
+      aria-label={strings.admin.open}
+      aria-pressed={admin}
+      title={admin ? strings.admin.back : strings.admin.open}
+      onclick={onadmin}
+    >
+      <Icon name="shield" size={20} />
+    </button>
+  {/if}
 
   <button class="item" type="button" aria-label={strings.nav.settings} title={strings.settings.open} onclick={onopensettings}>
     <svg viewBox="0 0 24 24" aria-hidden="true">
