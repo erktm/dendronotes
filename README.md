@@ -5,10 +5,10 @@ everything else – search index, sessions – is a derived cache that can be re
 
 One container, one process, no external services, no external requests (air-gap friendly).
 
-> **Status: milestone 2** – soma access, authentication, file tree, an editor with live
-> preview and optional Vim key bindings, a reading view, synapses (click to open or create),
-> quick switcher, outline and a side-by-side conflict view. Search, backlinks and live sync
-> follow in M3, attachments in M4, Kubernetes manifests in M5.
+> **Status: milestone 3** – soma access, authentication, file tree, an editor with live
+> preview and optional Vim key bindings, a reading view, synapses with backlinks, full-text
+> search with tags, live updates when files change on disk, and synapses that follow renamed
+> notes. Attachments follow in M4, Kubernetes manifests in M5.
 
 ## Vocabulary
 
@@ -42,13 +42,26 @@ make run-image    # run the image hardened (read-only, no capabilities)
 - **Edit and Read.** The editor renders Markdown as you type (live preview); the line with
   the cursor shows its syntax. The reading view shows the finished note. Switch with the
   toggle in the top bar or ⌘E / Ctrl+E.
-- **Synapses.** Type `[[` for suggestions from the soma. Click a synapse to open the note –
+- **Synapses.** Type `[[` for suggestions from the soma, and `[[Note#` for the headings of
+  that note (`[[#` for this note's own). Click a synapse to open the note –
   in the editor, on the line you are editing, hold ⌘ / Ctrl while clicking. A synapse whose
   note does not exist yet is shown dashed; clicking it creates the note next to the current
   one (or at the path given, e.g. `[[Projects/Idea]]`). Markdown links to notes, such as
   `[Text](Other.md)`, are synapses too.
 - **Tasks.** Checkboxes (`- [ ]`) can be ticked in both views; the file changes accordingly.
-- **Details panel.** Outline of the note and its outgoing synapses (on wide screens).
+- **Details panel** (on wide screens). Outline of the note, its synapses, and the
+  **incoming synapses**: every note that connects here, with the line it does so in.
+- **Search** (⌘⇧F / Ctrl+Shift+F, or the magnifier in the left rail). Words match their
+  beginning, `"quoted text"` an exact phrase and `#tag` a tag, including nested tags such as
+  `#garden/beds`; case and accents are ignored. A result opens the note at the matching line.
+  With an empty search field, the panel lists all tags.
+- **Tags.** `#tag` anywhere in the text (not in code) or a `tags:` list in the front matter.
+- **Renaming and moving.** Synapses in other notes are rewritten so they keep pointing to the
+  renamed or moved note (Markdown links included), unless switched off in the settings. A note
+  that was changed by someone else in that moment is left alone and reported.
+- **Live updates.** Changes made outside dendronotes – another editor, git, a sync tool or a
+  second browser tab – appear right away: the file tree, search and backlinks update, and an
+  open note reloads. If it has unsaved edits, the comparison below opens instead.
 - **Saving.** Notes save automatically while you type (⌘S / Ctrl+S saves at once). If the
   file was changed elsewhere in the meantime, nothing is overwritten: a comparison of both
   versions appears and you choose "Keep mine" or "Use version on disk".
@@ -56,16 +69,34 @@ make run-image    # run the image hardened (read-only, no capabilities)
 | Shortcut         | Action                         |
 |------------------|--------------------------------|
 | ⌘O / Ctrl+O      | Quick switcher: open or create a note (Shift+Enter creates) |
+| ⌘⇧F / Ctrl+Shift+F | Search notes                 |
 | ⌘E / Ctrl+E      | Switch between edit and read   |
 | ⌘S / Ctrl+S      | Save now                       |
 | ⌘, / Ctrl+,      | Settings                       |
 
 **Settings** (stored in the browser, never in the soma): live preview, Vim key bindings,
-readable line length, note font (sans or serif), theme (system, light, dark) and the
-details panel.
+readable line length, note font (sans or serif), theme (system, light, dark), the details
+panel, and whether renaming updates synapses.
 
 Images and embedded files are shown as placeholders until attachments arrive in M4;
 images from other hosts are never loaded.
+
+## Index and live updates
+
+dendronotes keeps a search index in `$DENDRONOTES_DATA_DIR/index.db` (SQLite with FTS5,
+compiled into the binary, no extra service). It is a cache: delete it at any time and it is
+rebuilt from the soma on the next start, as it is when its format changes or the file is
+damaged. `/readyz` reports ready once the index has caught up with the soma.
+
+Changes on disk are picked up through file system events (inotify on Linux). Every
+`DENDRONOTES_RESCAN_INTERVAL` (default 5 minutes) the whole soma is compared as well, which
+covers file systems without events, such as some network volumes. A very large soma may need
+a higher inotify limit on the host (`fs.inotify.max_user_watches`); without it, changes are
+still found by the rescans.
+
+Browsers receive updates through Server-Sent Events (`/api/soma/events`). Behind a reverse
+proxy, do not buffer that path and allow idle reads of at least 30 seconds (a heartbeat is
+sent every 25 seconds); dendronotes sets `X-Accel-Buffering: no` for nginx.
 
 ## Running the container
 
@@ -94,6 +125,7 @@ All variables carry the `DENDRONOTES_` prefix. Variables without it are ignored.
 | `DENDRONOTES_SHUTDOWN_TIMEOUT`         | `20s`              | Maximum time for in-flight requests after SIGTERM          |
 | `DENDRONOTES_MAX_NOTE_MB`              | `5`                | Largest note the editor opens or saves                     |
 | `DENDRONOTES_IGNORE`                   |                    | Extra name patterns hidden from the tree, e.g. `node_modules,*.tmp` (dot entries are always hidden) |
+| `DENDRONOTES_RESCAN_INTERVAL`          | `5m`               | How often the whole soma is compared with the index, in addition to file system events; `0` turns it off |
 | `DENDRONOTES_TRUSTED_PROXIES`          |                    | IPs/CIDRs of reverse proxies whose `X-Forwarded-*` headers are believed |
 | `DENDRONOTES_AUTH_MODE`                | `password`         | `password` or `proxy`                                      |
 | `DENDRONOTES_AUTH_PASSWORD_HASH`       |                    | argon2id hash (see below)                                  |
@@ -125,7 +157,6 @@ docker run --rm -it dendronotes:<version> hash-password
 
 Login attempts are rate-limited per client IP and globally; sessions are stored only as
 SHA-256 hashes in `$DENDRONOTES_DATA_DIR/sessions.json` and sent as `HttpOnly`,
-| `DENDRONOTES_RESCAN_INTERVAL`          | `5m`               | How often the whole soma is compared with the index, in addition to file system events; `0` turns it off |
 `SameSite=Strict` cookies (`__Host-` prefixed and `Secure` over HTTPS).
 
 **Behind an authenticating proxy** (e.g. oauth2-proxy with Keycloak): set
@@ -147,6 +178,8 @@ sure only the proxy can reach dendronotes (Kubernetes: a NetworkPolicy).
 - Strict Content-Security-Policy with per-response nonce; no inline scripts, no `eval`, no
   external hosts. The only inline style allowed is the exact `tab-size: 4` attribute the
   editor sets (by hash).
+- The event stream carries only paths and versions, never note content, and ends when the
+  session ends. Search snippets mark matches with control characters, not HTML.
 - Note content is untrusted: the reading view renders it with markdown-it and sanitizes the
   result with DOMPurify (no scripts, event handlers, style attributes, forms, frames, SVG or
   `javascript:` URLs). External links open with `rel="noopener noreferrer"`. A test corpus of
@@ -166,8 +199,12 @@ is in [`docs/openapi.yaml`](docs/openapi.yaml), which a test keeps in sync with 
 | `PUT /api/soma/notes/{path}`            | Save a note; requires `If-Match`, `412` on conflict  |
 | `POST /api/soma/notes/{path}`           | Create a note                                        |
 | `POST /api/soma/folders/{path}`         | Create a folder                                      |
-| `POST /api/soma/move`                   | Rename or move: `{"from": …, "to": …}`               |
+| `POST /api/soma/move`                   | Rename or move: `{"from": …, "to": …, "updateSynapses": true}` |
 | `DELETE /api/soma/entries/{path}`       | Move a file or folder to `.trash/` in the soma       |
+| `GET /api/soma/search?q=`               | Full-text search (words, "phrases", #tags)           |
+| `GET /api/soma/backlinks/{path}`        | Notes with synapses to a note                        |
+| `GET /api/soma/tags`                    | All tags with their number of notes                  |
+| `GET /api/soma/events`                  | Live updates (Server-Sent Events)                    |
 
 ## Air gap and reproducible builds
 
@@ -189,6 +226,11 @@ make image-offline   # rebuild without cache and without network in the build st
 cmd/dendronotes/   entry point: serve, hash-password, healthcheck, version
 internal/config/   read and validate DENDRONOTES_* environment variables
 internal/soma/     soma access exclusively through os.Root (tree, notes, move, trash)
+internal/mdparse/  synapses and tags of a note (same rules as web/src/lib/synapses.ts)
+internal/index/    SQLite cache: versions, synapses, tags, full-text search
+internal/watch/    file system events (fsnotify) for changes made outside dendronotes
+internal/events/   fan-out of live updates to connected browsers
+internal/relink/   rewrites synapses when notes are renamed or moved
 internal/auth/     password (argon2id), sessions, rate limit, proxy header
 internal/clientip/ client address behind trusted proxies
 internal/httpx/    JSON helpers
