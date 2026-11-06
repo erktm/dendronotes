@@ -45,6 +45,7 @@ func (s *Server) routes() []route {
 		{"GET", "/api/soma/search", s.handleSearch, false},
 		{"GET", "/api/soma/backlinks/{path...}", s.handleBacklinks, false},
 		{"GET", "/api/soma/tags", s.handleTags, false},
+		{"GET", "/api/soma/graph", s.handleGraph, false},
 		{"GET", "/api/soma/events", s.handleEvents, false},
 	}
 }

@@ -64,6 +64,16 @@ func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"tags": tags})
 }
 
+// handleGraph returns all notes and the synapses between them.
+func (s *Server) handleGraph(w http.ResponseWriter, r *http.Request) {
+	g, err := s.index.Graph(r.Context())
+	if err != nil {
+		s.internalError(w, r, "graph", err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, g)
+}
+
 func (s *Server) internalError(w http.ResponseWriter, r *http.Request, what string, err error) {
 	if r.Context().Err() == nil {
 		s.log.Error(what+" failed", "err", err)

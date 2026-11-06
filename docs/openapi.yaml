@@ -346,6 +346,41 @@ paths:
                         tag: { type: string, example: garden/beds }
                         count: { type: integer }
         "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/soma/graph:
+    get:
+      summary: All notes and the synapses between them
+      description: >
+        Nodes are the notes (with their tags) and, prefixed with "?", notes that
+        unresolved synapses point to. Edges are resolved synapses, at most one per
+        direction; a note's synapses to itself are left out.
+      responses:
+        "200":
+          description: The graph.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [nodes, edges]
+                properties:
+                  nodes:
+                    type: array
+                    items:
+                      type: object
+                      required: [id]
+                      properties:
+                        id: { type: string, example: Projects/Garden plan.md }
+                        label: { type: string, description: Name of a missing note as written. }
+                        missing: { type: boolean }
+                        tags: { type: array, items: { type: string } }
+                  edges:
+                    type: array
+                    items:
+                      type: object
+                      required: [source, target]
+                      properties:
+                        source: { type: string }
+                        target: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
   /api/soma/events:
     get:
       summary: Live updates (Server-Sent Events)

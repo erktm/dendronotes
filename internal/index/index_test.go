@@ -349,3 +349,41 @@ func TestParseQuery(t *testing.T) {
 		t.Errorf("ftsQuery = %s", got)
 	}
 }
+
+func TestGraph(t *testing.T) {
+	f := newFixture(t, garden)
+	f.sync(t)
+	g, err := f.ix.Graph(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []string
+	tags := map[string][]string{}
+	for _, n := range g.Nodes {
+		ids = append(ids, n.ID)
+		if n.Tags != nil {
+			tags[n.ID] = n.Tags
+		}
+		if n.Missing != strings.HasPrefix(n.ID, MissingPrefix) || (n.Missing && n.Label != "Missing") {
+			t.Errorf("node %+v", n)
+		}
+	}
+	wantIDs := []string{"Café.md", "Journal/Garden log.md", "Projects/Archive/Old.md", "Projects/Garden plan.md", "Projects/Twin/Soil types.md", "Soil types.md", "?missing"}
+	if !slices.Equal(ids, wantIDs) {
+		t.Errorf("nodes = %v", ids)
+	}
+	if !slices.Equal(tags["Projects/Garden plan.md"], []string{"todo"}) || !slices.Equal(tags["Café.md"], []string{"Kitchen/desserts"}) {
+		t.Errorf("tags = %v", tags)
+	}
+	want := []GraphEdge{
+		{"Journal/Garden log.md", "Projects/Garden plan.md"},
+		{"Journal/Garden log.md", "Soil types.md"},
+		{"Projects/Archive/Old.md", "Projects/Garden plan.md"},
+		{"Projects/Archive/Old.md", "?missing"},
+		{"Projects/Garden plan.md", "Soil types.md"},
+		{"Projects/Garden plan.md", "Journal/Garden log.md"},
+	}
+	if !slices.Equal(g.Edges, want) {
+		t.Errorf("edges:\n got %v\nwant %v", g.Edges, want)
+	}
+}

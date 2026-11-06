@@ -68,6 +68,12 @@ func TestSearchBacklinksTagsAPI(t *testing.T) {
 	}
 	expect(t, c.do("GET", "/api/soma/backlinks/..%2Fetc%2Fpasswd", ""), 400, "invalid_path")
 
+	rec = c.do("GET", "/api/soma/graph", "")
+	expect(t, rec, 200, "")
+	if g := decode[index.Graph](t, rec); len(g.Nodes) != 3 || len(g.Edges) != 2 { // two synapses Log → plan are one edge
+		t.Errorf("graph: %+v", g)
+	}
+
 	rec = c.do("GET", "/api/soma/tags", "")
 	expect(t, rec, 200, "")
 	if tags := decode[struct{ Tags []index.TagCount }](t, rec).Tags; len(tags) != 2 {
