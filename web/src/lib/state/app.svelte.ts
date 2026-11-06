@@ -17,7 +17,7 @@ import {
 } from '../paths'
 import { router } from '../router.svelte'
 import { strings } from '../strings'
-import { newNotePath, normalizePath, resolveSynapse } from '../synapses'
+import { newNotePath, normalizePath, resolveFile, resolveSynapse } from '../synapses'
 import { buildTree } from '../tree'
 import { NoteSession } from './note.svelte'
 import { live } from './live.svelte'
@@ -67,6 +67,8 @@ class App {
 
   /** Paths of all notes in the soma (for synapses and the quick switcher). */
   notePaths = $derived(this.entries.filter((e) => e.type === 'file' && isNote(e.path)).map((e) => e.path))
+  /** Paths of all files (for attachments). */
+  filePaths = $derived(this.entries.filter((e) => e.type === 'file').map((e) => e.path))
 
   note = $state.raw<NoteSession | null>(null)
   /** A note that should get the cursor when it opens. */
@@ -351,6 +353,52 @@ class App {
   /** The note a synapse in fromPath points to, or null if it does not exist yet. */
   resolveSynapse(target: string, markdown: boolean, fromPath: string): string | null {
     return resolveSynapse({ target, markdown }, fromPath, this.notePaths)
+  }
+
+  /** The file an attachment reference in fromPath points to, or null. */
+  resolveFile(target: string, markdown: boolean, fromPath: string): string | null {
+    return resolveFile({ target, markdown }, fromPath, this.filePaths)
+  }
+
+  /**
+   * Uploads files into a folder (taken names get a " (n)" suffix) and
+   * returns the stored paths; failures are reported and skipped.
+   */
+  async upload(files: readonly File[], folder: string, rename?: (f: File) => string): Promise<string[]> {
+    const stored: string[] = []
+    for (const f of files) {
+      const name = (rename?.(f) ?? f.name).normalize('NFC')
+      const problem = nameProblem(name)
+      if (problem) {
+        this.toast(`${name}: ${problem}`)
+        continue
+      }
+      try {
+        stored.push((await api.uploadFile(join(folder, name), f)).path)
+      } catch (err) {
+        this.toast(strings.files.uploadFailed(name, errorMessage(err)))
+      }
+    }
+    if (stored.length) {
+      if (folder) this.expanded.add(folder)
+      await this.refresh()
+    }
+    return stored
+  }
+
+  /** Uploads files dropped on the tree or picked in the file dialog, and says how it went. */
+  async uploadInto(files: readonly File[], folder: string): Promise<void> {
+    if (files.length > 1 || files.some((f) => f.size > 2 << 20)) this.toast(strings.files.uploading(files.length), 'info')
+    const stored = await this.upload(files, folder)
+    if (stored.length) this.toast(strings.files.uploaded(stored.length), 'info')
+    // A single file opens right away.
+    if (stored.length === 1 && files.length === 1) await this.navigate(stored[0]!)
+  }
+
+  /** How a stored file is best written in a note: its name, or its path if the name is ambiguous. */
+  embedTarget(path: string, fromPath: string): string {
+    const name = basename(path)
+    return this.resolveFile(name, false, fromPath) === path ? name : path
   }
 
   /** Follows a synapse; an unresolved one creates its note first. */

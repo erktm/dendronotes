@@ -45,15 +45,22 @@
   }
 
   function ondragover(e: DragEvent) {
-    if (!e.dataTransfer?.types.includes(DRAG_TYPE)) return
+    const types = e.dataTransfer?.types ?? []
+    const files = types.includes('Files')
+    if (!e.dataTransfer || (!types.includes(DRAG_TYPE) && !files)) return
     e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
+    e.dataTransfer.dropEffect = files ? 'copy' : 'move'
     rootDrop = true
   }
 
   function ondrop(e: DragEvent) {
     e.preventDefault()
     rootDrop = false
+    const files = [...(e.dataTransfer?.files ?? [])]
+    if (files.length) {
+      void app.uploadInto(files, '')
+      return
+    }
     const from = e.dataTransfer?.getData(DRAG_TYPE)
     if (from) void app.moveInto(from, '')
   }

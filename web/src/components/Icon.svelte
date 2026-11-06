@@ -19,6 +19,9 @@
     search: 'M15 15l5 5M10.5 16.5a6 6 0 1 0 0-12 6 6 0 0 0 0 12z',
     panel: 'M4.5 5h15a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM15 5v14',
     refresh: 'M19 12a7 7 0 1 1-2.05-4.95M19 4.5V8h-3.5',
+    upload: 'M12 15.5V4.5M7.5 9 12 4.5 16.5 9M5 19.5h14',
+    download: 'M12 4.5v11M7.5 11 12 15.5 16.5 11M5 19.5h14',
+    external: 'M13.5 4.5h6v6M19.5 4.5 11 13M17.5 14v4.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1H10',
   } as const
 
   export type IconName = keyof typeof icons

@@ -392,3 +392,92 @@
   font-family: var(--font-ui);
   font-size: 0.85em;
 }
+
+/* --- Attachments (M4) ------------------------------------------------- */
+
+.cm-image {
+  display: inline-block;
+  max-width: 100%;
+  max-height: 480px;
+  margin: 4px 0;
+  border-radius: 8px;
+  vertical-align: bottom;
+  cursor: text;
+}
+
+.reading .embed-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0.4em 0;
+  border-radius: 8px;
+}
+.reading .embed-video {
+  display: block;
+  max-width: 100%;
+  margin: 0.4em 0;
+  border-radius: 8px;
+  background: var(--code-bg);
+}
+.reading .embed-audio {
+  display: block;
+  width: min(100%, 480px);
+  margin: 0.4em 0;
+}
+
+.reading a.file {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 10px 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg-raised);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 0.85em;
+  text-decoration: none;
+}
+.reading a.file::before {
+  content: '';
+  width: 10px;
+  height: 12px;
+  flex: none;
+  border: 1.5px solid var(--accent);
+  border-radius: 2px 5px 2px 2px;
+}
+.reading a.file:hover {
+  border-color: var(--accent);
+}
+.reading a.file.missing,
+.reading .attachment.missing {
+  border-style: dashed;
+  color: var(--text-faint);
+}
+
+/* An embedded note: framed, with its source as a heading link. */
+.reading .embed-note {
+  display: block;
+  margin: 0.6em 0;
+  padding: 2px 0 2px 16px;
+  border-left: 3px solid var(--accent-soft);
+}
+.reading .embed-head {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--font-ui);
+  font-size: 0.8em;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.reading .embed-body {
+  display: block;
+}
+.reading .embed-body > :first-child {
+  margin-top: 0;
+}
+.reading .embed-status {
+  color: var(--text-faint);
+  font-family: var(--font-ui);
+  font-size: 0.85em;
+}

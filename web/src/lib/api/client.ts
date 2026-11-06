@@ -21,6 +21,8 @@ export function onUnauthorized(fn: () => void): void {
 
 interface RequestOptions {
   body?: unknown
+  /** Sent as is instead of JSON (file uploads). */
+  raw?: Blob
   headers?: Record<string, string>
   signal?: AbortSignal
   /** Do not trigger the global 401 handler (login, initial check). */
@@ -30,8 +32,11 @@ interface RequestOptions {
 /** Sends a JSON request to the API and returns the decoded answer. */
 export async function request<T>(method: string, url: string, opts: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json', ...opts.headers }
-  let body: string | undefined
-  if (opts.body !== undefined) {
+  let body: string | Blob | undefined
+  if (opts.raw !== undefined) {
+    headers['Content-Type'] = opts.raw.type || 'application/octet-stream'
+    body = opts.raw
+  } else if (opts.body !== undefined) {
     headers['Content-Type'] = 'application/json'
     body = JSON.stringify(opts.body)
   }

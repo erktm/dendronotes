@@ -146,6 +146,27 @@ export function resolveSynapse(
   fromPath: string,
   notes: readonly string[],
 ): string | null {
+  return resolveIn(ref, fromPath, notes, true)
+}
+
+/**
+ * Finds an attachment (![[photo.png]], ![](photo.png)) among all files,
+ * with the same rules as notes but without adding ".md".
+ */
+export function resolveFile(
+  ref: Pick<SynapseRef, 'target' | 'markdown'>,
+  fromPath: string,
+  files: readonly string[],
+): string | null {
+  return resolveIn(ref, fromPath, files, false)
+}
+
+function resolveIn(
+  ref: Pick<SynapseRef, 'target' | 'markdown'>,
+  fromPath: string,
+  notes: readonly string[],
+  noteExt: boolean,
+): string | null {
   const byFold = new Map<string, string>()
   for (const n of notes) byFold.set(fold(n), n)
   const exact = (p: string | null) => (p === null ? null : notes.includes(p) ? p : (byFold.get(fold(p)) ?? null))
@@ -155,7 +176,8 @@ export function resolveSynapse(
     return exact(normalizePath(`${here}/${ref.target}`)) ?? exact(normalizePath(ref.target))
   }
 
-  const target = withNoteExt(ref.target.replace(/^\/+/, ''))
+  const bare = ref.target.replace(/^\/+/, '')
+  const target = noteExt ? withNoteExt(bare) : bare
   let candidates: string[]
   if (target.includes('/')) {
     const direct = exact(normalizePath(target)) ?? exact(normalizePath(`${here}/${target}`))

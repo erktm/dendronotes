@@ -4,11 +4,12 @@ import { describe, expect, it } from 'vitest'
 import { renderMarkdown } from './markdown'
 
 const notes = ['Soil types.md', 'Projects/Plan.md']
+const files = ['photo.png', 'Projects/north bed.jpg', 'Projects/report.pdf', 'song.mp3', 'clip.mp4', ...notes]
+const find = (list: string[], want: string) =>
+  list.find((n) => n.toLowerCase() === want.toLowerCase() || n.toLowerCase().endsWith(`/${want.toLowerCase()}`)) ?? null
 const ctx = {
-  resolve: (target: string, markdown: boolean) => {
-    const want = (markdown ? target : `${target}.md`).replace(/^\.\.\//, '').toLowerCase()
-    return notes.find((n) => n.toLowerCase() === want || n.toLowerCase().endsWith(`/${want}`)) ?? null
-  },
+  resolve: (target: string, markdown: boolean) => find(notes, (markdown ? target : `${target}.md`).replace(/^\.\.\//, '')),
+  resolveFile: (target: string) => find(files, target.replace(/^\.\.\//, '')),
 }
 
 function dom(src: string): HTMLElement {
@@ -43,13 +44,25 @@ const XSS = [
   '[[x" onmouseover="alert(1)]]',
   '[[<img src=x onerror=alert(1)>]]',
   '<video src=x onerror=alert(1)></video>',
+  '<img src="//evil.example/api/soma/files/x.png">',
+  '<img src="https://evil.example/api/soma/files/x.png">',
+  '<img src="/api/soma/files/../../x" onerror=alert(1)>',
+  '<audio src="javascript:alert(1)" controls></audio>',
+  '<video src="data:video/mp4;base64,AAAA"></video>',
+  '<img src="/api/soma/files\\..\\x.png">',
+  '<img srcset="https://evil.example/x.png 1x" src="/api/soma/files/photo.png">',
 ]
 
 describe('renderMarkdown sanitizing', () => {
   for (const payload of XSS) {
     it(`neutralizes ${payload}`, () => {
       const el = dom(payload)
-      expect(el.querySelector('script, iframe, object, embed, svg, math, img, video, style, form, base, meta, link, button')).toBeNull()
+      expect(el.querySelector('script, iframe, object, embed, svg, math, style, form, base, meta, link, button, source')).toBeNull()
+      // Media may only load from the soma.
+      for (const m of el.querySelectorAll('img, audio, video')) {
+        expect(m.getAttribute('src') ?? '').toMatch(/^\/api\/soma\/files\/[^\\]*$/)
+        expect(m.hasAttribute('srcset')).toBe(false)
+      }
       for (const node of el.querySelectorAll('*')) {
         for (const attr of node.attributes) {
           expect(attr.name.startsWith('on'), `${node.tagName} ${attr.name}`).toBe(false)
@@ -100,10 +113,50 @@ describe('renderMarkdown features', () => {
     ])
   })
 
-  it('gives headings anchors and does not load images', () => {
-    const el = dom('## Garden Plan\n\n![bed](north-bed.jpg)')
+  it('gives headings anchors and shows missing images as placeholders', () => {
+    const el = dom('## Garden Plan\n\n![bed](north-bed-missing.jpg)')
     expect(el.querySelector('h2')!.id).toBe('garden-plan')
     expect(el.querySelector('img')).toBeNull()
-    expect(el.querySelector('.attachment')!.textContent).toContain('bed')
+    expect(el.querySelector('.attachment.missing')!.textContent).toContain('bed')
+  })
+
+  it('shows images, audio and video from the soma', () => {
+    const el = dom('![[photo.png|300]] ![[north bed.jpg|tomatoes]]\n\n![a bed](north%20bed.jpg)\n\n![[song.mp3]] ![[clip.mp4]]')
+    const [a, b, c] = [...el.querySelectorAll('img')]
+    expect(a!.getAttribute('src')).toBe('/api/soma/files/photo.png')
+    expect(a!.getAttribute('width')).toBe('300')
+    expect(b!.getAttribute('src')).toBe('/api/soma/files/Projects/north%20bed.jpg')
+    expect(b!.getAttribute('alt')).toBe('tomatoes')
+    expect(c!.getAttribute('alt')).toBe('a bed')
+    const audio = el.querySelector('audio')!
+    expect(audio.getAttribute('src')).toBe('/api/soma/files/song.mp3')
+    expect(audio.hasAttribute('controls')).toBe(true)
+    expect(el.querySelector('video')!.getAttribute('preload')).toBe('metadata')
+  })
+
+  it('links other attachments and keeps external images out', () => {
+    const el = dom('![[report.pdf]] [the report](Projects/report.pdf) ![x](https://example.org/x.png) ![[gone.png]]')
+    const links = [...el.querySelectorAll('a.file')]
+    expect(links.map((a) => a.getAttribute('href'))).toEqual(['/api/soma/files/Projects/report.pdf', '/api/soma/files/Projects/report.pdf'])
+    expect(links.every((a) => a.getAttribute('target') === '_blank' && a.getAttribute('rel') === 'noopener')).toBe(true)
+    expect(el.textContent).toContain('External image not loaded')
+    expect(el.textContent).toContain('Missing attachment: gone.png')
+    expect(el.querySelector('img')).toBeNull()
+  })
+
+  it('strips what media must not do', () => {
+    const el = dom('<video src="/api/soma/files/clip.mp4" autoplay loop poster="https://evil.example/p.png" width="50%" onplay="alert(1)"></video>')
+    const v = el.querySelector('video')!
+    expect([...v.attributes].map((a) => a.name).sort()).toEqual(['src'])
+  })
+
+  it('marks embedded notes for loading', () => {
+    const el = dom('![[Plan#Tasks]]\n\n![[Nowhere]]')
+    const embed = el.querySelector<HTMLElement>('.embed-note')!
+    expect(embed.dataset.embed).toBe('Projects/Plan.md')
+    expect(embed.dataset.embedHeading).toBe('Tasks')
+    expect(embed.querySelector('.embed-head a.synapse')!.getAttribute('href')).toBe('/n/Projects/Plan.md#tasks')
+    expect(el.querySelectorAll('.embed-note')).toHaveLength(1)
+    expect(el.querySelector('.embedded-note a.unresolved')).not.toBeNull()
   })
 })

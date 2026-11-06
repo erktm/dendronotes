@@ -7,7 +7,8 @@
   import { app } from '../lib/state/app.svelte'
   import { settings } from '../lib/state/settings.svelte'
   import { editorStatus } from '../lib/state/status.svelte'
-  import { displayName } from '../lib/paths'
+  import { dirname, displayName } from '../lib/paths'
+  import { pastedName } from '../lib/files'
   import { strings } from '../lib/strings'
 
   let { session }: { session: NoteSession } = $props()
@@ -27,6 +28,7 @@
       host: {
         resolve: (target, markdown) => app.resolveSynapse(target, markdown, s.path),
         open: (target, markdown) => void app.openSynapse(target, markdown, s.path),
+        resolveFile: (target, markdown) => app.resolveFile(target, markdown, s.path),
       },
       notes: () => app.notePaths,
       headings: async (path) => outline((await readNote(path)).content),
@@ -39,6 +41,7 @@
         editorStatus.col = col
       },
       onVimMode: (mode) => (editorStatus.vimMode = mode),
+      onFiles: (files, pos) => void embedFiles(files, pos),
     })
     handle = editor
     if (s.autofocus) {
@@ -69,11 +72,24 @@
     if (handle && content !== handle.doc()) handle.replaceDoc(content)
   })
 
-  // Notes added, renamed or removed: re-resolve synapses.
+  // Files added, renamed or removed: re-resolve synapses and attachments.
   $effect(() => {
-    void app.notePaths
+    void app.filePaths
     handle?.refresh()
   })
+
+  /** Clipboard images carry generic names; give them a dated one. */
+  const generic = (f: File) => f.name === '' || /^image\.(png|jpe?g|gif|webp)$/i.test(f.name)
+
+  /** Uploads pasted or dropped files next to the note and embeds them. */
+  async function embedFiles(files: File[], pos: number) {
+    const s = session
+    if (s.readOnly) return
+    if (files.some((f) => f.size > 2 << 20)) app.toast(strings.files.uploading(files.length), 'info')
+    const stored = await app.upload(files, dirname(s.path), (f) => (generic(f) ? pastedName(f.type) : f.name))
+    if (stored.length === 0 || !handle || app.note !== s) return
+    handle.insertAt(pos, stored.map((p) => `![[${app.embedTarget(p, s.path)}]]`).join('\n'))
+  }
 
   $effect(() => {
     const req = app.scrollRequest

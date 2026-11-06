@@ -41,3 +41,18 @@ export function outline(src: string): Heading[] {
     })
   return out
 }
+
+/**
+ * The part of a note under a heading (up to the next heading of the same or
+ * a higher level), for ![[Note#Heading]]. The whole note if not found.
+ */
+export function section(src: string, heading: string): string {
+  const want = heading.trim().toLowerCase()
+  const headings = outline(src)
+  const i = headings.findIndex((h) => h.text.toLowerCase() === want)
+  if (i < 0) return src
+  const h = headings[i]!
+  const next = headings.slice(i + 1).find((n) => n.level <= h.level)
+  const lines = src.split('\n')
+  return lines.slice(h.line, next ? next.line : lines.length).join('\n')
+}

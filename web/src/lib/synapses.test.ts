@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isNoteTarget, maskCode, newNotePath, normalizePath, parseSynapses, resolveSynapse, synapseLabel } from './synapses'
+import { isNoteTarget, maskCode, newNotePath, normalizePath, parseSynapses, resolveFile, resolveSynapse, synapseLabel } from './synapses'
 import shared from './testdata/synapses.json'
 
 const targets = (src: string) => parseSynapses(src).map((s) => s.target)
@@ -112,4 +112,15 @@ describe('shared synapse cases', () => {
       expect(resolveSynapse({ target: c.target, markdown: c.markdown }, c.from, shared.resolve.notes)).toBe(c.expected)
     })
   }
+})
+
+describe('resolveFile', () => {
+  const files = ['photo.png', 'Projects/photo.png', 'Projects/report.pdf', 'Projects/Plan.md']
+  it('finds attachments by name, path or relative link, without adding .md', () => {
+    expect(resolveFile({ target: 'report.pdf', markdown: false }, 'x.md', files)).toBe('Projects/report.pdf')
+    expect(resolveFile({ target: 'photo.png', markdown: false }, 'Projects/Plan.md', files)).toBe('Projects/photo.png')
+    expect(resolveFile({ target: 'photo.png', markdown: false }, 'Journal/x.md', files)).toBe('photo.png')
+    expect(resolveFile({ target: '../photo.png', markdown: true }, 'Projects/Plan.md', files)).toBe('photo.png')
+    expect(resolveFile({ target: 'report', markdown: false }, 'x.md', files)).toBeNull()
+  })
 })

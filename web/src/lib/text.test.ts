@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { snippetParts } from './snippet'
 import { diffLines } from './diff'
 import { fuzzyMatch, highlightChunks } from './fuzzy'
-import { outline } from './outline'
+import { outline, section } from './outline'
 
 describe('diffLines', () => {
   it('marks added and removed lines', () => {
@@ -69,5 +69,14 @@ describe('snippetParts', () => {
     expect(snippetParts('<b>x</b>\u0003y')).toEqual([{ text: '<b>x</b>y', mark: false }])
     expect(snippetParts(`\u0002open`)).toEqual([{ text: 'open', mark: false }])
     expect(snippetParts('')).toEqual([])
+  })
+})
+
+describe('section', () => {
+  const src = '# Plan\nintro\n## Tasks\n- a\n### Sub\nx\n## Layout\nrows'
+  it('cuts the part under a heading, including deeper headings', () => {
+    expect(section(src, 'tasks')).toBe('## Tasks\n- a\n### Sub\nx')
+    expect(section(src, 'Layout')).toBe('## Layout\nrows')
+    expect(section(src, 'Missing')).toBe(src)
   })
 })

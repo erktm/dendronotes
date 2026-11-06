@@ -27,6 +27,8 @@ export interface EditorOptions {
   onChange: (doc: string) => void
   onCursor: (line: number, col: number) => void
   onVimMode: (mode: string | null) => void
+  /** Files pasted or dropped into the editor at a position. */
+  onFiles: (files: File[], pos: number) => void
 }
 
 export interface EditorHandle {
@@ -40,6 +42,8 @@ export interface EditorHandle {
   focus(): void
   /** Moves the cursor to a 0-based line and scrolls it to the top. */
   scrollToLine(line: number): void
+  /** Inserts text at a position (as a user edit) and puts the cursor after it. */
+  insertAt(pos: number, text: string): void
   destroy(): void
 }
 
@@ -158,6 +162,24 @@ export function createEditor(parent: HTMLElement, o: EditorOptions): EditorHandl
     readOnlyC.of(EditorState.readOnly.of(o.readOnly)),
     EditorView.contentAttributes.of({ 'aria-label': o.label, spellcheck: 'true' }),
     placeholder(o.placeholder),
+    // Pasted or dropped files are uploaded and embedded where they land.
+    EditorView.domEventHandlers({
+      paste(event, view) {
+        const files = [...(event.clipboardData?.files ?? [])]
+        if (files.length === 0 || view.state.readOnly) return false
+        event.preventDefault()
+        o.onFiles(files, view.state.selection.main.head)
+        return true
+      },
+      drop(event, view) {
+        const files = [...(event.dataTransfer?.files ?? [])]
+        if (files.length === 0 || view.state.readOnly) return false
+        event.preventDefault()
+        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY }) ?? view.state.selection.main.head
+        o.onFiles(files, pos)
+        return true
+      },
+    }),
     EditorView.updateListener.of((u) => {
       if (u.docChanged && !u.transactions.some((tr) => tr.annotation(external))) o.onChange(u.state.doc.toString())
       if (u.docChanged || u.selectionSet) {
@@ -202,6 +224,11 @@ export function createEditor(parent: HTMLElement, o: EditorOptions): EditorHandl
       view.dispatch({ effects: refreshDecorations.of(null) })
     },
     focus() {
+      view.focus()
+    },
+    insertAt(pos, text) {
+      const at = Math.min(Math.max(pos, 0), view.state.doc.length)
+      view.dispatch({ changes: { from: at, insert: text }, selection: { anchor: at + text.length }, userEvent: 'input.paste' })
       view.focus()
     },
     scrollToLine(line) {

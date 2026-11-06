@@ -10,6 +10,7 @@
   import { dirname } from '../lib/paths'
   import { strings } from '../lib/strings'
   import Wordmark from './Wordmark.svelte'
+  import { UPLOAD_EXTENSIONS } from '../lib/files'
 
   let serverState = $state<ServerState>('checking')
 
@@ -34,6 +35,8 @@
     return serverState === 'ready' ? 'checking' : serverState
   })
 
+  let picker: HTMLInputElement | undefined = $state()
+
   // New entries go next to the open note.
   const targetFolder = () => (app.note ? dirname(app.note.path) : '')
 </script>
@@ -56,6 +59,23 @@
       >
         <Icon name="folder-plus" size={18} />
       </button>
+      <button type="button" aria-label={strings.files.upload} title={strings.files.uploadHint} onclick={() => picker?.click()}>
+        <Icon name="upload" size={18} />
+      </button>
+      <input
+        bind:this={picker}
+        class="picker"
+        type="file"
+        multiple
+        accept={UPLOAD_EXTENSIONS.join(',')}
+        tabindex="-1"
+        aria-hidden="true"
+        onchange={() => {
+          const files = [...(picker?.files ?? [])]
+          if (picker) picker.value = ''
+          if (files.length) void app.uploadInto(files, targetFolder())
+        }}
+      />
     </div>
   </header>
 
@@ -92,6 +112,9 @@
   .actions {
     display: flex;
     gap: 2px;
+  }
+  .picker {
+    display: none;
   }
   button {
     display: grid;

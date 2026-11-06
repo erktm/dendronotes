@@ -55,6 +55,10 @@ export interface MoveResult {
 export const move = (from: string, to: string, updateSynapses = false) =>
   request<MoveResult>('POST', '/api/soma/move', { body: { from, to, updateSynapses } })
 
+/** Uploads a file; with unique, a taken name gets a " (n)" suffix. Answers the stored entry. */
+export const uploadFile = (path: string, file: Blob, unique = true) =>
+  request<Entry>('POST', `/api/soma/files/${encodePath(path)}${unique ? '?unique=1' : ''}`, { raw: file })
+
 export const trash = (path: string) =>
   request<{ trashedTo: string }>('DELETE', `/api/soma/entries/${encodePath(path)}`)
 

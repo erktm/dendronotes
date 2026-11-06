@@ -13,6 +13,7 @@ import {
   WidgetType,
 } from '@codemirror/view'
 import { isNoteTarget, splitWikiTarget } from '../synapses'
+import { fileKind, fileURL } from '../files'
 import { isNote } from '../paths'
 import { strings } from '../strings'
 
@@ -20,6 +21,8 @@ import { strings } from '../strings'
 export interface SynapseHost {
   resolve(target: string, markdown: boolean): string | null
   open(target: string, markdown: boolean): void
+  /** Resolves an attachment (image, PDF …) to a soma path. */
+  resolveFile(target: string, markdown: boolean): string | null
 }
 
 export const synapseHost = Facet.define<SynapseHost, SynapseHost | null>({
@@ -114,6 +117,41 @@ class ChipWidget extends WidgetType {
     el.textContent = this.kind === 'note' ? `${strings.reading.embeddedNote} ${this.label}` : strings.reading.attachment(this.label)
     return el
   }
+}
+
+/** An image from the soma, shown in place of its Markdown. */
+class ImageWidget extends WidgetType {
+  constructor(
+    readonly src: string,
+    readonly alt: string,
+    readonly width: number | undefined,
+  ) {
+    super()
+  }
+  override eq(other: ImageWidget): boolean {
+    return other.src === this.src && other.alt === this.alt && other.width === this.width
+  }
+  toDOM(): HTMLElement {
+    const img = document.createElement('img')
+    img.className = 'cm-image'
+    img.src = this.src
+    img.alt = this.alt
+    img.loading = 'lazy'
+    img.draggable = false
+    if (this.width) img.width = this.width
+    return img
+  }
+  // Clicking the image puts the cursor there, which reveals the Markdown.
+  override ignoreEvent(): boolean {
+    return false
+  }
+}
+
+/** The widget for an embedded attachment: the image itself, or a chip. */
+function attachmentWidget(host: SynapseHost | null, target: string, markdown: boolean, label: string, width?: number): WidgetType {
+  const path = host?.resolveFile(target, markdown) ?? null
+  if (path && fileKind(path) === 'image') return new ImageWidget(fileURL(path), label, width)
+  return new ChipWidget(label || target, 'attachment')
 }
 
 const hidden = Decoration.replace({})
@@ -227,8 +265,16 @@ function build(view: EditorView): DecorationSet {
           case 'Image': {
             if (!on) {
               const text = state.sliceDoc(node.from, node.to)
-              const alt = /^!\[([^\]]*)\]/.exec(text)?.[1] || text
-              out.push(Decoration.replace({ widget: new ChipWidget(alt, 'attachment') }).range(node.from, node.to))
+              const m = /^!\[([^\]]*)\]\(\s*<?([^)\s>]*)/.exec(text)
+              const alt = m?.[1] ?? ''
+              let src = (m?.[2] ?? '').split('#')[0] ?? ''
+              try {
+                src = decodeURIComponent(src)
+              } catch {
+                // keep as written
+              }
+              const widget = EXTERNAL.test(src) || !src ? new ChipWidget(alt || text, 'attachment') : attachmentWidget(host, src, true, alt)
+              out.push(Decoration.replace({ widget }).range(node.from, node.to))
             }
             return false
           }
@@ -276,7 +322,11 @@ function build(view: EditorView): DecorationSet {
             const { target, heading, alias } = splitWikiTarget(inner)
             const isNoteLink = target !== '' && isNoteTarget(target)
             if (embed && !on) {
-              out.push(Decoration.replace({ widget: new ChipWidget(alias ?? inner, isNoteLink ? 'note' : 'attachment') }).range(node.from, node.to))
+              const size = alias && /^(\d{1,5})(?:x\d{1,5})?$/.exec(alias.trim())
+              const widget = isNoteLink
+                ? new ChipWidget(alias ?? inner, 'note')
+                : attachmentWidget(host, target, false, size ? target : (alias ?? target), size ? Number(size[1]) : undefined)
+              out.push(Decoration.replace({ widget }).range(node.from, node.to))
               return false
             }
             const pipe = inner.indexOf('|')

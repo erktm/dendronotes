@@ -5,9 +5,10 @@
   import ReadingView from './ReadingView.svelte'
   import StatusBar from './StatusBar.svelte'
   import ConflictView from './ConflictView.svelte'
+  import AttachmentView from './AttachmentView.svelte'
   import type { NoteSession } from '../lib/state/note.svelte'
   import { settings } from '../lib/state/settings.svelte'
-  import { displayName } from '../lib/paths'
+  import { displayName, isNote } from '../lib/paths'
   import { strings } from '../lib/strings'
 
   let { session }: { session: NoteSession } = $props()
@@ -17,6 +18,8 @@
   <p class="loading">{strings.note.loading}</p>
 {:else if session.status === 'missing'}
   <EmptyState title={strings.note.notFoundTitle} text={strings.note.notFoundText(displayName(session.path))} />
+{:else if session.status === 'unsupported' && !isNote(session.path)}
+  <AttachmentView path={session.path} />
 {:else if session.status === 'unsupported'}
   <EmptyState title={strings.note.unsupportedTitle} text={strings.note.unsupportedText} />
 {:else if session.status === 'too-large'}

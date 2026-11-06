@@ -2,17 +2,72 @@
   import type { NoteSession } from '../lib/state/note.svelte'
   import { app } from '../lib/state/app.svelte'
   import { settings } from '../lib/state/settings.svelte'
-  import { renderMarkdown } from '../lib/markdown'
+  import { renderMarkdown, type RenderContext } from '../lib/markdown'
+  import { readNote } from '../lib/api/soma'
+  import { live } from '../lib/state/live.svelte'
+  import { section } from '../lib/outline'
+  import { strings } from '../lib/strings'
 
   let { session }: { session: NoteSession } = $props()
 
   let article: HTMLElement | undefined = $state()
 
-  const html = $derived(
-    renderMarkdown(session.content, {
-      resolve: (target, markdown) => app.resolveSynapse(target, markdown, session.path),
-    }),
-  )
+  /** Resolves synapses and attachments as written in the note at path. */
+  const contextFor = (path: string): RenderContext => ({
+    resolve: (target, markdown) => app.resolveSynapse(target, markdown, path),
+    resolveFile: (target, markdown) => app.resolveFile(target, markdown, path),
+  })
+
+  const html = $derived(renderMarkdown(session.content, contextFor(session.path)))
+
+  // --- Embedded notes (![[Note]], ![[Note#Heading]]) ---------------------
+
+  const MAX_EMBED_DEPTH = 3
+  let generation = 0
+
+  /** Loads and renders the embedded notes below root; nested ones follow recursively. */
+  async function fillEmbeds(root: ParentNode, chain: readonly string[], gen: number): Promise<void> {
+    // Only this level's embeds; nested ones are filled after their parent.
+    const owner = root instanceof Element ? root.closest('.embed-note') : null
+    const pending = [...root.querySelectorAll<HTMLElement>('.embed-note[data-embed]:not([data-filled])')].filter(
+      (el) => el.parentElement?.closest('.embed-note') === owner,
+    )
+    await Promise.all(
+      pending.map(async (el) => {
+        el.dataset.filled = ''
+        const path = el.dataset.embed ?? ''
+        const body = el.querySelector<HTMLElement>(':scope > .embed-body')
+        if (!body) return
+        if (chain.includes(path) || chain.length > MAX_EMBED_DEPTH) {
+          body.textContent = strings.reading.embedTooDeep
+          return
+        }
+        let content: string
+        try {
+          content = (await readNote(path)).content
+        } catch {
+          if (gen === generation) body.textContent = strings.reading.embedMissing(path)
+          return
+        }
+        if (gen !== generation) return // the note was rendered again meanwhile
+        const heading = el.dataset.embedHeading
+        // Sanitized by DOMPurify in renderMarkdown.
+        body.innerHTML = renderMarkdown(heading ? section(content, heading) : content, contextFor(path))
+        // Checkboxes belong to the other note: shown, not toggled from here.
+        for (const box of body.querySelectorAll<HTMLInputElement>('input.task-box')) box.disabled = true
+        await fillEmbeds(body, [...chain, path], gen)
+      }),
+    )
+  }
+
+  $effect(() => {
+    void html
+    void live.version // embedded notes may have changed
+    if (!article) return
+    const gen = ++generation
+    for (const el of article.querySelectorAll<HTMLElement>('.embed-note[data-filled]')) delete el.dataset.filled
+    void fillEmbeds(article, [session.path], gen)
+  })
 
   function toggleTask(line: number) {
     if (session.readOnly) return
@@ -28,16 +83,19 @@
   function interactions(node: HTMLElement) {
     const onclick = (e: MouseEvent) => {
       const target = e.target as HTMLElement
+      // Inside an embedded note, synapses are relative to that note.
+      const embed = target.closest<HTMLElement>('.embed-note .embed-body')?.closest<HTMLElement>('.embed-note')
+      const from = embed?.dataset.embed ?? session.path
       if (target instanceof HTMLInputElement && target.classList.contains('task-box')) {
         e.preventDefault()
-        toggleTask(Number(target.dataset.line))
+        if (!embed) toggleTask(Number(target.dataset.line))
         return
       }
       const a = target.closest('a')
       if (!a) return
       if (a.dataset.synapse !== undefined) {
         e.preventDefault()
-        void app.openSynapse(a.dataset.synapse, a.dataset.markdown === 'true', session.path)
+        void app.openSynapse(a.dataset.synapse, a.dataset.markdown === 'true', from)
       } else if (a.getAttribute('href')?.startsWith('#')) {
         e.preventDefault()
         node.querySelector(`[id="${CSS.escape(a.getAttribute('href')!.slice(1))}"]`)?.scrollIntoView({ block: 'start' })

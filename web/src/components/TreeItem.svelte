@@ -56,12 +56,15 @@
     e.dataTransfer.effectAllowed = 'move'
   }
 
-  // Folders accept drops on themselves and on everything inside them.
+  // Folders accept drops on themselves and on everything inside them:
+  // entries of the tree (moved) and files from the computer (uploaded).
   function ondragover(e: DragEvent) {
-    if (!isDir || !e.dataTransfer?.types.includes(DRAG_TYPE)) return
+    const types = e.dataTransfer?.types ?? []
+    const files = types.includes('Files')
+    if (!isDir || !e.dataTransfer || (!types.includes(DRAG_TYPE) && !files)) return
     e.preventDefault()
     e.stopPropagation()
-    e.dataTransfer.dropEffect = 'move'
+    e.dataTransfer.dropEffect = files ? 'copy' : 'move'
     dropTarget = true
   }
 
@@ -75,6 +78,11 @@
     e.preventDefault()
     e.stopPropagation()
     dropTarget = false
+    const files = [...(e.dataTransfer?.files ?? [])]
+    if (files.length) {
+      void app.uploadInto(files, node.path)
+      return
+    }
     const from = e.dataTransfer?.getData(DRAG_TYPE)
     if (from) void app.moveInto(from, node.path)
   }

@@ -41,8 +41,27 @@ export const strings = {
 
   reading: {
     attachment: (name: string) => `Attachment: ${name}`,
+    missingAttachment: (name: string) => `Missing attachment: ${name}`,
     externalImage: (alt: string) => `External image not loaded: ${alt}`,
     embeddedNote: 'Embedded note:',
+    embedLoading: 'Loading …',
+    embedTooDeep: 'Embedded too deeply – open the note to read it.',
+    embedMissing: (name: string) => `“${name}” could not be loaded.`,
+    openFile: (name: string) => `Open ${name}`,
+  },
+  files: {
+    upload: 'Upload files',
+    uploadHint: 'Upload files into the current folder',
+    uploading: (n: number) => (n === 1 ? 'Uploading 1 file …' : `Uploading ${n} files …`),
+    uploaded: (n: number) => (n === 1 ? 'Uploaded 1 file.' : `Uploaded ${n} files.`),
+    uploadFailed: (name: string, reason: string) => `Couldn’t upload “${name}”: ${reason}`,
+    dropHere: (folder: string) => (folder ? `Drop to upload into ${folder}` : 'Drop to upload into the soma'),
+    open: 'Open in new tab',
+    download: 'Download',
+    size: 'Size',
+    modified: 'Modified',
+    noPreview: 'No preview for this file type.',
+    viewerLabel: (name: string) => `File ${name}`,
   },
 
   details: {
@@ -260,7 +279,9 @@ export const strings = {
       not_found: 'It no longer exists – it may have been moved or deleted.',
       move_into_self: 'A folder can’t be moved into itself.',
       read_only: 'This file is read-only.',
-      too_large: 'This note is too large to edit here.',
+      too_large: 'This is too large – for notes the editor’s limit, for uploads the server’s.',
+      unsupported_type:
+        'This file type can’t be uploaded, or its content doesn’t match its extension. Images, PDF, audio, video, text and zip files are allowed.',
       not_a_note: 'Only text notes (.md, .markdown, .txt) can be edited.',
       is_directory: 'That’s a folder, not a file.',
       not_a_directory: 'The target is not a folder.',
