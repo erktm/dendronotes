@@ -166,6 +166,37 @@ func (s *Soma) Tree() ([]Entry, error) {
 	return out, err
 }
 
+// Stat describes one entry the way Tree lists it. Hidden entries, escaping
+// symlinks and symlinked folders are reported as not found.
+func (s *Soma) Stat(p string) (Entry, error) {
+	p, err := CleanPath(p)
+	if err != nil {
+		return Entry{}, err
+	}
+	for _, seg := range strings.Split(p, "/") {
+		if s.Ignored(seg) {
+			return Entry{}, ErrNotFound
+		}
+	}
+	lst, err := s.root.Lstat(p)
+	if err != nil {
+		return Entry{}, mapErr(err)
+	}
+	switch {
+	case lst.Mode()&fs.ModeSymlink != 0:
+		st, err := s.root.Stat(p)
+		if err != nil || !st.Mode().IsRegular() {
+			return Entry{}, ErrNotFound
+		}
+		return Entry{Path: p, Type: "file", Size: st.Size(), MTime: st.ModTime().UnixMilli(), ReadOnly: true}, nil
+	case lst.IsDir():
+		return Entry{Path: p, Type: "dir", MTime: lst.ModTime().UnixMilli()}, nil
+	case lst.Mode().IsRegular():
+		return Entry{Path: p, Type: "file", Size: lst.Size(), MTime: lst.ModTime().UnixMilli()}, nil
+	}
+	return Entry{}, ErrNotFound
+}
+
 func validPathOrSkip(p string) error {
 	_, err := CleanPath(p)
 	return err

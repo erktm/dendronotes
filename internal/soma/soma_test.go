@@ -429,3 +429,28 @@ func TestOpen(t *testing.T) {
 		t.Fatal("expected error for an invalid ignore pattern")
 	}
 }
+
+func TestStat(t *testing.T) {
+	s, dir, outside := setup(t)
+	write(t, filepath.Join(dir, "Notes", "a.md"), "hello")
+	write(t, filepath.Join(dir, "node_modules", "x.md"), "ignored")
+	write(t, filepath.Join(dir, ".git", "config.md"), "hidden")
+	symlink(t, "Notes/a.md", filepath.Join(dir, "link.md"))                          // inside: read-only file
+	symlink(t, filepath.Join(outside, "secret.md"), filepath.Join(dir, "escape.md")) // absolute: never followed
+	symlink(t, "Notes", filepath.Join(dir, "dirlink"))                               // folders are not followed
+
+	if e, err := s.Stat("Notes/a.md"); err != nil || e.Type != "file" || e.Size != 5 || e.ReadOnly {
+		t.Errorf("file: %+v, %v", e, err)
+	}
+	if e, err := s.Stat("Notes"); err != nil || e.Type != "dir" {
+		t.Errorf("dir: %+v, %v", e, err)
+	}
+	if e, err := s.Stat("link.md"); err != nil || e.Type != "file" || !e.ReadOnly {
+		t.Errorf("symlink inside: %+v, %v", e, err)
+	}
+	for _, p := range []string{"escape.md", "dirlink", "node_modules/x.md", ".git/config.md", "missing.md", "../outside/secret.md"} {
+		if _, err := s.Stat(p); err == nil {
+			t.Errorf("Stat(%q) succeeded", p)
+		}
+	}
+}
