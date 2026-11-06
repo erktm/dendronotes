@@ -1,6 +1,9 @@
 <script lang="ts">
   import type { NoteSession } from '../lib/state/note.svelte'
   import { app } from '../lib/state/app.svelte'
+  import { live } from '../lib/state/live.svelte'
+  import { backlinks as fetchBacklinks, type Backlink } from '../lib/api/soma'
+  import { displayName } from '../lib/paths'
   import { outline } from '../lib/outline'
   import { parseSynapses, synapseLabel } from '../lib/synapses'
   import { strings } from '../lib/strings'
@@ -22,6 +25,34 @@
     }
     return out
   })
+
+  /** Notes with synapses to this one; null while loading. */
+  let incoming = $state.raw<Backlink[] | null>(null)
+  let incomingFor = ''
+
+  $effect(() => {
+    const path = session.path
+    void live.version // any change in the soma may add or remove synapses
+    if (path !== incomingFor) incoming = null
+    const ctrl = new AbortController()
+    const timer = setTimeout(
+      async () => {
+        try {
+          incoming = await fetchBacklinks(path, ctrl.signal)
+          incomingFor = path
+        } catch {
+          if (!ctrl.signal.aborted) incoming = []
+        }
+      },
+      path === incomingFor ? 300 : 0,
+    )
+    return () => {
+      clearTimeout(timer)
+      ctrl.abort()
+    }
+  })
+
+  const incomingCount = $derived(incoming?.reduce((n, b) => n + b.synapses.length, 0) ?? 0)
 </script>
 
 <aside class="panel" aria-label={strings.details.label}>
@@ -57,6 +88,40 @@
               <span class="label">{s.label}</span>
               {#if !s.resolved}<span class="hint">· {strings.details.notCreated}</span>{:else if s.embed}<span class="hint">· {strings.details.embed}</span>{/if}
             </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </section>
+
+  <section>
+    <h2>{strings.details.incoming} {#if incoming}<span class="count">{incomingCount}</span>{/if}</h2>
+    {#if incoming === null}
+      <p class="empty">{strings.details.incomingLoading}</p>
+    {:else if incoming.length === 0}
+      <p class="empty">{strings.details.noIncoming}</p>
+    {:else}
+      <ul class="incoming">
+        {#each incoming as b (b.path)}
+          <li>
+            <button type="button" onclick={() => void app.navigate(b.path)}>
+              <span class="dot" aria-hidden="true"></span>
+              <span class="label">{displayName(b.path)}</span>
+            </button>
+            <ul class="contexts">
+              {#each b.synapses as syn, i (i)}
+                <li>
+                  <button
+                    type="button"
+                    class="context"
+                    title={strings.details.openAt(displayName(b.path), syn.line)}
+                    onclick={() => void app.openAt(b.path, syn.line)}
+                  >
+                    {syn.context}
+                  </button>
+                </li>
+              {/each}
+            </ul>
           </li>
         {/each}
       </ul>
@@ -152,6 +217,24 @@
   .hint {
     flex: none;
     color: var(--text-faint);
+  }
+  .contexts {
+    margin: 0 0 6px 15px;
+    padding-left: 8px;
+    border-left: 1px solid var(--line);
+  }
+  .context {
+    display: -webkit-box;
+    min-height: 0;
+    padding: 4px 8px;
+    overflow: hidden;
+    color: var(--text-faint);
+    font-size: var(--text-xs);
+    line-height: 1.45;
+    white-space: normal;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
   }
   @media (max-width: 1100px) {
     .panel {

@@ -15,6 +15,7 @@ interface Stored {
   theme: ThemeChoice
   showDetails: boolean
   view: ViewMode
+  updateSynapses: boolean
 }
 
 const DEFAULTS: Stored = {
@@ -25,6 +26,7 @@ const DEFAULTS: Stored = {
   theme: 'system',
   showDetails: true,
   view: 'edit',
+  updateSynapses: true,
 }
 
 function load(): Stored {
@@ -43,6 +45,7 @@ function load(): Stored {
       theme: pick('theme', ['system', 'light', 'dark'] as const),
       showDetails: bool('showDetails'),
       view: pick('view', ['edit', 'read'] as const),
+      updateSynapses: bool('updateSynapses'),
     }
   } catch {
     return { ...DEFAULTS }
@@ -57,6 +60,7 @@ class Settings {
   theme: ThemeChoice
   showDetails: boolean
   view: ViewMode
+  updateSynapses: boolean
 
   constructor() {
     const s = load()
@@ -67,6 +71,7 @@ class Settings {
     this.theme = $state(s.theme)
     this.showDetails = $state(s.showDetails)
     this.view = $state(s.view)
+    this.updateSynapses = $state(s.updateSynapses)
 
     $effect.root(() => {
       $effect(() => {
@@ -78,6 +83,7 @@ class Settings {
           theme: this.theme,
           showDetails: this.showDetails,
           view: this.view,
+          updateSynapses: this.updateSynapses,
         }
         try {
           localStorage.setItem(KEY, JSON.stringify(snapshot))

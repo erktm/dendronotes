@@ -11,8 +11,10 @@ export const brand = {
 } as const
 
 /** The platform's main modifier key, for shortcut hints. */
-export const modKey =
-  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+'
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
+export const modKey = isMac ? '⌘' : 'Ctrl+'
+/** Modifier plus Shift, e.g. ⌘⇧F or Ctrl+Shift+F. */
+export const modShiftKey = isMac ? '⌘⇧' : 'Ctrl+Shift+'
 
 export const strings = {
   app: {
@@ -51,6 +53,25 @@ export const strings = {
     noSynapses: 'No synapses yet',
     notCreated: 'not created yet',
     embed: 'embedded',
+    incoming: 'Incoming synapses',
+    noIncoming: 'No other note connects here yet',
+    incomingLoading: 'Looking for synapses …',
+    openAt: (name: string, line: number) => `Open ${name} at line ${line + 1}`,
+  },
+  search: {
+    title: 'Search',
+    open: `Search notes (${modShiftKey}F)`,
+    label: 'Search notes',
+    placeholder: 'Search notes …',
+    hint: 'Words match their beginning, "quotes" an exact phrase, #tag a tag.',
+    results: 'Search results',
+    count: (n: number) => (n === 1 ? '1 note' : `${n} notes`),
+    empty: 'No notes match',
+    incomplete: 'Still indexing the soma – results may be missing.',
+    tags: 'Tags',
+    noTags: 'No tags yet. Write #tag in a note to add one.',
+    nameMatch: 'Name matches',
+    clear: 'Clear search',
   },
 
   switcher: {
@@ -98,6 +119,9 @@ export const strings = {
     dark: 'Dark',
     details: 'Show details panel',
     detailsDesc: 'Outline and synapses next to the note.',
+    files: 'Files',
+    updateSynapses: 'Update synapses on rename',
+    updateSynapsesDesc: 'When a note is renamed or moved, rewrite the synapses in other notes so they keep pointing to it.',
     soma: 'Soma',
     stored: 'Settings are stored in this browser. Your notes stay plain Markdown files; nothing is written into the soma.',
   },
@@ -126,7 +150,7 @@ export const strings = {
     files: 'Files',
     showFiles: 'Show files',
     hideFiles: 'Hide files',
-    search: 'Open a note',
+    search: 'Search',
     settings: 'Settings',
   },
 
@@ -177,6 +201,12 @@ export const strings = {
   toasts: {
     movedToTrash: (name: string) => `Moved “${name}” to the trash.`,
     saveFailed: (reason: string) => `Couldn’t save: ${reason}`,
+    synapsesUpdated: (synapses: number, notes: number) =>
+      `Updated ${synapses === 1 ? '1 synapse' : `${synapses} synapses`} in ${notes === 1 ? '1 note' : `${notes} notes`}.`,
+    synapsesSkipped: (n: number) =>
+      `${n === 1 ? '1 note was' : `${n} notes were`} changed meanwhile; their synapses were not updated.`,
+    changedElsewhere: (name: string) => `“${name}” was updated elsewhere.`,
+    deletedElsewhere: (name: string) => `“${name}” was deleted or moved elsewhere. Your unsaved changes are still in the editor.`,
   },
 
   empty: {

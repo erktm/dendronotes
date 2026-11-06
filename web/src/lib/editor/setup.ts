@@ -8,6 +8,7 @@ import { highlightSelectionMatches, search, searchKeymap } from '@codemirror/sea
 import { Annotation, Compartment, EditorState, type Extension } from '@codemirror/state'
 import { drawSelection, dropCursor, EditorView, highlightSpecialChars, keymap, placeholder } from '@codemirror/view'
 import { tagHighlighter, tags } from '@lezer/highlight'
+import { outline, type Heading } from '../outline'
 import { dirname, displayName } from '../paths'
 import { livePreview, refreshDecorations, synapseHost, type SynapseHost } from './livePreview'
 import { SynapseSyntax } from './synapseSyntax'
@@ -21,6 +22,8 @@ export interface EditorOptions {
   host: SynapseHost
   /** Note paths offered when typing [[ . */
   notes: () => readonly string[]
+  /** Headings of another note, offered when typing [[Note# . */
+  headings: (path: string) => Promise<readonly Heading[]>
   onChange: (doc: string) => void
   onCursor: (line: number, col: number) => void
   onVimMode: (mode: string | null) => void
@@ -54,6 +57,46 @@ const highlighter = tagHighlighter([
   { tag: tags.quote, class: 'tok-quote' },
   { tag: [tags.processingInstruction, tags.meta, tags.contentSeparator, tags.labelName], class: 'tok-mark' },
 ])
+
+/** [[Note#…: the headings of that note; [[#…: those of this note. */
+function headingCompletion(o: EditorOptions) {
+  return async (ctx: CompletionContext): Promise<CompletionResult | null> => {
+    const before = ctx.matchBefore(/\[\[[^[\]\n|#]*#[^[\]\n|#]*$/)
+    if (!before) return null
+    const inner = before.text.slice(2)
+    const hash = inner.indexOf('#')
+    const target = inner.slice(0, hash).trim()
+    let headings: readonly Heading[]
+    if (!target) {
+      headings = outline(ctx.state.doc.toString())
+    } else {
+      const path = o.host.resolve(target, false)
+      if (!path) return null
+      try {
+        headings = await o.headings(path)
+      } catch {
+        return null
+      }
+    }
+    if (ctx.aborted || headings.length === 0) return null
+    return {
+      from: before.from + 2 + hash + 1,
+      validFor: /^[^[\]\n|#]*$/,
+      options: headings.map((h, i) => ({
+        label: h.text,
+        detail: `H${h.level}`,
+        boost: -i, // keep the note's order
+        apply: (view: EditorView, _c: unknown, from: number, to: number) => {
+          const closed = view.state.sliceDoc(to, to + 2) === ']]'
+          view.dispatch({
+            changes: { from, to, insert: closed ? h.text : `${h.text}]]` },
+            selection: { anchor: from + h.text.length + 2 },
+          })
+        },
+      })),
+    }
+  }
+}
 
 function synapseCompletion(notes: () => readonly string[]) {
   return (ctx: CompletionContext): CompletionResult | null => {
@@ -106,7 +149,7 @@ export function createEditor(parent: HTMLElement, o: EditorOptions): EditorHandl
     markdown({ base: markdownLanguage, extensions: [SynapseSyntax] }),
     syntaxHighlighting(highlighter),
     closeBrackets(),
-    autocompletion({ override: [synapseCompletion(o.notes)], icons: false }),
+    autocompletion({ override: [synapseCompletion(o.notes), headingCompletion(o)], icons: false }),
     search({ top: true }),
     highlightSelectionMatches(),
     keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, ...completionKeymap, indentWithTab]),

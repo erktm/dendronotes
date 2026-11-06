@@ -71,6 +71,14 @@
     </div>
   </section>
 
+  <section aria-labelledby="settings-files">
+    <h3 id="settings-files">{strings.settings.files}</h3>
+    <div class="setting">
+      <label for="set-relink">{strings.settings.updateSynapses}<span class="desc">{strings.settings.updateSynapsesDesc}</span></label>
+      <input id="set-relink" class="switch" type="checkbox" role="switch" bind:checked={settings.updateSynapses} />
+    </div>
+  </section>
+
   <section aria-labelledby="settings-soma">
     <h3 id="settings-soma">{strings.settings.soma}</h3>
     <p class="note">{strings.settings.stored}</p>

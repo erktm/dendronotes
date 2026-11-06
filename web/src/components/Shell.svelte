@@ -16,13 +16,13 @@
   import { strings } from '../lib/strings'
 
   const narrow = window.matchMedia('(max-width: 760px)')
-  let filesOpen = $state(!narrow.matches)
+  let sidebarOpen = $state(!narrow.matches)
 
   // Follow the URL.
   $effect(() => {
     const path = router.notePath
     untrack(() => app.openPath(path))
-    if (narrow.matches) filesOpen = false
+    if (narrow.matches) sidebarOpen = false
   })
 
   // Remember which folders are open.
@@ -56,6 +56,10 @@
     if (key === 's') {
       e.preventDefault()
       void app.note?.save()
+    } else if (key === 'f' && e.shiftKey) {
+      e.preventDefault()
+      sidebarOpen = true
+      app.openSearch()
     } else if (key === 'o') {
       e.preventDefault()
       app.switcherOpen = true
@@ -84,14 +88,20 @@
 <svelte:window {onkeydown} {onbeforeunload} />
 <svelte:document {onvisibilitychange} />
 
-<div class="shell" class:collapsed={!filesOpen}>
+<div class="shell" class:collapsed={!sidebarOpen}>
   <Rail
-    {filesOpen}
-    ontogglefiles={() => (filesOpen = !filesOpen)}
-    onopenswitcher={() => (app.switcherOpen = true)}
+    view={sidebarOpen ? app.sidebarView : null}
+    onfiles={() => {
+      if (sidebarOpen && app.sidebarView === 'files') sidebarOpen = false
+      else ((sidebarOpen = true), (app.sidebarView = 'files'))
+    }}
+    onsearch={() => {
+      if (sidebarOpen && app.sidebarView === 'search') sidebarOpen = false
+      else ((sidebarOpen = true), app.openSearch())
+    }}
     onopensettings={() => (app.settingsOpen = true)}
   />
-  {#if filesOpen}
+  {#if sidebarOpen}
     <Sidebar />
   {/if}
   <main class="main">

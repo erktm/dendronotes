@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { snippetParts } from './snippet'
 import { diffLines } from './diff'
 import { fuzzyMatch, highlightChunks } from './fuzzy'
 import { outline } from './outline'
@@ -50,5 +51,23 @@ describe('outline', () => {
       [2, 'Tasks', 6, 'tasks-1'],
       [3, 'Café', 7, 'cafe'],
     ])
+  })
+})
+
+describe('snippetParts', () => {
+  const M = (t: string) => `\u0002${t}\u0003`
+  it('splits marked matches from plain text', () => {
+    expect(snippetParts(`a ${M('clay')} and ${M('sand')}.`)).toEqual([
+      { text: 'a ', mark: false },
+      { text: 'clay', mark: true },
+      { text: ' and ', mark: false },
+      { text: 'sand', mark: true },
+      { text: '.', mark: false },
+    ])
+  })
+  it('copes with unbalanced markers and keeps markup as text', () => {
+    expect(snippetParts('<b>x</b>\u0003y')).toEqual([{ text: '<b>x</b>y', mark: false }])
+    expect(snippetParts(`\u0002open`)).toEqual([{ text: 'open', mark: false }])
+    expect(snippetParts('')).toEqual([])
   })
 })

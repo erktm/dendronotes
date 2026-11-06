@@ -47,10 +47,21 @@
     return { destroy: () => node.removeEventListener('click', onclick) }
   }
 
+  /** The last top-level block starting at or before a source line. */
+  function blockAt(root: HTMLElement, line: number): Element | null {
+    let found: Element | null = null
+    for (const el of root.querySelectorAll('[data-source-line]')) {
+      if (Number((el as HTMLElement).dataset.sourceLine) > line) break
+      found = el
+    }
+    return found
+  }
+
   $effect(() => {
     const req = app.scrollRequest
     if (req && article) {
-      article.querySelector(`[id="${CSS.escape(req.slug)}"]`)?.scrollIntoView({ block: 'start' })
+      const target = req.slug ? article.querySelector(`[id="${CSS.escape(req.slug)}"]`) : blockAt(article, req.line)
+      target?.scrollIntoView({ block: req.slug ? 'start' : 'center' })
       app.scrollRequest = null
     }
   })

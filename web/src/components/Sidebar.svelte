@@ -1,9 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import FileTree from './FileTree.svelte'
+  import SearchPanel from './SearchPanel.svelte'
   import Icon from './Icon.svelte'
   import StatusChip from './StatusChip.svelte'
   import { app } from '../lib/state/app.svelte'
+  import { live } from '../lib/state/live.svelte'
   import { checkReady, type ServerState } from '../lib/api/health'
   import { dirname } from '../lib/paths'
   import { strings } from '../lib/strings'
@@ -24,11 +26,22 @@
     }
   })
 
+  // The live stream knows first when the connection drops; /readyz tells
+  // whether the server can work (soma reachable, index built).
+  const shownState = $derived.by((): ServerState => {
+    if (live.state === 'live') return serverState === 'unavailable' ? 'unavailable' : 'ready'
+    if (live.state === 'connecting') return 'checking'
+    return serverState === 'ready' ? 'checking' : serverState
+  })
+
   // New entries go next to the open note.
   const targetFolder = () => (app.note ? dirname(app.note.path) : '')
 </script>
 
-<aside class="sidebar" aria-label={strings.nav.files}>
+<aside class="sidebar" aria-label={app.sidebarView === 'search' ? strings.search.title : strings.nav.files}>
+  {#if app.sidebarView === 'search'}
+    <SearchPanel />
+  {:else}
   <header class="head">
     <Wordmark />
     <div class="actions">
@@ -47,9 +60,10 @@
   </header>
 
   <FileTree />
+  {/if}
 
   <footer class="foot">
-    <StatusChip state={serverState} />
+    <StatusChip state={shownState} />
     <span class="user" title={strings.auth.signedInAs(app.user)}>{app.user}</span>
     <button type="button" aria-label={strings.auth.signOut} title={strings.auth.signOut} onclick={() => void app.logout()}>
       <Icon name="logout" size={17} />

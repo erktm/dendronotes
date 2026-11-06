@@ -3,14 +3,15 @@
   import { brand, strings } from '../lib/strings'
 
   let {
-    filesOpen,
-    ontogglefiles,
-    onopenswitcher,
+    view,
+    onfiles,
+    onsearch,
     onopensettings,
   }: {
-    filesOpen: boolean
-    ontogglefiles: () => void
-    onopenswitcher: () => void
+    /** What the open sidebar shows, or null when it is closed. */
+    view: 'files' | 'search' | null
+    onfiles: () => void
+    onsearch: () => void
     onopensettings: () => void
   } = $props()
 </script>
@@ -20,18 +21,26 @@
 
   <button
     class="item"
-    class:active={filesOpen}
+    class:active={view === 'files'}
     type="button"
     aria-label={strings.nav.files}
-    aria-pressed={filesOpen}
-    title={filesOpen ? strings.nav.hideFiles : strings.nav.showFiles}
-    onclick={ontogglefiles}
+    aria-pressed={view === 'files'}
+    title={view === 'files' ? strings.nav.hideFiles : strings.nav.showFiles}
+    onclick={onfiles}
   >
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" />
     </svg>
   </button>
-  <button class="item" type="button" aria-label={strings.nav.search} title={strings.switcher.open} onclick={onopenswitcher}>
+  <button
+    class="item"
+    class:active={view === 'search'}
+    type="button"
+    aria-label={strings.nav.search}
+    aria-pressed={view === 'search'}
+    title={strings.search.open}
+    onclick={onsearch}
+  >
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="10.5" cy="10.5" r="6" />
       <path d="m15 15 5 5" />

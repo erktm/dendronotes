@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { createEditor, type EditorHandle } from '../lib/editor/setup'
+  import { readNote } from '../lib/api/soma'
+  import { outline } from '../lib/outline'
   import type { NoteSession } from '../lib/state/note.svelte'
   import { app } from '../lib/state/app.svelte'
   import { settings } from '../lib/state/settings.svelte'
@@ -27,6 +29,7 @@
         open: (target, markdown) => void app.openSynapse(target, markdown, s.path),
       },
       notes: () => app.notePaths,
+      headings: async (path) => outline((await readNote(path)).content),
       onChange: (doc) => {
         s.content = doc
         s.scheduleSave()

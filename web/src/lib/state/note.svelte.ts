@@ -1,7 +1,7 @@
 import { ApiError } from '../api/client'
 import { readNote, saveNote } from '../api/soma'
 import { errorMessage } from '../errors'
-import { isNote } from '../paths'
+import { displayName, isNote } from '../paths'
 import { strings } from '../strings'
 
 export type NoteStatus = 'loading' | 'ready' | 'missing' | 'unsupported' | 'too-large' | 'error'
@@ -9,6 +9,9 @@ export type NoteStatus = 'loading' | 'ready' | 'missing' | 'unsupported' | 'too-
 export interface NoteHost {
   toast(text: string, kind?: 'error' | 'info'): void
 }
+
+/** How many of our own recent versions are remembered (see changedOnDisk). */
+const KNOWN_VERSIONS = 16
 
 const AUTOSAVE_DELAY = 800
 
@@ -39,6 +42,8 @@ export class NoteSession {
   private timer: ReturnType<typeof setTimeout> | undefined
   private inflight: Promise<void> | null = null
   private closed = false
+  /** Versions this session loaded or saved itself: events about them are no news. */
+  private known: string[] = []
 
   constructor(path: string, host: NoteHost) {
     this.path = path
@@ -54,7 +59,7 @@ export class NoteSession {
     try {
       const n = await readNote(this.path)
       if (this.closed) return
-      this.etag = n.etag
+      this.setVersion(n.etag)
       this.content = n.content
       this.saved = n.content
       this.readOnly = !!n.readOnly
@@ -92,7 +97,7 @@ export class NoteSession {
       this.saving = true
       try {
         const meta = await saveNote(this.path, text, basedOn)
-        this.etag = meta.etag
+        this.setVersion(meta.etag)
         this.saved = text
         this.conflict = null
         this.disk = null
@@ -145,5 +150,79 @@ export class NoteSession {
   close(): void {
     this.closed = true
     clearTimeout(this.timer)
+  }
+
+  private setVersion(etag: string): void {
+    this.etag = etag
+    this.known = [etag, ...this.known.filter((e) => e !== etag)].slice(0, KNOWN_VERSIONS)
+  }
+
+  /**
+   * The note changed on disk (reported by the event stream). Without unsaved
+   * edits it reloads quietly; with them, the conflict view opens. Our own
+   * saves come back as events too – sometimes before the save's answer –
+   * and are recognized by their version.
+   */
+  async changedOnDisk(etag: string): Promise<void> {
+    if (this.status === 'missing' && !this.closed) {
+      await this.load() // the note is back (restored, or moved back)
+      return
+    }
+    if (this.inflight) await this.inflight
+    if (this.closed || this.status !== 'ready' || this.known.includes(etag)) return
+    if (this.conflict !== null) {
+      if (etag !== this.conflict) {
+        this.conflict = etag
+        this.disk = null // the comparison loads the newer version
+      }
+      return
+    }
+    if (this.dirty) {
+      this.conflict = etag
+      return
+    }
+    try {
+      const n = await readNote(this.path)
+      if (this.closed || this.known.includes(n.etag)) return
+      if (this.dirty || this.inflight) {
+        // Typing started while loading: let the user decide.
+        this.conflict = n.etag
+        this.disk = n.content
+        return
+      }
+      this.setVersion(n.etag)
+      this.content = n.content
+      this.saved = n.content
+      this.readOnly = !!n.readOnly
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) this.removedOnDisk()
+    }
+  }
+
+  /** The note was deleted or moved away elsewhere. */
+  removedOnDisk(): void {
+    if (this.closed || this.status !== 'ready') return
+    if (this.dirty) {
+      this.host.toast(strings.toasts.deletedElsewhere(displayName(this.path)), 'info')
+      return
+    }
+    clearTimeout(this.timer)
+    this.status = 'missing'
+  }
+
+  /** After reconnecting: catch up with changes that happened meanwhile. */
+  async revalidate(): Promise<void> {
+    if (this.closed) return
+    if (this.status === 'missing' || this.status === 'error') {
+      await this.load()
+      return
+    }
+    if (this.status !== 'ready') return
+    try {
+      const n = await readNote(this.path)
+      if (n.etag !== this.etag) await this.changedOnDisk(n.etag)
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) this.removedOnDisk()
+    }
   }
 }

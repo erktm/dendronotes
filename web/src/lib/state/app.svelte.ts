@@ -1,7 +1,7 @@
 import { SvelteSet } from 'svelte/reactivity'
 import { ApiError, onUnauthorized } from '../api/client'
 import * as api from '../api/soma'
-import type { Entry, Me } from '../api/soma'
+import type { Change, Entry, Me } from '../api/soma'
 import { errorMessage } from '../errors'
 import {
   ancestors,
@@ -20,6 +20,8 @@ import { strings } from '../strings'
 import { newNotePath, normalizePath, resolveSynapse } from '../synapses'
 import { buildTree } from '../tree'
 import { NoteSession } from './note.svelte'
+import { live } from './live.svelte'
+import { settings } from './settings.svelte'
 
 type AuthState = 'checking' | 'anonymous' | 'authenticated'
 
@@ -70,6 +72,12 @@ class App {
   /** A note that should get the cursor when it opens. */
   private focusNext: string | null = null
 
+  /** What the sidebar shows. */
+  sidebarView = $state<'files' | 'search'>('files')
+  searchQuery = $state('')
+  /** Bumped to move the focus into the search field. */
+  searchFocus = $state(0)
+
   switcherOpen = $state(false)
   settingsOpen = $state(false)
   /** A heading the open view should scroll to (set by the outline). */
@@ -78,13 +86,12 @@ class App {
   toasts = $state<Toast[]>([])
   confirmRequest = $state.raw<ConfirmRequest | null>(null)
   private toastId = 0
+  /** A move started here is in progress: its "removed" events are expected. */
+  private moving = 0
+  private refreshTimer: ReturnType<typeof setTimeout> | undefined
 
   constructor() {
-    onUnauthorized(() => {
-      if (this.auth !== 'authenticated') return
-      this.auth = 'anonymous'
-      this.toast(strings.auth.sessionEnded, 'info')
-    })
+    onUnauthorized(() => this.sessionEnded())
   }
 
   // --- Authentication ---------------------------------------------------
@@ -114,6 +121,7 @@ class App {
     } catch {
       // Logging out locally is what matters.
     }
+    live.stop()
     this.closeNote()
     router.go(null, true)
     this.entries = []
@@ -136,6 +144,43 @@ class App {
     this.logoutUrl = me.logoutUrl ?? ''
     this.auth = 'authenticated'
     void this.refresh()
+    live.start({
+      resync: () => {
+        void this.refresh()
+        void this.note?.revalidate()
+      },
+      change: (c) => this.applyChange(c),
+      refused: () => void this.checkSession(),
+    })
+  }
+
+  private sessionEnded(): void {
+    if (this.auth !== 'authenticated') return
+    live.stop()
+    this.auth = 'anonymous'
+    this.toast(strings.auth.sessionEnded, 'info')
+  }
+
+  /** The event stream was refused: find out whether we are still signed in. */
+  private async checkSession(): Promise<void> {
+    try {
+      await api.me()
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) this.sessionEnded()
+    }
+  }
+
+  /** Applies a change reported by the server (made here or anywhere else). */
+  private applyChange(c: Change): void {
+    if (c.tree) {
+      clearTimeout(this.refreshTimer)
+      this.refreshTimer = setTimeout(() => void this.refresh(), 120)
+    }
+    const n = this.note
+    if (!n) return
+    const mine = c.notes.find((x) => x.path === n.path)
+    if (mine) void n.changedOnDisk(mine.etag)
+    if (c.removed.includes(n.path) && this.moving === 0) n.removedOnDisk()
   }
 
   // --- Tree -------------------------------------------------------------
@@ -210,15 +255,22 @@ class App {
   }
 
   private async moveTo(from: string, to: string): Promise<boolean> {
-    if (this.note && isInside(this.note.path, from)) await this.note.flush()
-    let moved: string
+    // Save first: the open note may be moved, or contain synapses to rewrite.
+    await this.note?.flush()
+    let res: api.MoveResult
+    this.moving++
     try {
-      moved = (await api.move(from, to)).path
+      res = await api.move(from, to, settings.updateSynapses)
     } catch (err) {
       this.toast(errorMessage(err))
       await this.refresh()
       return false
+    } finally {
+      this.moving--
     }
+    const moved = res.path
+    if (res.updatedSynapses) this.toast(strings.toasts.synapsesUpdated(res.updatedSynapses, res.updatedNotes ?? 0), 'info')
+    if (res.failed?.length) this.toast(strings.toasts.synapsesSkipped(res.failed.length))
     // Carry expanded folders and the open note over to the new location.
     for (const p of [...this.expanded]) {
       if (isInside(p, from)) {
@@ -232,7 +284,24 @@ class App {
       router.go(next, true)
     }
     await this.refresh()
+    // Its own synapses may have been rewritten (relative links).
+    void this.note?.revalidate()
     return true
+  }
+
+  // --- Search -------------------------------------------------------------
+
+  /** Opens the search in the sidebar, optionally with a query. */
+  openSearch(query?: string): void {
+    if (query !== undefined) this.searchQuery = query
+    this.sidebarView = 'search'
+    this.searchFocus++
+  }
+
+  /** Opens a note and scrolls to a line (search results, backlinks). */
+  async openAt(path: string, line: number): Promise<void> {
+    await this.navigate(path)
+    if (line >= 0 && this.note?.path === path) this.scrollRequest = { line, slug: '' }
   }
 
   async remove(path: string): Promise<void> {

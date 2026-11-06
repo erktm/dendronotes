@@ -44,8 +44,16 @@ export const createNote = (path: string, content = '') => request<NoteMeta>('POS
 
 export const createFolder = (path: string) => request<Entry>('POST', `/api/soma/folders/${encodePath(path)}`, { body: {} })
 
-export const move = (from: string, to: string) =>
-  request<{ path: string }>('POST', '/api/soma/move', { body: { from, to } })
+export interface MoveResult {
+  path: string
+  updatedNotes?: number
+  updatedSynapses?: number
+  failed?: string[]
+}
+
+/** Renames or moves; with updateSynapses, synapses to moved notes are rewritten. */
+export const move = (from: string, to: string, updateSynapses = false) =>
+  request<MoveResult>('POST', '/api/soma/move', { body: { from, to, updateSynapses } })
 
 export const trash = (path: string) =>
   request<{ trashedTo: string }>('DELETE', `/api/soma/entries/${encodePath(path)}`)
@@ -56,3 +64,43 @@ export const login = (password: string) =>
   request<Me>('POST', '/api/auth/login', { body: { password }, expect401: true })
 
 export const logout = () => request<{ logoutUrl?: string }>('POST', '/api/auth/logout', { expect401: true })
+
+// --- Index -----------------------------------------------------------------
+
+/** Encloses matched words in search snippets (never HTML). */
+export const MARK_START = '\u0002'
+export const MARK_END = '\u0003'
+
+export interface Hit {
+  path: string
+  /** Text around the match, matches enclosed in MARK_START … MARK_END. */
+  snippet: string
+  /** First line with a match (0-based), -1 if only the name matched. */
+  line: number
+  tags?: string[]
+}
+
+export const search = (q: string, signal?: AbortSignal) =>
+  request<{ hits: Hit[]; complete: boolean }>('GET', `/api/soma/search?q=${encodeURIComponent(q)}&limit=50`, { signal })
+
+export interface Backlink {
+  path: string
+  synapses: { line: number; context: string; embed?: boolean }[]
+}
+
+export const backlinks = (path: string, signal?: AbortSignal) =>
+  request<{ backlinks: Backlink[] }>('GET', `/api/soma/backlinks/${encodePath(path)}`, { signal }).then((r) => r.backlinks)
+
+export interface TagCount {
+  tag: string
+  count: number
+}
+
+export const tags = (signal?: AbortSignal) => request<{ tags: TagCount[] }>('GET', '/api/soma/tags', { signal }).then((r) => r.tags)
+
+/** What changed in the soma, as sent by the event stream. */
+export interface Change {
+  tree: boolean
+  notes: { path: string; etag: string }[]
+  removed: string[]
+}

@@ -135,12 +135,23 @@ function headingIdPlugin(md: MarkdownItInstance): void {
   })
 }
 
+/** Top-level blocks carry their source line, so views can scroll to a line. */
+function sourceLinePlugin(md: MarkdownItInstance): void {
+  md.core.ruler.push('source_lines', (state: StateCore) => {
+    for (const token of state.tokens) {
+      if (token.level === 0 && token.nesting !== -1 && token.block && token.map) {
+        token.attrSet('data-source-line', String(token.map[0]))
+      }
+    }
+  })
+}
+
 let md: MarkdownItInstance | null = null
 
 function renderer(): MarkdownItInstance {
   if (!md) {
     md = new MarkdownIt({ html: true, linkify: true, breaks: true, typographer: false })
-    md.use(synapsePlugin).use(linkPlugin).use(taskPlugin).use(headingIdPlugin)
+    md.use(synapsePlugin).use(linkPlugin).use(taskPlugin).use(headingIdPlugin).use(sourceLinePlugin)
   }
   return md
 }
