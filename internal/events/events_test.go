@@ -4,12 +4,12 @@ import "testing"
 
 func TestPublishSubscribe(t *testing.T) {
 	h := NewHub(2)
-	a, cancelA, ok := h.Subscribe()
+	_, a, cancelA, ok := h.Subscribe()
 	if !ok {
 		t.Fatal("subscribe failed")
 	}
-	b, cancelB, _ := h.Subscribe()
-	if _, _, ok := h.Subscribe(); ok {
+	_, b, cancelB, _ := h.Subscribe()
+	if _, _, _, ok := h.Subscribe(); ok {
 		t.Error("third subscriber accepted despite max 2")
 	}
 	h.Publish(Event{Name: "change", Data: 1})
@@ -32,7 +32,7 @@ func TestPublishSubscribe(t *testing.T) {
 
 func TestSlowSubscriberIsDropped(t *testing.T) {
 	h := NewHub(1)
-	c, cancel, _ := h.Subscribe()
+	_, c, cancel, _ := h.Subscribe()
 	defer cancel()
 	for i := 0; i <= bufferSize; i++ {
 		h.Publish(Event{Name: "x"})
@@ -48,14 +48,36 @@ func TestSlowSubscriberIsDropped(t *testing.T) {
 
 func TestClose(t *testing.T) {
 	h := NewHub(4)
-	c, cancel, _ := h.Subscribe()
+	_, c, cancel, _ := h.Subscribe()
 	h.Close()
 	if _, ok := <-c; ok {
 		t.Error("subscriber not closed")
 	}
 	cancel() // after Close: no panic
-	if _, _, ok := h.Subscribe(); ok {
+	if _, _, _, ok := h.Subscribe(); ok {
 		t.Error("subscribe after Close succeeded")
 	}
 	h.Publish(Event{Name: "late"}) // no panic
+}
+
+func TestSendReachesOnlyTheGivenSubscribers(t *testing.T) {
+	h := NewHub(3)
+	ida, a, cancelA, _ := h.Subscribe()
+	_, b, cancelB, _ := h.Subscribe()
+	defer cancelA()
+	defer cancelB()
+	h.Send([]string{ida, "unknown"}, Event{Name: "collab"})
+	if e := <-a; e.Name != "collab" {
+		t.Errorf("a got %+v", e)
+	}
+	select {
+	case e := <-b:
+		t.Errorf("b got %+v", e)
+	default:
+	}
+	h.Drop(ida)
+	if _, ok := <-a; ok {
+		t.Error("dropped subscriber still open")
+	}
+	h.Drop(ida) // idempotent
 }

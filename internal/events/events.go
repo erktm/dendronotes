@@ -1,7 +1,11 @@
 // Package events fans out live updates to connected clients (Server-Sent Events).
 package events
 
-import "sync"
+import (
+	"crypto/rand"
+	"encoding/base64"
+	"sync"
+)
 
 // Event is one message to clients.
 type Event struct {
@@ -13,37 +17,42 @@ type Event struct {
 // disconnected; its client reconnects and resynchronizes.
 type Hub struct {
 	mu     sync.Mutex
-	subs   map[chan Event]struct{}
+	subs   map[string]chan Event
 	max    int
 	closed bool
 }
 
-// bufferSize is how many events a subscriber may fall behind.
-const bufferSize = 32
+// bufferSize is how many events a subscriber may fall behind. Collaborative
+// editing sends an event per typing burst, so there is room for a few seconds.
+const bufferSize = 256
 
 // NewHub allows at most max simultaneous subscribers.
 func NewHub(max int) *Hub {
-	return &Hub{subs: map[chan Event]struct{}{}, max: max}
+	return &Hub{subs: map[string]chan Event{}, max: max}
 }
 
-// Subscribe registers a subscriber. ok is false when the hub is closed or full.
-// cancel must be called when the subscriber leaves.
-func (h *Hub) Subscribe() (ch <-chan Event, cancel func(), ok bool) {
+// Subscribe registers a subscriber under a new random id. ok is false when
+// the hub is closed or full. cancel must be called when the subscriber leaves.
+func (h *Hub) Subscribe() (id string, ch <-chan Event, cancel func(), ok bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.closed || len(h.subs) >= h.max {
-		return nil, func() {}, false
+		return "", nil, func() {}, false
 	}
+	var b [16]byte
+	_, _ = rand.Read(b[:])
+	id = base64.RawURLEncoding.EncodeToString(b[:])
 	c := make(chan Event, bufferSize)
-	h.subs[c] = struct{}{}
-	return c, func() { h.drop(c) }, true
+	h.subs[id] = c
+	return id, c, func() { h.Drop(id) }, true
 }
 
-func (h *Hub) drop(c chan Event) {
+// Drop disconnects a subscriber (idempotent).
+func (h *Hub) Drop(id string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if _, ok := h.subs[c]; ok {
-		delete(h.subs, c)
+	if c, ok := h.subs[id]; ok {
+		delete(h.subs, id)
 		close(c)
 	}
 }
@@ -52,13 +61,28 @@ func (h *Hub) drop(c chan Event) {
 func (h *Hub) Publish(e Event) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	for c := range h.subs {
-		select {
-		case c <- e:
-		default: // too slow: disconnect
-			delete(h.subs, c)
-			close(c)
+	for id, c := range h.subs {
+		h.deliver(id, c, e)
+	}
+}
+
+// Send delivers e to some subscribers only, without blocking.
+func (h *Hub) Send(ids []string, e Event) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for _, id := range ids {
+		if c, ok := h.subs[id]; ok {
+			h.deliver(id, c, e)
 		}
+	}
+}
+
+func (h *Hub) deliver(id string, c chan Event, e Event) {
+	select {
+	case c <- e:
+	default: // too slow: disconnect
+		delete(h.subs, id)
+		close(c)
 	}
 }
 
@@ -74,8 +98,8 @@ func (h *Hub) Close() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.closed = true
-	for c := range h.subs {
-		delete(h.subs, c)
+	for id, c := range h.subs {
+		delete(h.subs, id)
 		close(c)
 	}
 }

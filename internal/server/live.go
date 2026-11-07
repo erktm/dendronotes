@@ -20,7 +20,7 @@ const heartbeat = 25 * time.Second
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	rt := runtimeOf(r)
 	sm, _ := somaOf(r)
-	ch, cancel, ok := rt.Hub.Subscribe()
+	id, ch, cancel, ok := rt.Hub.Subscribe()
 	if !ok {
 		httpx.Error(w, http.StatusServiceUnavailable, "too_many_streams")
 		return
@@ -49,7 +49,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	if _, err := fmt.Fprint(w, "retry: 3000\n"); err != nil {
 		return
 	}
-	if !send(events.Event{Name: "hello", Data: map[string]bool{"ready": rt.Index.Ready()}}) {
+	if !send(events.Event{Name: "hello", Data: map[string]any{"ready": rt.Index.Ready(), "stream": id}}) {
 		return
 	}
 

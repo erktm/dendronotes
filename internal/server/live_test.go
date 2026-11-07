@@ -84,7 +84,7 @@ func TestSearchBacklinksTagsAPI(t *testing.T) {
 // subscribe returns the next change event published by the server.
 func subscribe(t *testing.T, s *Server) func() index.Changes {
 	t.Helper()
-	ch, cancel, ok := rtOf(t, s).Hub.Subscribe()
+	_, ch, cancel, ok := rtOf(t, s).Hub.Subscribe()
 	if !ok {
 		t.Fatal("subscribe failed")
 	}

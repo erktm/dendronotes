@@ -45,7 +45,7 @@ func TestSharing(t *testing.T) {
 	}
 
 	// Sharing tells connected clients.
-	events, cancel, _ := rtOf(t, s).Hub.Subscribe()
+	_, events, cancel, _ := rtOf(t, s).Hub.Subscribe()
 	defer cancel()
 	expect(t, admin.do("PUT", member(benUser), `{"role":"viewer"}`), 200, "")
 	select {
