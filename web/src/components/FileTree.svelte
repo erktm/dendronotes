@@ -15,6 +15,7 @@
   function openMenu(e: MouseEvent, node: TreeNode | null) {
     e.preventDefault()
     e.stopPropagation()
+    if (!app.canEdit) return // every entry in the menu changes the soma
     // Keyboard-opened context menus report (0, 0): anchor at the element.
     let { clientX: x, clientY: y } = e
     if (x === 0 && y === 0 && e.currentTarget instanceof HTMLElement) {
@@ -45,6 +46,7 @@
   }
 
   function ondragover(e: DragEvent) {
+    if (!app.canEdit) return
     const types = e.dataTransfer?.types ?? []
     const files = types.includes('Files')
     if (!e.dataTransfer || (!types.includes(DRAG_TYPE) && !files)) return
@@ -97,7 +99,9 @@
   {#if empty}
     <div class="empty">
       <p>{strings.soma.empty}</p>
-      <button type="button" onclick={() => startCreate('new-note', '')}>{strings.soma.createFirstNote}</button>
+      {#if app.canEdit}
+        <button type="button" onclick={() => startCreate('new-note', '')}>{strings.soma.createFirstNote}</button>
+      {/if}
     </div>
   {:else if app.somaId && !app.treeLoaded}
     <p class="loading">{strings.soma.loading}</p>

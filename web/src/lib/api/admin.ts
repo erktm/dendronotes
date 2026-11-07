@@ -48,6 +48,18 @@ export interface ServerInfo {
   storage: { somasDir: string; somasBytes: number; somasFiles: number; dataDir: string; dataBytes: number }
   limits: { maxNoteBytes: number; maxUploadBytes: number }
   settings: Record<string, string>
+  localLogin: boolean
+  sso: SSOStatus | null
+}
+
+export interface SSOStatus {
+  issuer: string
+  clientId: string
+  redirectUrl: string
+  ready: boolean
+  checkedAt: string
+  error?: string
+  logout: boolean
 }
 
 export interface NewUser {
@@ -77,6 +89,7 @@ export const sessions = () => request<{ sessions: Session[]; current: number }>(
 export const endSession = (id: number) => request<{ ok: boolean }>('DELETE', `/api/admin/sessions/${id}`)
 
 export const server = () => request<ServerInfo>('GET', '/api/admin/server')
+export const checkSSO = () => request<SSOStatus>('POST', '/api/admin/sso/check')
 
 export const audit = (before = 0, limit = 100) =>
   request<{ entries: AuditEntry[] }>('GET', `/api/admin/audit?limit=${limit}${before ? `&before=${before}` : ''}`).then((r) => r.entries)

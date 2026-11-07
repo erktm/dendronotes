@@ -65,6 +65,7 @@ func testConfig(t *testing.T) config.Config {
 			SessionTTL:    time.Hour,
 			CookieSecure:  "auto",
 			ProxyHeader:   "X-Forwarded-User",
+			LocalLogin:    true,
 		},
 	}
 }

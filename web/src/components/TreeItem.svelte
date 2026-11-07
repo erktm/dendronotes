@@ -61,7 +61,7 @@
   function ondragover(e: DragEvent) {
     const types = e.dataTransfer?.types ?? []
     const files = types.includes('Files')
-    if (!isDir || !e.dataTransfer || (!types.includes(DRAG_TYPE) && !files)) return
+    if (!isDir || !app.canEdit || !e.dataTransfer || (!types.includes(DRAG_TYPE) && !files)) return
     e.preventDefault()
     e.stopPropagation()
     e.dataTransfer.dropEffect = files ? 'copy' : 'move'
@@ -111,7 +111,7 @@
       class:active
       class:muted={!isDir && !isNote(node.path)}
       use:cssVars={{ '--depth': depth }}
-      draggable="true"
+      draggable={app.canEdit ? 'true' : 'false'}
       title={node.path}
       onclick={activate}
       oncontextmenu={(e) => onmenu(e, node)}

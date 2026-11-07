@@ -8,6 +8,8 @@ export type NoteStatus = 'loading' | 'ready' | 'missing' | 'unsupported' | 'too-
 
 export interface NoteHost {
   toast(text: string, kind?: 'error' | 'info'): void
+  /** Whether the account may change notes in the open soma (not a viewer). */
+  readonly canEdit: boolean
 }
 
 /** How many of our own recent versions are remembered (see changedOnDisk). */
@@ -26,7 +28,8 @@ export class NoteSession {
   status = $state<NoteStatus>('loading')
   content = $state('')
   saved = $state('')
-  readOnly = $state(false)
+  /** The file can't be written (a symbolic link). */
+  fileReadOnly = $state(false)
   /** ETag of the version on disk when a save hit a conflict. */
   conflict = $state<string | null>(null)
   /** Content of the version on disk during a conflict (for the comparison). */
@@ -50,6 +53,11 @@ export class NoteSession {
     this.host = host
   }
 
+  /** Nothing can be changed: a symbolic link, or the soma is only shared for reading. */
+  get readOnly(): boolean {
+    return this.fileReadOnly || !this.host.canEdit
+  }
+
   async load(): Promise<void> {
     if (!isNote(this.path)) {
       this.status = 'unsupported'
@@ -62,7 +70,7 @@ export class NoteSession {
       this.setVersion(n.etag)
       this.content = n.content
       this.saved = n.content
-      this.readOnly = !!n.readOnly
+      this.fileReadOnly = !!n.readOnly
       this.conflict = null
       this.disk = null
       this.failed = false
@@ -193,7 +201,7 @@ export class NoteSession {
       this.setVersion(n.etag)
       this.content = n.content
       this.saved = n.content
-      this.readOnly = !!n.readOnly
+      this.fileReadOnly = !!n.readOnly
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) this.removedOnDisk()
     }

@@ -331,8 +331,65 @@ func TestDescribeHidesSecrets(t *testing.T) {
 	}
 	for _, v := range Vars {
 		if v != EnvSomaDir && v != EnvTrustedProxies && v != EnvIgnore && v != EnvProxyAllowed && v != EnvProxyLogoutURL &&
-			v != EnvAdminHash && v != EnvAdminHashFile && c.Describe(v) == "" {
+			v != EnvAdminHash && v != EnvAdminHashFile && v != EnvPublicURL && !strings.HasPrefix(v, Prefix+"OIDC_") &&
+			c.Describe(v) == "" {
 			t.Errorf("%s has no description", v)
 		}
+	}
+}
+
+func TestOIDC(t *testing.T) {
+	soma, data := dirs(t)
+	secret := filepath.Join(t.TempDir(), "secret")
+	if err := os.WriteFile(secret, []byte("s3cret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m := map[string]string{EnvSomasDir: soma, EnvDataDir: data, EnvOIDCIssuer: "https://sso.example.org/realms/main/"}
+	_, err := Load(env(m))
+	if err == nil || !strings.Contains(err.Error(), EnvOIDCClientID) || !strings.Contains(err.Error(), EnvPublicURL) {
+		t.Errorf("issuer alone: %v", err)
+	}
+	m[EnvOIDCClientID] = "dendronotes"
+	m[EnvPublicURL] = "https://notes.example.org/"
+	m[EnvOIDCSecretFile] = secret
+	m[EnvOIDCScopes] = "profile,email groups"
+	m[EnvOIDCAdminGroups] = "dn-admins"
+	c, err := Load(env(m))
+	o := c.Auth.OIDC
+	if err != nil || !o.Enabled() || o.Issuer != "https://sso.example.org/realms/main" || c.Auth.PublicURL != "https://notes.example.org" ||
+		o.ClientSecret.Reveal() != "s3cret" || strings.Join(o.Scopes, " ") != "openid profile email groups" ||
+		o.UsernameClaim != "preferred_username" || o.GroupsClaim != "groups" || o.LoginLabel != "SSO" ||
+		len(o.AdminGroups) != 1 || !c.Auth.LocalLogin {
+		t.Errorf("oidc: %+v %v", c.Auth, err)
+	}
+	if c.Describe(EnvOIDCSecretFile) != "(set)" || strings.Contains(c.Describe(EnvOIDCSecretFile), "s3cret") {
+		t.Errorf("secret shown: %q", c.Describe(EnvOIDCSecretFile))
+	}
+
+	m[EnvLocalLogin] = "false"
+	if c, err := Load(env(m)); err != nil || c.Auth.LocalLogin {
+		t.Errorf("local login off: %v", err)
+	}
+	m[EnvAuthMode] = "proxy"
+	m[EnvTrustedProxies] = "10.0.0.0/8"
+	if _, err := Load(env(m)); err == nil || !strings.Contains(err.Error(), "only with") {
+		t.Errorf("oidc in proxy mode: %v", err)
+	}
+
+	for k, bad := range map[string]string{
+		EnvPublicURL:  "notes.example.org",
+		EnvOIDCIssuer: "ftp://sso.example.org",
+		EnvLocalLogin: "maybe",
+		EnvOIDCCAFile: secret, // not PEM
+	} {
+		m := map[string]string{EnvSomasDir: soma, EnvDataDir: data, EnvOIDCIssuer: "https://sso.example.org", EnvOIDCClientID: "x",
+			EnvPublicURL: "https://notes.example.org", k: bad}
+		if _, err := Load(env(m)); err == nil || !strings.Contains(err.Error(), k) {
+			t.Errorf("%s=%q: %v", k, bad, err)
+		}
+	}
+	// Turning passwords off needs another way in.
+	if _, err := Load(env(map[string]string{EnvSomasDir: soma, EnvDataDir: data, EnvLocalLogin: "false"})); err == nil {
+		t.Error("LOCAL_LOGIN=false without OIDC accepted")
 	}
 }

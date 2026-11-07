@@ -8,6 +8,8 @@ export interface LiveHandlers {
   resync(): void
   /** Something changed in the soma. */
   change(c: Change): void
+  /** Members, roles or the soma itself changed: reload the soma list. */
+  access(): void
   /** The stream was refused; the session may have ended. */
   refused(): void
 }
@@ -62,6 +64,7 @@ class Live {
       this.version++
       this.handlers?.change(c)
     })
+    es.addEventListener('access', () => this.handlers?.access())
     es.onerror = () => {
       if (this.source !== es) return
       if (es.readyState === EventSource.CLOSED) {

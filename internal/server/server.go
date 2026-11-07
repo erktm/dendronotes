@@ -18,6 +18,7 @@ import (
 	"dendronotes/internal/httpx"
 	"dendronotes/internal/soma"
 	"dendronotes/internal/somas"
+	"dendronotes/internal/sso"
 	"dendronotes/internal/store"
 )
 
@@ -32,6 +33,7 @@ type Server struct {
 	store   *store.Store
 	somas   *somas.Manager
 	auth    *auth.Authenticator
+	sso     *sso.Provider // nil without OIDC
 	ips     *clientip.Resolver
 	assets  *assets
 	version string
@@ -64,16 +66,40 @@ func New(cfg config.Config, log *slog.Logger, webFS fs.FS, version string) (*Ser
 		return nil, err
 	}
 
+	if o := cfg.Auth.OIDC; o.Enabled() {
+		s.sso, err = sso.New(sso.Config{
+			Issuer:        o.Issuer,
+			ClientID:      o.ClientID,
+			ClientSecret:  o.ClientSecret.Reveal(),
+			RedirectURL:   cfg.Auth.PublicURL + "/api/auth/oidc/callback",
+			PostLogoutURL: cfg.Auth.PublicURL + "/",
+			Scopes:        o.Scopes,
+			UsernameClaim: o.UsernameClaim,
+			GroupsClaim:   o.GroupsClaim,
+			CAPEM:         o.CAPEM,
+		}, log)
+		if err != nil {
+			return fail(fmt.Errorf("oidc: %w", err))
+		}
+		ctx, stop := context.WithCancel(context.Background())
+		s.sso.Start(ctx)
+		s.addCloser("oidc", func() error { stop(); return nil })
+	}
 	s.auth, err = auth.New(auth.Config{
-		Mode:           auth.Mode(cfg.Auth.Mode),
-		SessionTTL:     cfg.Auth.SessionTTL,
-		CookieSecure:   cfg.Auth.CookieSecure,
-		HashParams:     hashParams,
-		AdminUsername:  cfg.Auth.AdminUsername,
-		ProxyHeader:    cfg.Auth.ProxyHeader,
-		ProxyAllowed:   cfg.Auth.ProxyAllowed,
-		ProxyLogoutURL: cfg.Auth.ProxyLogoutURL,
-		OnProvision:    s.welcome,
+		Mode:               auth.Mode(cfg.Auth.Mode),
+		SessionTTL:         cfg.Auth.SessionTTL,
+		CookieSecure:       cfg.Auth.CookieSecure,
+		HashParams:         hashParams,
+		AdminUsername:      cfg.Auth.AdminUsername,
+		PasswordsAdminOnly: !cfg.Auth.LocalLogin,
+		SSO:                s.sso,
+		SSOLabel:           cfg.Auth.OIDC.LoginLabel,
+		AdminGroups:        cfg.Auth.OIDC.AdminGroups,
+		AllowedGroups:      cfg.Auth.OIDC.AllowedGroups,
+		ProxyHeader:        cfg.Auth.ProxyHeader,
+		ProxyAllowed:       cfg.Auth.ProxyAllowed,
+		ProxyLogoutURL:     cfg.Auth.ProxyLogoutURL,
+		OnProvision:        s.welcome,
 	}, st, s.ips, log)
 	if err != nil {
 		return fail(fmt.Errorf("auth: %w", err))

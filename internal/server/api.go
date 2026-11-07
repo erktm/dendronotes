@@ -31,14 +31,22 @@ func (s *Server) routes() []route {
 		{"POST", "/api/auth/login", s.auth.HandleLogin, public},
 		{"POST", "/api/auth/logout", s.auth.HandleLogout, public},
 		{"GET", "/api/auth/me", s.auth.HandleMe, public},
+		{"GET", "/api/auth/methods", s.auth.HandleMethods, public},
+		{"GET", "/api/auth/oidc/login", s.auth.HandleSSOLogin, public},
+		{"GET", "/api/auth/oidc/callback", s.auth.HandleSSOCallback, public},
 
 		{"PATCH", "/api/me", s.handleUpdateProfile, signedIn},
 		{"POST", "/api/me/password", s.handleChangePassword, signedIn},
 
 		{"GET", "/api/somas", s.handleListSomas, signedIn},
 		{"POST", "/api/somas", s.handleCreateSoma, signedIn},
-		{"PATCH", "/api/somas/{soma}", s.handleRenameSoma, somaOwner},
+		{"PATCH", "/api/somas/{soma}", s.handleUpdateSoma, somaOwner},
 		{"DELETE", "/api/somas/{soma}", s.handleDeleteSoma, somaOwner},
+		{"GET", "/api/somas/{soma}/members", s.handleMembers, somaViewer},
+		{"PUT", "/api/somas/{soma}/members/{id}", s.handleSetMember, somaOwner},
+		{"DELETE", "/api/somas/{soma}/members/{id}", s.handleRemoveMember, somaOwner},
+		{"DELETE", "/api/somas/{soma}/membership", s.handleLeaveSoma, somaViewer},
+		{"GET", "/api/users/search", s.handleSearchUsers, signedIn},
 
 		{"GET", "/api/somas/{soma}/tree", s.handleTree, somaViewer},
 		{"GET", "/api/somas/{soma}/notes/{path...}", s.handleReadNote, somaViewer},
@@ -67,6 +75,7 @@ func (s *Server) routes() []route {
 		{"GET", "/api/admin/sessions", s.handleAdminSessions, adminOnly},
 		{"DELETE", "/api/admin/sessions/{id}", s.handleAdminEndSession, adminOnly},
 		{"GET", "/api/admin/server", s.handleAdminServer, adminOnly},
+		{"POST", "/api/admin/sso/check", s.handleAdminSSOCheck, adminOnly},
 		{"GET", "/api/admin/audit", s.handleAdminAudit, adminOnly},
 	}
 }

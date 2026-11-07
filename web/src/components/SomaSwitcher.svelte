@@ -119,6 +119,12 @@
         <span class="check" aria-hidden="true"><Icon name="plus" size={14} /></span>
         <span class="label">{strings.somas.create}</span>
       </button>
+      {#if app.soma}
+        <button type="button" role="menuitem" onclick={() => (close(false), (app.shareOpen = true))}>
+          <span class="check" aria-hidden="true"><Icon name="user" size={14} /></span>
+          <span class="label">{app.soma.role === 'owner' ? strings.share.menuOwner : strings.share.menuMember}</span>
+        </button>
+      {/if}
       {#if app.soma?.role === 'owner'}
         <button type="button" role="menuitem" onclick={rename}>
           <span class="check" aria-hidden="true"><Icon name="pencil" size={14} /></span>

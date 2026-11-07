@@ -49,6 +49,7 @@
   <header class="head">
     <Wordmark />
     <div class="actions">
+      {#if app.canEdit}
       <button type="button" aria-label={strings.tree.newNote} title={strings.tree.newNote} onclick={() => app.startCreate('new-note', targetFolder())}>
         <Icon name="plus" size={18} />
       </button>
@@ -77,6 +78,7 @@
           if (files.length) void app.uploadInto(files, targetFolder())
         }}
       />
+      {/if}
     </div>
   </header>
 

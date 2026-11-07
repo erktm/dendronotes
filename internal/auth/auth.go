@@ -1,6 +1,7 @@
 // Package auth authenticates requests against the accounts in the store:
-// with a user name, a password and a session cookie, or via a header set by a
-// trusted authenticating proxy (e.g. oauth2-proxy in front of an OIDC provider).
+// with a user name and password or through an OpenID Connect provider
+// (Keycloak), both followed by a session cookie, or via a header set by a
+// trusted authenticating proxy (e.g. oauth2-proxy).
 package auth
 
 import (
@@ -17,6 +18,7 @@ import (
 
 	"dendronotes/internal/clientip"
 	"dendronotes/internal/httpx"
+	"dendronotes/internal/sso"
 	"dendronotes/internal/store"
 )
 
@@ -24,7 +26,7 @@ import (
 type Mode string
 
 const (
-	ModeLocal Mode = "local" // accounts with passwords (and, later, OIDC)
+	ModeLocal Mode = "local" // dendronotes signs people in (passwords, OIDC)
 	ModeProxy Mode = "proxy" // a trusted proxy names the user in a header
 )
 
@@ -53,6 +55,16 @@ type Config struct {
 	// later OIDC), e.g. to give it a first soma. Errors are logged only.
 	OnProvision func(context.Context, store.User) error
 
+	// PasswordsAdminOnly turns password sign-in off for everyone but
+	// AdminUsername (emergency access next to SSO).
+	PasswordsAdminOnly bool
+
+	// SSO signs people in through an OpenID Connect provider (nil: off).
+	SSO           *sso.Provider
+	SSOLabel      string   // provider name on the sign-in button
+	AdminGroups   []string // provider groups whose members are admins (empty: not synced)
+	AllowedGroups []string // only members of these groups may sign in (empty: everyone)
+
 	// Proxy mode.
 	ProxyHeader    string
 	ProxyAllowed   []string // empty: every user the proxy lets through
@@ -67,6 +79,7 @@ type Authenticator struct {
 	store   *store.Store
 	limiter *rateLimiter // per client IP and globally
 	byUser  *rateLimiter // per account name
+	starts  *rateLimiter // SSO sign-in attempts per client IP
 	allowed map[string]bool
 	sem     chan struct{} // bounds concurrent argon2 computations (memory)
 	dummy   *Hash         // verified for unknown users, so timing reveals nothing
@@ -84,6 +97,7 @@ func New(cfg Config, st *store.Store, ips *clientip.Resolver, log *slog.Logger) 
 		store:   st,
 		limiter: newRateLimiter(12*time.Second, 5, time.Second, 20),
 		byUser:  newRateLimiter(30*time.Second, 5, time.Millisecond, 1<<30),
+		starts:  newRateLimiter(3*time.Second, 20, 20*time.Millisecond, 500),
 		sem:     make(chan struct{}, 2),
 	}
 	enc, err := HashPassword("not a real password", cfg.HashParams)
@@ -310,7 +324,39 @@ func (a *Authenticator) HandleMe(w http.ResponseWriter, r *http.Request) {
 		a.unauthorized(w)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, MeResponse{User: id.user, Mode: a.cfg.Mode, LogoutURL: a.cfg.ProxyLogoutURL})
+	httpx.WriteJSON(w, http.StatusOK, MeResponse{User: id.user, Mode: a.cfg.Mode, LogoutURL: a.logoutURL(id.user)})
+}
+
+// logoutURL is where the browser goes after signing out of dendronotes: the
+// proxy's or the OIDC provider's logout, if any.
+func (a *Authenticator) logoutURL(u store.User) string {
+	switch {
+	case a.cfg.Mode == ModeProxy:
+		return a.cfg.ProxyLogoutURL
+	case u.Source == store.SourceOIDC && a.cfg.SSO != nil:
+		return a.cfg.SSO.LogoutURL()
+	}
+	return ""
+}
+
+// MethodsResponse tells the sign-in page which ways to sign in exist.
+type MethodsResponse struct {
+	Mode  Mode `json:"mode"`
+	Local bool `json:"local"` // the password form is offered to everyone
+	SSO   *struct {
+		Label string `json:"label"`
+	} `json:"sso"`
+}
+
+// HandleMethods lists the ways to sign in (public).
+func (a *Authenticator) HandleMethods(w http.ResponseWriter, r *http.Request) {
+	m := MethodsResponse{Mode: a.cfg.Mode, Local: a.cfg.Mode == ModeLocal && !a.cfg.PasswordsAdminOnly}
+	if a.cfg.Mode == ModeLocal && a.cfg.SSO != nil {
+		m.SSO = &struct {
+			Label string `json:"label"`
+		}{a.cfg.SSOLabel}
+	}
+	httpx.WriteJSON(w, http.StatusOK, m)
 }
 
 // HandleLogin checks user name and password and starts a session.
@@ -349,6 +395,10 @@ func (a *Authenticator) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	if name == "" || len(name) > maxUsernameLen || body.Password == "" || len(body.Password) > maxPasswordLen {
 		fail("malformed")
+		return
+	}
+	if a.cfg.PasswordsAdminOnly && !strings.EqualFold(name, a.cfg.AdminUsername) {
+		fail("password sign-in is off")
 		return
 	}
 
@@ -393,6 +443,8 @@ func (a *Authenticator) HandleLogin(w http.ResponseWriter, r *http.Request) {
 // HandleLogout ends the session. In proxy mode it returns the URL the
 // browser should visit to log out at the proxy.
 func (a *Authenticator) HandleLogout(w http.ResponseWriter, r *http.Request) {
+	id, _ := a.authenticate(r)
+	logout := a.logoutURL(id.user)
 	if a.cfg.Mode == ModeLocal {
 		for _, name := range []string{cookieSecure, cookieInsecure} {
 			if c, err := r.Cookie(name); err == nil {
@@ -406,11 +458,11 @@ func (a *Authenticator) HandleLogout(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]string{"logoutUrl": a.cfg.ProxyLogoutURL})
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"logoutUrl": logout})
 }
 
 func (a *Authenticator) setCookie(w http.ResponseWriter, r *http.Request, token string) {
-	secure := a.cfg.CookieSecure == "true" || (a.cfg.CookieSecure != "false" && a.ips.IsHTTPS(r))
+	secure := a.secure(r)
 	name := cookieInsecure
 	if secure {
 		name = cookieSecure

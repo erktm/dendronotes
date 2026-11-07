@@ -8,6 +8,7 @@
   import AdminView from './AdminView.svelte'
   import PromptDialog from './PromptDialog.svelte'
   import ProfileDialog from './ProfileDialog.svelte'
+  import ShareDialog from './ShareDialog.svelte'
   import EmptyState from './EmptyState.svelte'
   import ConfirmDialog from './ConfirmDialog.svelte'
   import QuickSwitcher from './QuickSwitcher.svelte'
@@ -242,6 +243,7 @@
 <ConfirmDialog />
 <PromptDialog />
 <ProfileDialog />
+<ShareDialog />
 <QuickSwitcher />
 <SettingsDialog />
 

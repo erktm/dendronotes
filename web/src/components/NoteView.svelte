@@ -35,7 +35,7 @@
     {#if session.readOnly}
       <div class="banner">
         <Icon name="lock" size={17} />
-        <p>{strings.note.readOnly}</p>
+        <p>{session.fileReadOnly ? strings.note.readOnly : strings.note.viewerOnly}</p>
       </div>
     {/if}
     {#if settings.view === 'read'}

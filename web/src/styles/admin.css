@@ -148,6 +148,13 @@
   border-radius: 10px;
   background: var(--bg-raised);
 }
+.admin-card.wide {
+  grid-column: 1 / -1;
+}
+.admin-card .admin-actions {
+  justify-content: flex-start;
+  margin-top: var(--space-3);
+}
 .admin-card h3 {
   margin: 0 0 var(--space-2);
   color: var(--text-muted);

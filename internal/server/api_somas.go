@@ -66,27 +66,71 @@ func (s *Server) handleCreateSoma(w http.ResponseWriter, r *http.Request) {
 		Owner: store.Person{ID: u.ID, Username: u.Username, DisplayName: u.DisplayName}})
 }
 
-// handleRenameSoma changes a soma's display name (owner only).
-func (s *Server) handleRenameSoma(w http.ResponseWriter, r *http.Request) {
+// handleUpdateSoma renames a soma or hands it to another member (owner only).
+// The previous owner stays as editor.
+func (s *Server) handleUpdateSoma(w http.ResponseWriter, r *http.Request) {
 	sm, _ := somaOf(r)
 	var body struct {
-		Name string `json:"name"`
+		Name    *string `json:"name"`
+		OwnerID *int64  `json:"ownerId"`
 	}
 	if err := httpx.DecodeJSON(w, r, &body, 4096); err != nil {
 		httpx.WriteDecodeError(w, err)
 		return
 	}
-	name, err := somas.CleanName(body.Name)
+	name := sm.Name
+	if body.Name != nil {
+		n, err := somas.CleanName(*body.Name)
+		if err != nil {
+			httpx.Error(w, http.StatusBadRequest, "invalid_name")
+			return
+		}
+		name = n
+	}
+	var heir store.User
+	if body.OwnerID != nil && *body.OwnerID != sm.OwnerID {
+		role, err := s.store.MemberRole(r.Context(), sm.ID, *body.OwnerID)
+		if err != nil {
+			s.internalError(w, r, "membership lookup", err)
+			return
+		}
+		if heir, err = s.store.UserByID(r.Context(), *body.OwnerID); err != nil && !errors.Is(err, store.ErrNotFound) {
+			s.internalError(w, r, "user lookup", err)
+			return
+		}
+		if role == "" || heir.ID == 0 || heir.Disabled {
+			httpx.Error(w, http.StatusBadRequest, "invalid_transfer")
+			return
+		}
+	}
+	if name != sm.Name {
+		if err := s.store.RenameSoma(r.Context(), sm.ID, name); err != nil {
+			s.internalError(w, r, "renaming soma", err)
+			return
+		}
+		s.audit(r, "soma.rename", sm.ID, sm.Name+" → "+name)
+	}
+	if heir.ID != 0 {
+		if err := s.store.TransferSoma(r.Context(), sm.ID, heir.ID); err != nil {
+			s.internalError(w, r, "transferring soma", err)
+			return
+		}
+		s.audit(r, "soma.transfer", sm.ID, "→ "+heir.Username)
+	}
+	accessChanged(r)
+	u, _ := auth.UserFrom(r.Context())
+	list, err := s.store.SomasOf(r.Context(), u.ID)
 	if err != nil {
-		httpx.Error(w, http.StatusBadRequest, "invalid_name")
+		s.internalError(w, r, "listing somas", err)
 		return
 	}
-	if err := s.store.RenameSoma(r.Context(), sm.ID, name); err != nil {
-		s.internalError(w, r, "renaming soma", err)
-		return
+	for _, m := range list {
+		if m.ID == sm.ID {
+			httpx.WriteJSON(w, http.StatusOK, m)
+			return
+		}
 	}
-	s.audit(r, "soma.rename", sm.ID, sm.Name+" → "+name)
-	httpx.WriteJSON(w, http.StatusOK, map[string]string{"id": sm.ID, "name": name})
+	httpx.Error(w, http.StatusNotFound, "not_found")
 }
 
 // handleDeleteSoma moves a soma to the trash (owner only).
@@ -117,6 +161,12 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u, _ := auth.UserFrom(r.Context())
+	if u.Source == store.SourceOIDC && s.sso != nil {
+		// The provider is the source of name and e-mail; they are updated
+		// on every sign-in.
+		httpx.Error(w, http.StatusBadRequest, "managed_by_provider")
+		return
+	}
 	nu, err := s.store.UpdateUser(r.Context(), u.ID, up)
 	if err != nil {
 		s.internalError(w, r, "updating profile", err)

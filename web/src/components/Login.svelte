@@ -2,6 +2,7 @@
   import Logo from './Logo.svelte'
   import { app } from '../lib/state/app.svelte'
   import { ApiError } from '../lib/api/client'
+  import { authMethods, type AuthMethods } from '../lib/api/soma'
   import { errorMessage } from '../lib/errors'
   import { focusOnMount } from '../lib/actions'
   import { strings } from '../lib/strings'
@@ -11,9 +12,35 @@
   let password = $state('')
   let busy = $state(false)
   let error = $state('')
+  let methods = $state.raw<AuthMethods | null>(null)
+
+  // ?local=1 shows the password form even when single sign-on replaces it
+  // (emergency access for the admin account).
+  const params = new URLSearchParams(location.search)
+  const forceLocal = params.get('local') === '1'
+
+  // The single sign-on callback reports problems as ?login_error=…
+  const loginError = params.get('login_error')
+  if (loginError) {
+    error = strings.auth.loginErrors[loginError] ?? strings.auth.loginErrors.sso_failed!
+    params.delete('login_error')
+    const rest = params.toString()
+    history.replaceState(history.state, '', location.pathname + (rest ? `?${rest}` : '') + location.hash)
+  }
+
+  const showForm = $derived(methods !== null && (methods.local || forceLocal))
+  // Return to the page that asked for the sign-in.
+  const ssoHref = $derived(`/api/auth/oidc/login?next=${encodeURIComponent(location.pathname + location.search)}`)
 
   $effect(() => {
     document.title = strings.auth.pageTitle
+  })
+
+  $effect(() => {
+    authMethods().then(
+      (m) => (methods = m),
+      () => (methods = { mode: app.mode, local: true, sso: null }),
+    )
   })
 
   async function submit(e: SubmitEvent) {
@@ -55,6 +82,14 @@
     {:else}
       <h1>{strings.auth.welcome}</h1>
       <p class="lead">{strings.auth.lead}</p>
+      {#if methods?.sso}
+        <a class="primary sso" href={ssoHref}>{strings.auth.ssoContinue(methods.sso.label)}</a>
+        {#if showForm}<p class="or"><span>{strings.auth.or}</span></p>{/if}
+      {/if}
+      {#if error && !showForm}
+        <p class="error" role="alert">{error}</p>
+      {/if}
+      {#if showForm}
       <form onsubmit={submit}>
         <label for="username">{strings.auth.username}</label>
         <input
@@ -87,6 +122,7 @@
           {busy ? strings.auth.signingIn : strings.auth.signIn}
         </button>
       </form>
+      {/if}
     {/if}
   </div>
 </main>
@@ -168,6 +204,29 @@
   }
   .primary:hover:not(:disabled) {
     background: var(--accent-strong);
+  }
+  a.primary {
+    display: grid;
+    place-items: center;
+    margin-top: 0;
+    text-decoration: none;
+  }
+  .sso + .error {
+    margin-top: var(--space-3);
+  }
+  .or {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin: var(--space-4) 0;
+    color: var(--text-faint);
+    font-size: var(--text-xs);
+  }
+  .or::before,
+  .or::after {
+    content: '';
+    flex: 1;
+    border-top: 1px solid var(--line);
   }
   .primary:disabled {
     opacity: 0.55;

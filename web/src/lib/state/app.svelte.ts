@@ -87,6 +87,8 @@ class App {
   somasLoaded = $state(false)
   somaId = $state('')
   soma = $derived(this.somas.find((s) => s.id === this.somaId) ?? null)
+  /** The account may change notes in the open soma (owner or editor, not viewer). */
+  canEdit = $derived(this.soma !== null && this.soma.role !== 'viewer')
 
   entries = $state.raw<Entry[]>([])
   tree = $derived(buildTree(this.entries))
@@ -114,6 +116,7 @@ class App {
   switcherOpen = $state(false)
   settingsOpen = $state(false)
   profileOpen = $state(false)
+  shareOpen = $state(false)
   /** A heading the open view should scroll to (set by the outline). */
   scrollRequest = $state.raw<{ line: number; slug: string } | null>(null)
 
@@ -166,7 +169,8 @@ class App {
     setSoma('')
     this.user = null
     this.auth = 'anonymous'
-    if (this.mode === 'proxy' && logoutUrl) window.location.assign(logoutUrl)
+    // Sign out at the proxy or the OpenID Connect provider too.
+    if (logoutUrl) window.location.assign(logoutUrl)
   }
 
   persistExpanded(): void {
@@ -232,6 +236,7 @@ class App {
         void this.note?.revalidate()
       },
       change: (c) => this.applyChange(c),
+      access: () => void this.refreshSomas(),
       refused: () => void this.checkSession(),
     })
   }
@@ -264,16 +269,51 @@ class App {
     }
   }
 
-  /** Re-reads the soma list after changes made elsewhere (admin area); leaves a soma that is gone. */
+  /**
+   * Re-reads the soma list after changes made elsewhere (sharing, admin area):
+   * roles take effect at once, and a soma that is no longer accessible is left.
+   */
   async refreshSomas(): Promise<void> {
+    const before = this.soma
     try {
       this.somas = await api.listSomas()
     } catch {
       return
     }
     if (!this.somaId || this.somas.some((s) => s.id === this.somaId)) return
+    if (before) this.toast(strings.somas.accessEnded(before.name), 'info')
     if (router.view === 'admin') this.useSoma(this.preferredSoma())
     else router.goSoma(this.preferredSoma(), true)
+  }
+
+  /** Leaves a soma that is shared with the account. */
+  async leaveSoma(id: string): Promise<void> {
+    const soma = this.somas.find((s) => s.id === id)
+    if (!soma || soma.role === 'owner') return
+    const ok = await this.ask({
+      title: strings.share.leaveTitle,
+      message: strings.share.leaveMessage(soma.name, soma.owner.displayName || soma.owner.username),
+      confirmLabel: strings.share.leave,
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await api.leaveSoma(id)
+    } catch (err) {
+      this.toast(errorMessage(err))
+      return
+    }
+    this.shareOpen = false
+    this.somas = this.somas.filter((s) => s.id !== id)
+    this.toast(strings.share.left(soma.name), 'info')
+    if (id === this.somaId) router.goSoma(this.preferredSoma(), true)
+  }
+
+  /** For write actions: false (and a hint) when the soma is only shared for reading. */
+  private mayEdit(): boolean {
+    if (this.canEdit) return true
+    if (this.soma) this.toast(strings.share.viewerHint, 'info')
+    return false
   }
 
   async deleteSoma(id: string): Promise<void> {
@@ -314,7 +354,10 @@ class App {
       await api.me()
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) this.sessionEnded()
+      return
     }
+    // Still signed in: maybe the soma is no longer shared with us.
+    await this.refreshSomas()
   }
 
   /** Applies a change reported by the server (made here or anywhere else). */
@@ -343,11 +386,13 @@ class App {
 
   /** Shows the inline name input for a new note or folder in parent. */
   startCreate(kind: 'new-note' | 'new-folder', parent: string): void {
+    if (!this.mayEdit()) return
     if (parent) this.expanded.add(parent)
     this.edit = { kind, parent }
   }
 
   async createEntry(kind: 'note' | 'folder', parent: string, rawName: string): Promise<boolean> {
+    if (!this.mayEdit()) return false
     const problem = nameProblem(rawName)
     if (problem) {
       this.toast(problem)
@@ -402,6 +447,7 @@ class App {
   }
 
   private async moveTo(from: string, to: string): Promise<boolean> {
+    if (!this.mayEdit()) return false
     // Save first: the open note may be moved, or contain synapses to rewrite.
     await this.note?.flush()
     let res: api.MoveResult
@@ -452,6 +498,7 @@ class App {
   }
 
   async remove(path: string): Promise<void> {
+    if (!this.mayEdit()) return
     const isDir = this.entries.find((e) => e.path === path)?.type === 'dir'
     const ok = await this.ask({
       title: isDir ? strings.dialogs.deleteFolderTitle : strings.dialogs.deleteNoteTitle,
@@ -510,6 +557,7 @@ class App {
    * returns the stored paths; failures are reported and skipped.
    */
   async upload(files: readonly File[], folder: string, rename?: (f: File) => string): Promise<string[]> {
+    if (!this.mayEdit()) return []
     const stored: string[] = []
     for (const f of files) {
       const name = (rename?.(f) ?? f.name).normalize('NFC')
@@ -553,6 +601,7 @@ class App {
       await this.navigate(resolved)
       return
     }
+    if (!this.mayEdit()) return
     const path = markdown ? normalizePath(join(dirname(fromPath), target)) : newNotePath(target, fromPath)
     if (!path) {
       this.toast(strings.errors.byCode.invalid_path!)

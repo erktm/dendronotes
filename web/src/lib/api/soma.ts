@@ -94,6 +94,15 @@ export const trash = (path: string) =>
 
 export const me = () => request<Me>('GET', '/api/auth/me', { expect401: true })
 
+export interface AuthMethods {
+  mode: 'local' | 'proxy'
+  /** The password form is offered to everyone (else only via ?local=1, for the admin). */
+  local: boolean
+  sso: { label: string } | null
+}
+
+export const authMethods = () => request<AuthMethods>('GET', '/api/auth/methods')
+
 export const login = (username: string, password: string) =>
   request<Me>('POST', '/api/auth/login', { body: { username, password }, expect401: true })
 
@@ -102,7 +111,32 @@ export const login = (username: string, password: string) =>
 export const listSomas = () => request<{ somas: Membership[] }>('GET', '/api/somas').then((r) => r.somas)
 export const createSoma = (name: string) => request<Membership>('POST', '/api/somas', { body: { name } })
 export const renameSoma = (id: string, name: string) =>
-  request<{ id: string; name: string }>('PATCH', `/api/somas/${encodeURIComponent(id)}`, { body: { name } })
+  request<Membership>('PATCH', `/api/somas/${encodeURIComponent(id)}`, { body: { name } })
+/** Hands the soma to another member; the previous owner stays as editor. */
+export const transferSoma = (id: string, ownerId: number) =>
+  request<Membership>('PATCH', `/api/somas/${encodeURIComponent(id)}`, { body: { ownerId } })
+
+// --- Sharing ---------------------------------------------------------------
+
+export interface Member extends Person {
+  role: SomaRole
+}
+
+export interface Members {
+  members: Member[]
+  /** The caller's own role. */
+  role: SomaRole
+}
+
+const membersURL = (id: string) => `/api/somas/${encodeURIComponent(id)}/members`
+export const members = (id: string) => request<Members>('GET', membersURL(id))
+export const setMember = (id: string, userId: number, role: 'editor' | 'viewer') =>
+  request<Members>('PUT', `${membersURL(id)}/${userId}`, { body: { role } })
+export const removeMember = (id: string, userId: number) => request<Members>('DELETE', `${membersURL(id)}/${userId}`)
+export const leaveSoma = (id: string) => request<{ id: string }>('DELETE', `/api/somas/${encodeURIComponent(id)}/membership`)
+/** People to share with: at least two characters of user or display name. */
+export const searchUsers = (q: string, signal?: AbortSignal) =>
+  request<{ users: Person[] }>('GET', `/api/users/search?q=${encodeURIComponent(q)}`, { signal }).then((r) => r.users)
 export const deleteSoma = (id: string) => request<{ id: string }>('DELETE', `/api/somas/${encodeURIComponent(id)}`)
 
 export const updateProfile = (body: { displayName?: string; email?: string }) => request<User>('PATCH', '/api/me', { body })

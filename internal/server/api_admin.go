@@ -14,6 +14,7 @@ import (
 	"dendronotes/internal/auth"
 	"dendronotes/internal/config"
 	"dendronotes/internal/httpx"
+	"dendronotes/internal/sso"
 	"dendronotes/internal/store"
 )
 
@@ -443,7 +444,28 @@ func (s *Server) handleAdminServer(w http.ResponseWriter, r *http.Request) {
 			"maxNoteBytes": s.cfg.MaxNoteBytes, "maxUploadBytes": s.cfg.MaxUploadBytes,
 		},
 		"settings": settings,
+		"localLogin": s.cfg.Auth.LocalLogin,
+		"sso":        s.ssoStatus(),
 	})
+}
+
+// ssoStatus describes the OpenID Connect provider (nil when not configured).
+func (s *Server) ssoStatus() *sso.Status {
+	if s.sso == nil {
+		return nil
+	}
+	st := s.sso.Status()
+	return &st
+}
+
+// handleAdminSSOCheck runs the provider discovery again.
+func (s *Server) handleAdminSSOCheck(w http.ResponseWriter, r *http.Request) {
+	if s.sso == nil {
+		httpx.Error(w, http.StatusNotFound, "not_available")
+		return
+	}
+	st := s.sso.Check()
+	httpx.WriteJSON(w, http.StatusOK, st)
 }
 
 // dirUsage adds up the size of the files below dir (at most limit files).

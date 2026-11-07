@@ -333,3 +333,37 @@ func TestValidUsername(t *testing.T) {
 		}
 	}
 }
+
+func TestUsernameFrom(t *testing.T) {
+	for in, want := range map[string]string{
+		"erik":                  "erik",
+		"Erik Haeger":           "Erik-Haeger",
+		"  anna.b@corp  ":       "anna.b@corp",
+		"x":                     "",
+		"!!!":                   "",
+		"Jürgen/Ops":            "Jürgen-Ops",
+		strings.Repeat("a", 80): strings.Repeat("a", 60),
+	} {
+		if got := usernameFrom(in); got != want {
+			t.Errorf("usernameFrom(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestSafeNext(t *testing.T) {
+	for in, want := range map[string]string{
+		"":                      "/",
+		"/s/abc/n/Note.md":      "/s/abc/n/Note.md",
+		"/admin/users?x=1":      "/admin/users?x=1",
+		"//evil.example":        "/",
+		"/\\evil.example":       "/",
+		"https://evil.example/": "/",
+		"javascript:alert(1)":   "/",
+		"/api/auth/logout":      "/",
+		"/a\r\nSet-Cookie: x=1": "/",
+	} {
+		if got := safeNext(in); got != want {
+			t.Errorf("safeNext(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

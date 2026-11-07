@@ -6,13 +6,13 @@ search indexes are caches that can be rebuilt at any time.
 
 One container, one process, no external services, no external requests (air-gap friendly).
 
-> **Status: milestone 6** – accounts with their own somas and an administration area, on top
-> of the notes app: file tree, an editor with live preview and optional Vim key bindings, a
-> reading view, synapses with backlinks, full-text search with tags, live updates when files
-> change on disk, synapses that follow renamed notes, attachments (images, audio, video and
-> other files) and embedded notes, and a graph of all notes and synapses.
-> Next: sharing somas and Keycloak sign-in (M7), editing together in real time (M8),
-> Kubernetes manifests (M5).
+> **Status: milestone 7** – accounts with their own somas, sharing with roles, sign-in through
+> Keycloak (OpenID Connect) and an administration area, on top of the notes app: file tree, an
+> editor with live preview and optional Vim key bindings, a reading view, synapses with
+> backlinks, full-text search with tags, live updates when files change on disk, synapses that
+> follow renamed notes, attachments (images, audio, video and other files) and embedded notes,
+> and a graph of all notes and synapses.
+> Next: editing together in real time (M8), Kubernetes manifests (M5).
 
 ## Vocabulary
 
@@ -111,6 +111,13 @@ up to `DENDRONOTES_MAX_UPLOAD_MB`. The content must match the extension.
   soma when it is created (renaming the soma keeps the folder). Deleting a soma moves its
   folder to `DENDRONOTES_SOMAS_DIR/.trash/`, so the notes stay recoverable as files; a soma
   registered from `DENDRONOTES_SOMA_DIR` keeps its folder where it is.
+- **Sharing** ("Share soma …" in the soma switcher). The owner adds people by name with a
+  role: *can edit* (notes and files) or *can read*. Only the owner shares, renames, deletes or
+  hands the soma over to another member ("Make owner"; the previous owner stays as editor).
+  Somas shared with you are listed under "Shared with you"; "People with access …" shows who
+  else is in and lets you leave. For readers the soma is read-only: no editing, uploads,
+  renaming or deleting – the server refuses such requests as well. Changes to sharing take
+  effect at once, also in browsers that have the soma open.
 - **Profile** (click your name at the bottom of the sidebar): display name, e-mail and, for
   accounts with a password, a new password. Changing it signs out your other sessions.
 - **Administration** (the shield in the left rail, admins only):
@@ -195,6 +202,18 @@ All variables carry the `DENDRONOTES_` prefix. Variables without it are ignored.
 | `DENDRONOTES_AUTH_PROXY_HEADER`        | `X-Forwarded-User` | Header carrying the user name in proxy mode                |
 | `DENDRONOTES_AUTH_PROXY_ALLOWED_USERS` |                    | Optional comma-separated allow list for proxy mode         |
 | `DENDRONOTES_AUTH_PROXY_LOGOUT_URL`    |                    | Where "Sign out" leads in proxy mode, e.g. `/oauth2/sign_out` |
+| `DENDRONOTES_PUBLIC_URL`               |                    | External address, e.g. `https://notes.example.org` (needed for OIDC) |
+| `DENDRONOTES_LOCAL_LOGIN`              | `true`             | `false`: only the admin account may sign in with a password (needs OIDC) |
+| `DENDRONOTES_OIDC_ISSUER`              |                    | Issuer URL of the provider, e.g. `https://sso.example.org/realms/main`; turns OIDC on |
+| `DENDRONOTES_OIDC_CLIENT_ID`           |                    | Client ID registered for dendronotes                       |
+| `DENDRONOTES_OIDC_CLIENT_SECRET_FILE`  |                    | File containing the client secret (none for a public client) |
+| `DENDRONOTES_OIDC_SCOPES`              | `openid profile email` | Scopes to request (`openid` is always added)           |
+| `DENDRONOTES_OIDC_USERNAME_CLAIM`      | `preferred_username` | Claim that becomes the user name                         |
+| `DENDRONOTES_OIDC_GROUPS_CLAIM`        | `groups`           | Claim with the groups; dotted paths work, e.g. `realm_access.roles` |
+| `DENDRONOTES_OIDC_ADMIN_GROUPS`        |                    | Comma-separated groups whose members are admins (synced on every sign-in) |
+| `DENDRONOTES_OIDC_ALLOWED_GROUPS`      |                    | Comma-separated groups allowed to sign in (empty: everyone the provider lets through) |
+| `DENDRONOTES_OIDC_LOGIN_LABEL`         | `SSO`              | Provider name on the sign-in button ("Continue with …")   |
+| `DENDRONOTES_OIDC_CA_FILE`             |                    | PEM file with extra CA certificates for the provider (own CA, air gap) |
 
 In local mode, one of the three admin password variables is required while no enabled admin
 account exists; without it, the server does not start. Once an admin exists, they are ignored
@@ -232,12 +251,54 @@ sure only the proxy can reach dendronotes (Kubernetes: a NetworkPolicy). Each us
 account on first access; the one named `DENDRONOTES_ADMIN_USERNAME` becomes admin while there is
 no admin yet.
 
-Signing in through Keycloak (OIDC) directly follows in M7.
+**Through Keycloak or another OpenID Connect provider** (in local mode, next to passwords).
+Register a client in Keycloak:
+
+- Client type *OpenID Connect*, *Standard flow* on; *Client authentication* on (then put the
+  secret into a file for `DENDRONOTES_OIDC_CLIENT_SECRET_FILE`) or off for a public client –
+  dendronotes always uses PKCE.
+- *Valid redirect URIs*: `https://notes.example.org/api/auth/oidc/callback`;
+  *Valid post logout redirect URIs*: `https://notes.example.org/` (with your
+  `DENDRONOTES_PUBLIC_URL`).
+- For groups: a *Group Membership* mapper in the client's dedicated scope, token claim name
+  `groups`, added to the ID token or the userinfo response ("Full group path" on or off both
+  work: a leading `/` is ignored). Realm roles work too with
+  `DENDRONOTES_OIDC_GROUPS_CLAIM=realm_access.roles`.
+
+```bash
+-e DENDRONOTES_PUBLIC_URL=https://notes.example.org \
+-e DENDRONOTES_OIDC_ISSUER=https://sso.example.org/realms/main \
+-e DENDRONOTES_OIDC_CLIENT_ID=dendronotes \
+-e DENDRONOTES_OIDC_CLIENT_SECRET_FILE=/run/secrets/oidc-client-secret \
+-e DENDRONOTES_OIDC_ADMIN_GROUPS=dendronotes-admins \
+-e DENDRONOTES_OIDC_LOGIN_LABEL=Keycloak
+```
+
+The sign-in page then offers "Continue with Keycloak". The first sign-in creates an account
+(with an empty soma "Notes"); accounts are matched by the provider's issuer and subject, never
+by name, so a provider user called like an existing local account gets a name with a suffix
+(`erik-2`) instead of taking it over. Display name and e-mail follow the provider on every
+sign-in; with `DENDRONOTES_OIDC_ADMIN_GROUPS` set, so does the admin role (without it, roles are
+managed in the administration area). `DENDRONOTES_OIDC_ALLOWED_GROUPS` keeps everyone else out.
+"Sign out" also ends the Keycloak session. dendronotes keeps its own session afterwards
+(`DENDRONOTES_SESSION_TTL`): taking someone's access away in Keycloak takes effect at their next
+sign-in – to end it at once, disable the account or end its sessions in the administration area.
+
+With `DENDRONOTES_LOCAL_LOGIN=false` the sign-in page shows only the Keycloak button; the admin
+account can still sign in with its password at `/?local=1` should the provider be unreachable.
+The administration area shows whether the provider is reachable.
 
 ## Security notes
 
 - Somas are separated per account: requests for a soma the account is not a member of are
-  answered with 404, as if it did not exist; the administration needs the admin role.
+  answered with 404, as if it did not exist; members with too low a role get 403 (readers on
+  every changing request). The administration needs the admin role. A test runs every route
+  as non-member, reader and editor.
+- OpenID Connect uses the authorization code flow with PKCE (S256), a random state bound to
+  the browser by a short-lived cookie (no login CSRF, each state works once) and a nonce; the
+  ID token's signature, issuer, audience, expiry and nonce are checked. After sign-in the
+  browser only returns to paths within dendronotes. The search for people to share with needs
+  two characters and shows only user and display names.
 - Every file access goes through Go's `os.Root`: paths with `..`, absolute paths and symlinks
   pointing out of the soma are refused by the kernel-level lookup. API paths are validated
   beforehand and can never address hidden entries (`.git`, `.trash`, …). Symlinks inside the
@@ -272,7 +333,7 @@ which a test keeps in sync with the server.
 | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | Session handling         |
 | `PATCH /api/me`, `POST /api/me/password` | Own profile and password                            |
 | `GET /api/somas`, `POST /api/somas`     | The account's somas; create one                      |
-| `PATCH /api/somas/{soma}`, `DELETE /api/somas/{soma}` | Rename or delete a soma (owner)        |
+| `PATCH /api/somas/{soma}`, `DELETE /api/somas/{soma}` | Rename, hand over or delete a soma (owner) |
 | `GET /api/somas/{soma}/tree`            | All visible files and folders                        |
 | `GET /api/somas/{soma}/notes/{path}`    | Read a note (with `ETag`)                            |
 | `PUT /api/somas/{soma}/notes/{path}`    | Save a note; requires `If-Match`, `412` on conflict  |
@@ -287,7 +348,12 @@ which a test keeps in sync with the server.
 | `GET /api/somas/{soma}/tags`            | All tags with their number of notes                  |
 | `GET /api/somas/{soma}/graph`           | All notes and the synapses between them              |
 | `GET /api/somas/{soma}/events`          | Live updates (Server-Sent Events)                    |
-| `/api/admin/users`, `/somas`, `/sessions`, `/server`, `/audit` | Administration (admins only)  |
+| `GET /api/somas/{soma}/members`         | Who has access, with roles                           |
+| `PUT`, `DELETE /api/somas/{soma}/members/{id}` | Share with an account or change its role; take access away (owner) |
+| `DELETE /api/somas/{soma}/membership`   | Leave a soma shared with you                         |
+| `GET /api/users/search?q=`              | Find people to share with (two characters or more)   |
+| `GET /api/auth/methods`, `/api/auth/oidc/login`, `/api/auth/oidc/callback` | Sign-in options and the OpenID Connect flow |
+| `/api/admin/users`, `/somas`, `/sessions`, `/server`, `/sso/check`, `/audit` | Administration (admins only) |
 
 ## Air gap and reproducible builds
 
@@ -317,7 +383,8 @@ internal/watch/    file system events (fsnotify) for changes made outside dendro
 internal/events/   fan-out of live updates to connected browsers
 internal/relink/   rewrites synapses when notes are renamed or moved
 internal/attach/   which files may be uploaded (type allow list, content check) and how they are served
-internal/auth/     sign-in (argon2id, proxy header), sessions, rate limits, first admin
+internal/auth/     sign-in (argon2id, OIDC accounts, proxy header), sessions, rate limits, first admin
+internal/sso/      OpenID Connect client: discovery, PKCE, ID token checks, groups
 internal/clientip/ client address behind trusted proxies
 internal/httpx/    JSON helpers
 internal/server/   route table with access levels, API and admin handlers, middleware (CSP with nonce,

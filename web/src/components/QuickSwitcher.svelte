@@ -44,7 +44,7 @@
       chunks: highlightChunks(displayName(r.path), r.hits),
     }))
     const exists = notes.some((p) => displayName(p).toLowerCase() === q.toLowerCase())
-    if (q && !exists && !nameProblem(q)) out.push({ kind: 'create', name: q })
+    if (q && !exists && !nameProblem(q) && app.canEdit) out.push({ kind: 'create', name: q })
     return out
   })
 

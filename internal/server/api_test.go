@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -148,6 +149,26 @@ func TestRouteAccess(t *testing.T) {
 		if rt.access != public {
 			if rec := newClient(t, s).do(rt.method, url, "{}"); rec.Code != 401 {
 				t.Errorf("anonymous %s %s: %d, want 401", rt.method, url, rec.Code)
+			}
+		}
+	}
+	// Members with too low a role get 403: viewers on changing routes, editors
+	// on owner routes.
+	benUser, err := s.store.UserByUsername(context.Background(), "ben")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, role := range []string{store.MemberViewer, store.MemberEditor} {
+		if err := s.store.SetMember(context.Background(), testSoma, benUser.ID, role); err != nil {
+			t.Fatal(err)
+		}
+		for _, rt := range s.routes() {
+			if store.RoleRank(rt.access.somaRole()) <= store.RoleRank(role) {
+				continue
+			}
+			url := concrete.Replace(rt.pattern)
+			if rec := ben.do(rt.method, url, "{}"); rec.Code != 403 {
+				t.Errorf("%s %s %s: %d, want 403", role, rt.method, url, rec.Code)
 			}
 		}
 	}

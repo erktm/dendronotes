@@ -18,6 +18,19 @@
   })
 
   const settings = $derived(info ? Object.entries(info.settings).sort(([a], [b]) => a.localeCompare(b)) : [])
+
+  let checking = $state(false)
+  async function check() {
+    if (!info) return
+    checking = true
+    try {
+      info = { ...info, sso: await admin.checkSSO() }
+    } catch (err) {
+      app.toast(errorMessage(err))
+    } finally {
+      checking = false
+    }
+  }
 </script>
 
 <div class="admin-page">
@@ -68,6 +81,35 @@
           <dt>{t.maxUpload}</dt>
           <dd>{formatSize(info.limits.maxUploadBytes)}</dd>
         </dl>
+      </div>
+      <div class="admin-card wide">
+        <h3>{t.sso}</h3>
+        {#if info.sso}
+          <dl>
+            <dt>{t.ssoState}</dt>
+            <dd>
+              <span class="admin-pill" class:accent={info.sso.ready} class:warn={!info.sso.ready}>{info.sso.ready ? t.ssoReady : t.ssoDown}</span>
+              {#if info.sso.error}<div class="admin-faint">{info.sso.error}</div>{/if}
+            </dd>
+            <dt>{t.ssoIssuer}</dt>
+            <dd class="admin-mono">{info.sso.issuer}</dd>
+            <dt>{t.ssoClient}</dt>
+            <dd class="admin-mono">{info.sso.clientId}</dd>
+            <dt>{t.ssoRedirect}</dt>
+            <dd class="admin-mono">{info.sso.redirectUrl}</dd>
+            <dt>{t.ssoLogout}</dt>
+            <dd>{info.sso.logout ? t.yes : t.no}</dd>
+            <dt>{t.ssoChecked}</dt>
+            <dd>{admin.formatDate(info.sso.checkedAt) || t.never}</dd>
+            <dt>{t.passwords}</dt>
+            <dd>{info.localLogin ? t.passwordsAll : t.passwordsAdmin}</dd>
+          </dl>
+          <div class="admin-actions">
+            <button type="button" class="admin-btn" disabled={checking} onclick={() => void check()}>{t.ssoCheck}</button>
+          </div>
+        {:else}
+          <p class="admin-faint">{t.ssoOff}</p>
+        {/if}
       </div>
     </div>
 

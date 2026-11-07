@@ -6,13 +6,16 @@
 package config
 
 import (
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/netip"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -47,6 +50,18 @@ const (
 	EnvProxyHeader     = Prefix + "AUTH_PROXY_HEADER"
 	EnvProxyAllowed    = Prefix + "AUTH_PROXY_ALLOWED_USERS"
 	EnvProxyLogoutURL  = Prefix + "AUTH_PROXY_LOGOUT_URL"
+	EnvPublicURL       = Prefix + "PUBLIC_URL"
+	EnvLocalLogin      = Prefix + "LOCAL_LOGIN"
+	EnvOIDCIssuer      = Prefix + "OIDC_ISSUER"
+	EnvOIDCClientID    = Prefix + "OIDC_CLIENT_ID"
+	EnvOIDCSecretFile  = Prefix + "OIDC_CLIENT_SECRET_FILE"
+	EnvOIDCScopes      = Prefix + "OIDC_SCOPES"
+	EnvOIDCUserClaim   = Prefix + "OIDC_USERNAME_CLAIM"
+	EnvOIDCGroupsClaim = Prefix + "OIDC_GROUPS_CLAIM"
+	EnvOIDCAdminGroups = Prefix + "OIDC_ADMIN_GROUPS"
+	EnvOIDCAllowed     = Prefix + "OIDC_ALLOWED_GROUPS"
+	EnvOIDCLabel       = Prefix + "OIDC_LOGIN_LABEL"
+	EnvOIDCCAFile      = Prefix + "OIDC_CA_FILE"
 )
 
 // Vars lists every supported variable. README.md documents all of them
@@ -55,14 +70,16 @@ var Vars = []string{
 	EnvSomasDir, EnvSomaDir, EnvDataDir, EnvHTTPPort, EnvLogLevel, EnvLogFormat, EnvShutdownTimeout,
 	EnvTrustedProxies, EnvMaxNoteMB, EnvMaxUploadMB, EnvIgnore, EnvRescanInterval, EnvAuthMode, EnvAdminUsername,
 	EnvAdminHash, EnvAdminHashFile, EnvAdminPassword, EnvSessionTTL, EnvCookieSecure,
-	EnvProxyHeader, EnvProxyAllowed, EnvProxyLogoutURL,
+	EnvProxyHeader, EnvProxyAllowed, EnvProxyLogoutURL, EnvPublicURL, EnvLocalLogin,
+	EnvOIDCIssuer, EnvOIDCClientID, EnvOIDCSecretFile, EnvOIDCScopes, EnvOIDCUserClaim, EnvOIDCGroupsClaim,
+	EnvOIDCAdminGroups, EnvOIDCAllowed, EnvOIDCLabel, EnvOIDCCAFile,
 }
 
 // Config holds all runtime settings.
 type Config struct {
 	SomasDir        string         // one folder per soma (source of truth)
 	ImportSomaDir   string         // an existing soma to register for the first admin (optional)
-	DataDir         string         // derived caches (index, sessions)
+	DataDir         string         // state.db (accounts, sessions) and the search indexes
 	Port            int            // HTTP port
 	LogLevel        slog.Level     // debug|info|warn|error
 	LogFormat       string         // json|text
@@ -86,7 +103,29 @@ type Auth struct {
 	ProxyHeader    string        // header carrying the user in proxy mode
 	ProxyAllowed   []string      // optional allow list in proxy mode
 	ProxyLogoutURL string        // where "Sign out" leads in proxy mode
+	PublicURL      string        // external base URL, e.g. https://notes.example.org (no trailing slash)
+	LocalLogin     bool          // sign-in with user name and password for everyone (else only the admin)
+	OIDC           OIDC          // sign-in through an OpenID Connect provider (Keycloak)
 }
+
+// OIDC configures sign-in through an OpenID Connect provider. It is enabled
+// when Issuer is set.
+type OIDC struct {
+	Issuer        string   // e.g. https://sso.example.org/realms/main
+	ClientID      string   // the client registered for dendronotes
+	ClientSecret  Secret   // from a file; empty for a public client (PKCE only)
+	Scopes        []string // always includes openid
+	UsernameClaim string   // claim that becomes the user name
+	GroupsClaim   string   // claim with the groups (dotted path, e.g. realm_access.roles)
+	AdminGroups   []string // members become admins (empty: roles are managed in dendronotes)
+	AllowedGroups []string // only members may sign in (empty: everyone)
+	LoginLabel    string   // name of the provider on the sign-in button
+	CAFile        string   // extra CA certificates (PEM) for the provider's TLS
+	CAPEM         []byte   // contents of CAFile
+}
+
+// Enabled reports whether OIDC sign-in is configured.
+func (o OIDC) Enabled() bool { return o.Issuer != "" }
 
 // Secret is a string that never shows up in logs or formatted output.
 type Secret string
@@ -109,6 +148,10 @@ const (
 	DefaultMaxNoteMB       = 5
 	DefaultMaxUploadMB     = 25
 	DefaultProxyHeader     = "X-Forwarded-User"
+	DefaultOIDCScopes      = "openid profile email"
+	DefaultOIDCUserClaim   = "preferred_username"
+	DefaultOIDCGroupsClaim = "groups"
+	DefaultOIDCLabel       = "SSO"
 	minPasswordLen         = 8
 )
 
@@ -132,6 +175,7 @@ func Load(getenv func(string) string) (Config, error) {
 			SessionTTL:    DefaultSessionTTL,
 			CookieSecure:  "auto",
 			ProxyHeader:   envOr(getenv, EnvProxyHeader, DefaultProxyHeader),
+			LocalLogin:    true,
 		},
 	}
 	var errs []error
@@ -279,6 +323,26 @@ func (c *Config) loadAuth(getenv func(string) string) error {
 		errs = append(errs, fmt.Errorf("set only one of %s, %s and %s", EnvAdminHash, EnvAdminHashFile, EnvAdminPassword))
 	}
 
+	if v := strings.TrimSpace(getenv(EnvPublicURL)); v != "" {
+		u, err := url.Parse(v)
+		if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.User != nil ||
+			u.RawQuery != "" || u.Fragment != "" {
+			errs = append(errs, fmt.Errorf("%s: %q must be an http(s) URL without query, e.g. https://notes.example.org", EnvPublicURL, v))
+		} else {
+			a.PublicURL = strings.TrimRight(u.String(), "/")
+		}
+	}
+	if v := strings.ToLower(strings.TrimSpace(getenv(EnvLocalLogin))); v != "" {
+		switch v {
+		case "true":
+		case "false":
+			a.LocalLogin = false
+		default:
+			errs = append(errs, fmt.Errorf("%s: invalid value %q (true, false)", EnvLocalLogin, v))
+		}
+	}
+	errs = append(errs, a.loadOIDC(getenv))
+
 	switch a.Mode {
 	case "local":
 	case "proxy":
@@ -295,6 +359,64 @@ func (c *Config) loadAuth(getenv func(string) string) error {
 		}
 	default:
 		errs = append(errs, fmt.Errorf("%s: invalid value %q (local, proxy)", EnvAuthMode, a.Mode))
+	}
+	if a.OIDC.Enabled() && a.Mode != "local" {
+		errs = append(errs, fmt.Errorf("%s works only with %s=local (in proxy mode the proxy signs people in)", EnvOIDCIssuer, EnvAuthMode))
+	}
+	if !a.LocalLogin && !a.OIDC.Enabled() {
+		errs = append(errs, fmt.Errorf("%s=false needs %s, otherwise only the admin could sign in", EnvLocalLogin, EnvOIDCIssuer))
+	}
+	return errors.Join(errs...)
+}
+
+// loadOIDC reads the OpenID Connect settings; all of them are ignored unless
+// the issuer is set.
+func (a *Auth) loadOIDC(getenv func(string) string) error {
+	o := &a.OIDC
+	o.Issuer = strings.TrimRight(strings.TrimSpace(getenv(EnvOIDCIssuer)), "/")
+	if o.Issuer == "" {
+		return nil
+	}
+	var errs []error
+	if u, err := url.Parse(o.Issuer); err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" ||
+		u.RawQuery != "" || u.Fragment != "" {
+		errs = append(errs, fmt.Errorf("%s: %q must be the issuer URL, e.g. https://sso.example.org/realms/main", EnvOIDCIssuer, o.Issuer))
+	}
+	o.ClientID = strings.TrimSpace(getenv(EnvOIDCClientID))
+	if o.ClientID == "" {
+		errs = append(errs, fmt.Errorf("%s is required with %s", EnvOIDCClientID, EnvOIDCIssuer))
+	}
+	if a.PublicURL == "" {
+		errs = append(errs, fmt.Errorf("%s is required with %s (it gives the redirect URI)", EnvPublicURL, EnvOIDCIssuer))
+	}
+	if f := getenv(EnvOIDCSecretFile); f != "" {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", EnvOIDCSecretFile, err))
+		}
+		o.ClientSecret = Secret(strings.TrimSpace(string(b)))
+	}
+	o.Scopes = strings.Fields(strings.ReplaceAll(envOr(getenv, EnvOIDCScopes, DefaultOIDCScopes), ",", " "))
+	if !slices.Contains(o.Scopes, "openid") {
+		o.Scopes = append([]string{"openid"}, o.Scopes...)
+	}
+	o.UsernameClaim = strings.TrimSpace(envOr(getenv, EnvOIDCUserClaim, DefaultOIDCUserClaim))
+	o.GroupsClaim = strings.TrimSpace(envOr(getenv, EnvOIDCGroupsClaim, DefaultOIDCGroupsClaim))
+	o.AdminGroups = splitList(getenv(EnvOIDCAdminGroups))
+	o.AllowedGroups = splitList(getenv(EnvOIDCAllowed))
+	o.LoginLabel = strings.TrimSpace(envOr(getenv, EnvOIDCLabel, DefaultOIDCLabel))
+	if len(o.LoginLabel) > 40 {
+		errs = append(errs, fmt.Errorf("%s: at most 40 characters", EnvOIDCLabel))
+	}
+	if f := getenv(EnvOIDCCAFile); f != "" {
+		b, err := os.ReadFile(f)
+		switch {
+		case err != nil:
+			errs = append(errs, fmt.Errorf("%s: %w", EnvOIDCCAFile, err))
+		case !x509.NewCertPool().AppendCertsFromPEM(b):
+			errs = append(errs, fmt.Errorf("%s: %s contains no PEM certificates", EnvOIDCCAFile, f))
+		}
+		o.CAFile, o.CAPEM = f, b
 	}
 	return errors.Join(errs...)
 }
@@ -474,6 +596,30 @@ func (c Config) Describe(name string) string {
 		return strings.Join(c.Auth.ProxyAllowed, ", ")
 	case EnvProxyLogoutURL:
 		return c.Auth.ProxyLogoutURL
+	case EnvPublicURL:
+		return c.Auth.PublicURL
+	case EnvLocalLogin:
+		return strconv.FormatBool(c.Auth.LocalLogin)
+	case EnvOIDCIssuer:
+		return c.Auth.OIDC.Issuer
+	case EnvOIDCClientID:
+		return c.Auth.OIDC.ClientID
+	case EnvOIDCSecretFile:
+		return secret(c.Auth.OIDC.ClientSecret != "")
+	case EnvOIDCScopes:
+		return strings.Join(c.Auth.OIDC.Scopes, " ")
+	case EnvOIDCUserClaim:
+		return c.Auth.OIDC.UsernameClaim
+	case EnvOIDCGroupsClaim:
+		return c.Auth.OIDC.GroupsClaim
+	case EnvOIDCAdminGroups:
+		return strings.Join(c.Auth.OIDC.AdminGroups, ", ")
+	case EnvOIDCAllowed:
+		return strings.Join(c.Auth.OIDC.AllowedGroups, ", ")
+	case EnvOIDCLabel:
+		return c.Auth.OIDC.LoginLabel
+	case EnvOIDCCAFile:
+		return c.Auth.OIDC.CAFile
 	}
 	return ""
 }

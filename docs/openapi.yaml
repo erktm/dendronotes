@@ -88,6 +88,56 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Me" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/auth/methods:
+    get:
+      summary: Ways to sign in (for the sign-in page)
+      security: []
+      responses:
+        "200":
+          description: >
+            `local` says whether the password form is offered to everyone (with
+            DENDRONOTES_LOCAL_LOGIN=false only the admin account may use it);
+            `sso` is null without OpenID Connect.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mode: { type: string, enum: [local, proxy] }
+                  local: { type: boolean }
+                  sso:
+                    type: [object, "null"]
+                    properties:
+                      label: { type: string }
+  /api/auth/oidc/login:
+    get:
+      summary: Start signing in through the OpenID Connect provider (browser navigation)
+      description: >
+        Redirects to the provider (authorization code flow with PKCE, state and
+        nonce) and sets a short-lived state cookie. Errors redirect to
+        `/?login_error=<code>`.
+      security: []
+      parameters:
+        - { name: next, in: query, schema: { type: string }, description: Path within dendronotes to return to. }
+      responses:
+        "302": { description: To the provider, or back with `login_error` (sso_unavailable, rate_limited). }
+        "404": { description: OpenID Connect is not configured. }
+  /api/auth/oidc/callback:
+    get:
+      summary: Return from the OpenID Connect provider (redirect URI)
+      description: >
+        Checks state (against the cookie), code, ID token and nonce, finds or
+        creates the account and starts a session. Errors redirect to
+        `/?login_error=<code>`: sso_failed, sso_expired, sso_denied,
+        sso_forbidden, account_disabled.
+      security: []
+      parameters:
+        - { name: code, in: query, schema: { type: string } }
+        - { name: state, in: query, schema: { type: string } }
+        - { name: error, in: query, schema: { type: string } }
+      responses:
+        "302": { description: To the page the sign-in started from, or back with `login_error`. }
+        "404": { description: OpenID Connect is not configured. }
   /api/me:
     patch:
       summary: Change your display name or e-mail
@@ -122,6 +172,22 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Error" }
+  /api/users/search:
+    get:
+      summary: Find people to share a soma with (user and display name start with q)
+      description: Needs at least two characters; returns at most 10 enabled accounts with id, user and display name only.
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string, maxLength: 100 } }
+      responses:
+        "200":
+          description: Matching people.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users: { type: array, items: { $ref: "#/components/schemas/Person" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
   /api/somas:
     get:
       summary: Your somas (owned and shared with you)
@@ -151,14 +217,21 @@ paths:
     parameters:
       - $ref: "#/components/parameters/soma"
     patch:
-      summary: Rename a soma (owner)
+      summary: Rename a soma or hand it to another member (owner)
+      description: >
+        Renaming keeps the folder name. A new owner must already be a member;
+        the previous owner stays as editor.
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, required: [name], properties: { name: { type: string } } }
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 100 }
+                ownerId: { type: integer }
       responses:
-        "200": { description: Renamed; the folder keeps its name. }
+        "200": { description: The soma as you now see it., content: { application/json: { schema: { $ref: "#/components/schemas/Membership" } } } }
         "400": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
@@ -167,6 +240,50 @@ paths:
       responses:
         "200": { description: Deleted. }
         "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/members:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+    get:
+      summary: Who has access to a soma (members)
+      responses:
+        "200":
+          description: Members, owner first, and your own role.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Members" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/members/{id}:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+      - $ref: "#/components/parameters/id"
+    put:
+      summary: Share the soma with an account or change its role (owner)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [role], properties: { role: { type: string, enum: [editor, viewer] } } }
+      responses:
+        "200": { description: The members now., content: { application/json: { schema: { $ref: "#/components/schemas/Members" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Take an account's access away (owner)
+      responses:
+        "200": { description: The members now., content: { application/json: { schema: { $ref: "#/components/schemas/Members" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/membership:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+    delete:
+      summary: Leave a soma shared with you (not as its owner)
+      responses:
+        "200": { description: Left. }
+        "400": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
   /api/somas/{soma}/tree:
     parameters:
@@ -617,6 +734,12 @@ paths:
       summary: Server state, storage, open somas and effective configuration (admin; secrets only as "(set)")
       responses:
         "200": { description: Server state. }
+  /api/admin/sso/check:
+    post:
+      summary: Ask the OpenID Connect provider again (discovery) and report its state (admin)
+      responses:
+        "200": { description: Provider state (as `sso` in /api/admin/server). }
+        "404": { description: OpenID Connect is not configured. }
   /api/admin/audit:
     get:
       summary: Audit log, newest first (admin)
@@ -661,7 +784,7 @@ components:
             type: object
             properties:
               error: { type: string, const: unauthorized }
-              mode: { type: string, enum: [password, proxy] }
+              mode: { type: string, enum: [local, proxy] }
     Error:
       description: Error with a stable code.
       content:
@@ -683,7 +806,8 @@ components:
             invalid_credentials, account_disabled, rate_limited, wrong_password,
             weak_password, not_local, invalid_username, username_taken,
             invalid_role, invalid_display_name, invalid_email, last_admin, self,
-            invalid_transfer, too_many_somas, shutting_down, internal_error.
+            invalid_transfer, too_many_somas, unknown_user, owner_cannot_leave,
+            managed_by_provider, not_available, shutting_down, internal_error.
     Readiness:
       type: object
       properties:
@@ -713,6 +837,24 @@ components:
         disabled: { type: boolean }
         createdAt: { type: string, format: date-time }
         lastLoginAt: { type: string, format: date-time }
+    Person:
+      type: object
+      properties:
+        id: { type: integer }
+        username: { type: string }
+        displayName: { type: string }
+    Members:
+      type: object
+      properties:
+        role: { type: string, enum: [owner, editor, viewer], description: Your role. }
+        members:
+          type: array
+          items:
+            allOf:
+              - $ref: "#/components/schemas/Person"
+              - type: object
+                properties:
+                  role: { type: string, enum: [owner, editor, viewer] }
     Membership:
       type: object
       properties:
