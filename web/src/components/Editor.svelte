@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import { collab } from '@codemirror/collab'
   import { createEditor, type EditorHandle } from '../lib/editor/setup'
   import { readNote } from '../lib/api/soma'
   import { outline } from '../lib/outline'
@@ -11,7 +12,8 @@
   import { pastedName } from '../lib/files'
   import { strings } from '../lib/strings'
 
-  let { session }: { session: NoteSession } = $props()
+  /** visible: false while the reading view is shown (the editor stays open). */
+  let { session, visible = true }: { session: NoteSession; visible?: boolean } = $props()
 
   let host: HTMLDivElement | undefined = $state()
   let handle = $state.raw<EditorHandle | null>(null)
@@ -21,6 +23,7 @@
     const s = session
     const editor = createEditor(host, {
       doc: s.content,
+      collab: collab({ startVersion: s.startVersion, clientID: s.clientID }),
       livePreview: settings.livePreview,
       readOnly: s.readOnly,
       label: strings.note.contentLabel(displayName(s.path)),
@@ -32,10 +35,8 @@
       },
       notes: () => app.notePaths,
       headings: async (path) => outline((await readNote(path)).content),
-      onChange: (doc) => {
-        s.content = doc
-        s.scheduleSave()
-      },
+      onChange: (view) => s.changed(view),
+      onSelection: (view) => s.selectionChanged(view),
       onCursor: (line, col) => {
         editorStatus.line = line
         editorStatus.col = col
@@ -44,13 +45,35 @@
       onFiles: (files, pos) => void embedFiles(files, pos),
     })
     handle = editor
-    if (s.autofocus) {
+    editor.restore(s.lastSelection, s.lastScroll)
+    s.attach(editor.view)
+    // A new note, or the editor started over while someone was typing.
+    if ((s.autofocus || s.lastFocused) && visible) {
       editor.focus()
       s.autofocus = false
+      s.lastFocused = false
     }
     return () => {
+      s.detach(editor.view)
       editor.destroy()
       editorStatus.vimMode = null
+    }
+  })
+
+  // The others' cursors.
+  $effect(() => {
+    const peers = session.peers
+    handle?.setPeers(peers.filter((p) => p.sel).map((p) => ({ id: p.id, name: p.name, color: p.color, anchor: p.sel!.anchor, head: p.sel!.head })))
+  })
+
+  // Shown again after the reading view: measure, and take the focus.
+  $effect(() => {
+    if (visible && handle) {
+      handle.remeasure()
+      if (session.autofocus) {
+        handle.focus()
+        session.autofocus = false
+      }
     }
   })
 
@@ -64,12 +87,6 @@
 
   $effect(() => {
     handle?.setReadOnly(session.readOnly)
-  })
-
-  // Content replaced from outside (reload from disk).
-  $effect(() => {
-    const content = session.content
-    if (handle && content !== handle.doc()) handle.replaceDoc(content)
   })
 
   // Files added, renamed or removed: re-resolve synapses and attachments.
@@ -93,7 +110,7 @@
 
   $effect(() => {
     const req = app.scrollRequest
-    if (req && handle) {
+    if (req && handle && visible) {
       handle.scrollToLine(req.line)
       app.scrollRequest = null
     }

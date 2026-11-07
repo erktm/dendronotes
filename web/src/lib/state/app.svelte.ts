@@ -21,7 +21,8 @@ import { strings } from '../strings'
 import { newNotePath, normalizePath, resolveFile, resolveSynapse } from '../synapses'
 import { buildTree } from '../tree'
 import { NoteSession } from './note.svelte'
-import { live } from './live.svelte'
+import { live, type CollabEventName } from './live.svelte'
+import type { CollabEvent, NoticeEvent, PresenceEvent, SavedEvent } from '../api/collab'
 import { settings } from './settings.svelte'
 
 type AuthState = 'checking' | 'anonymous' | 'authenticated'
@@ -124,8 +125,6 @@ class App {
   confirmRequest = $state.raw<ConfirmRequest | null>(null)
   promptRequest = $state.raw<PromptRequest | null>(null)
   private toastId = 0
-  /** A move started here is in progress: its "removed" events are expected. */
-  private moving = 0
   private refreshTimer: ReturnType<typeof setTimeout> | undefined
 
   constructor() {
@@ -237,6 +236,7 @@ class App {
       },
       change: (c) => this.applyChange(c),
       access: () => void this.refreshSomas(),
+      collab: (name, data) => this.collabEvent(name, data),
       refused: () => void this.checkSession(),
     })
   }
@@ -368,9 +368,9 @@ class App {
     }
     const n = this.note
     if (!n) return
-    const mine = c.notes.find((x) => x.path === n.path)
-    if (mine) void n.changedOnDisk(mine.etag)
-    if (c.removed.includes(n.path) && this.moving === 0) n.removedOnDisk()
+    // An open note follows its file through the server (editing together);
+    // only a missing note looks again.
+    if (c.notes.some((x) => x.path === n.path)) void n.changedOnDisk()
   }
 
   // --- Tree -------------------------------------------------------------
@@ -451,15 +451,12 @@ class App {
     // Save first: the open note may be moved, or contain synapses to rewrite.
     await this.note?.flush()
     let res: api.MoveResult
-    this.moving++
     try {
       res = await api.move(from, to, settings.updateSynapses)
     } catch (err) {
       this.toast(errorMessage(err))
       await this.refresh()
       return false
-    } finally {
-      this.moving--
     }
     const moved = res.path
     if (res.updatedSynapses) this.toast(strings.toasts.synapsesUpdated(res.updatedSynapses, res.updatedNotes ?? 0), 'info')
@@ -525,19 +522,36 @@ class App {
 
   // --- Navigation -------------------------------------------------------
 
-  /** User-initiated navigation (asks before throwing away a conflict). */
+  /** User-initiated navigation. */
   async navigate(path: string | null): Promise<void> {
-    const cur = this.note
-    if (cur && cur.path !== path && cur.conflict !== null) {
-      const ok = await this.ask({
-        title: strings.dialogs.discardTitle,
-        message: strings.dialogs.discardMessage(displayName(cur.path)),
-        confirmLabel: strings.dialogs.discard,
-        danger: true,
-      })
-      if (!ok) return
-    }
     router.go(path)
+  }
+
+  /** The id of this tab's event stream, for joining notes (NoteHost). */
+  stream(): Promise<string> {
+    return live.waitStream()
+  }
+
+  /** Routes the events of editing together to the open note. */
+  private collabEvent(name: CollabEventName, data: unknown): void {
+    const n = this.note
+    if (!n || data === null || typeof data !== 'object') return
+    switch (name) {
+      case 'collab':
+        n.receive(data as CollabEvent)
+        break
+      case 'presence':
+        n.presence(data as PresenceEvent)
+        break
+      case 'saved':
+        n.saved(data as SavedEvent)
+        break
+      case 'notice': {
+        const to = n.notice(data as NoticeEvent)
+        if (to && router.notePath !== to && this.note === n) router.go(to, true)
+        break
+      }
+    }
   }
 
   // --- Synapses ----------------------------------------------------------

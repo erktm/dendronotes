@@ -44,7 +44,7 @@ export interface ServerInfo {
   uptime: string
   authMode: string
   counts: { users: number; somas: number; sessions: number; openSomas: number }
-  open: { id: string; name: string; notes: number; streams: number; ready: boolean }[]
+  open: { id: string; name: string; notes: number; streams: number; editing: number; ready: boolean }[]
   storage: { somasDir: string; somasBytes: number; somasFiles: number; dataDir: string; dataBytes: number }
   limits: { maxNoteBytes: number; maxUploadBytes: number }
   settings: Record<string, string>

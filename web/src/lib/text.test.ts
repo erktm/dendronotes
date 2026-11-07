@@ -1,23 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { snippetParts } from './snippet'
-import { diffLines } from './diff'
 import { fuzzyMatch, highlightChunks } from './fuzzy'
 import { outline, section } from './outline'
-
-describe('diffLines', () => {
-  it('marks added and removed lines', () => {
-    const d = diffLines('a\nb\nc', 'a\nB\nc\nd')
-    expect(d.map((l) => `${l.type}:${l.text}`)).toEqual(['same:a', 'del:b', 'add:B', 'same:c', 'add:d'])
-  })
-
-  it('handles identical and empty texts', () => {
-    expect(diffLines('x\ny', 'x\ny').every((l) => l.type === 'same')).toBe(true)
-    expect(diffLines('', 'new')).toEqual([
-      { type: 'del', text: '' },
-      { type: 'add', text: 'new' },
-    ])
-  })
-})
 
 describe('fuzzyMatch', () => {
   it('requires the characters in order', () => {

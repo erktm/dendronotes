@@ -117,7 +117,7 @@
       <div class="admin-scroll">
         <table class="admin-table">
           <thead>
-            <tr><th>{t.openSomas}</th><th class="num">{t.notes}</th><th class="num">{t.streams}</th></tr>
+            <tr><th>{t.openSomas}</th><th class="num">{t.notes}</th><th class="num">{t.streams}</th><th class="num">{t.editing}</th></tr>
           </thead>
           <tbody>
             {#each info.open as o (o.id)}
@@ -125,6 +125,7 @@
                 <td>{o.name || o.id}</td>
                 <td class="num">{o.notes}</td>
                 <td class="num">{o.streams}</td>
+                <td class="num">{o.editing}</td>
               </tr>
             {/each}
           </tbody>

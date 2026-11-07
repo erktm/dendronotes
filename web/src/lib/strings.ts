@@ -131,14 +131,12 @@ export const strings = {
     close: 'close',
   },
 
-  conflict: {
-    text: 'Compare both versions and choose one.',
-    yours: 'Your version',
-    yoursHint: 'not saved',
-    disk: 'On disk',
-    diskHint: 'changed elsewhere',
-    loading: 'Loading the version on disk …',
-    explain: 'Both sides show their changes against the version you opened. Nothing is overwritten until you choose.',
+  collab: {
+    merged: 'This note was changed elsewhere; the changes were merged in.',
+    conflict: 'This note was changed elsewhere at the same place as here; both versions were kept, one after the other.',
+    peers: (n: number) => (n === 1 ? '1 other person is here' : `${n} other people are here`),
+    peer: (name: string) => `${name} is editing this note`,
+    leaveWarning: 'Some changes have not reached the server yet.',
   },
 
   settings: {
@@ -367,6 +365,7 @@ export const strings = {
     openSomas: 'Open somas',
     notes: 'notes',
     streams: 'live connections',
+    editing: 'notes being edited',
     limits: 'Limits',
     maxNote: 'Largest note',
     maxUpload: 'Largest upload',
@@ -448,9 +447,6 @@ export const strings = {
     deleteMessage: (name: string, isFolder: boolean) =>
       `“${name}”${isFolder ? ' and everything in it' : ''} will be moved to the .trash folder in your soma.`,
     moveToTrash: 'Move to trash',
-    discardTitle: 'Discard your changes?',
-    discardMessage: (name: string) => `“${name}” was changed elsewhere and your version is not saved.`,
-    discard: 'Discard',
   },
 
   toasts: {
@@ -461,7 +457,6 @@ export const strings = {
     synapsesSkipped: (n: number) =>
       `${n === 1 ? '1 note was' : `${n} notes were`} changed meanwhile; their synapses were not updated.`,
     changedElsewhere: (name: string) => `“${name}” was updated elsewhere.`,
-    deletedElsewhere: (name: string) => `“${name}” was deleted or moved elsewhere. Your unsaved changes are still in the editor.`,
   },
 
   empty: {
@@ -482,20 +477,15 @@ export const strings = {
     errorTitle: 'Couldn’t load this note',
     errorText: 'Something went wrong while loading it.',
     retry: 'Try again',
-    conflictTitle: 'This note was changed elsewhere.',
-    conflictText: 'Your latest edits are not saved yet.',
-    useDisk: 'Use version on disk',
-    keepMine: 'Keep mine',
     readOnly: 'This note is a symbolic link and can only be read here.',
     viewerOnly: 'This soma is shared with you for reading. Ask its owner if you want to edit it.',
   },
 
   saveState: {
     readOnly: 'Read-only',
-    conflict: 'Conflict',
     saving: 'Saving …',
+    offline: 'Offline – changes kept here',
     failed: 'Not saved',
-    edited: 'Edited',
     saved: 'Saved',
   },
 

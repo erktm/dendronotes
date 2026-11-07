@@ -4,7 +4,6 @@
   import Editor from './Editor.svelte'
   import ReadingView from './ReadingView.svelte'
   import StatusBar from './StatusBar.svelte'
-  import ConflictView from './ConflictView.svelte'
   import AttachmentView from './AttachmentView.svelte'
   import type { NoteSession } from '../lib/state/note.svelte'
   import { settings } from '../lib/state/settings.svelte'
@@ -28,8 +27,6 @@
   <EmptyState title={strings.note.errorTitle} text={strings.note.errorText}>
     <button type="button" class="button" onclick={() => void session.load()}>{strings.note.retry}</button>
   </EmptyState>
-{:else if session.conflict !== null}
-  <ConflictView {session} />
 {:else}
   <div class="note">
     {#if session.readOnly}
@@ -40,8 +37,14 @@
     {/if}
     {#if settings.view === 'read'}
       <div class="scroll"><ReadingView {session} /></div>
-    {:else}
-      <div class="edit"><Editor {session} /></div>
+    {/if}
+    <!-- The editor holds the live document, so it stays open while reading. -->
+    <div class="edit" hidden={settings.view === 'read'}>
+      {#key session.generation}
+        <Editor {session} visible={settings.view !== 'read'} />
+      {/key}
+    </div>
+    {#if settings.view !== 'read'}
       <StatusBar {session} />
     {/if}
   </div>

@@ -72,13 +72,7 @@
   })
 
   function toggleTask(line: number) {
-    if (session.readOnly) return
-    const lines = session.content.split('\n')
-    const text = lines[line]
-    if (text === undefined) return
-    lines[line] = text.replace(/\[( |x|X)\]/, (_m, c: string) => (c === ' ' ? '[x]' : '[ ]'))
-    session.content = lines.join('\n')
-    session.scheduleSave()
+    session.toggleTask(line)
   }
 
   /** Synapses navigate inside the app; checkboxes edit the note. */

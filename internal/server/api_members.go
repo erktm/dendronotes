@@ -101,6 +101,7 @@ func (s *Server) handleRemoveMember(w http.ResponseWriter, r *http.Request) {
 	}
 	s.audit(r, "member.remove", sm.ID, u.Username)
 	accessChanged(r)
+	runtimeOf(r).DropUser(u.ID) // no more live updates of this soma
 	s.handleMembers(w, r)
 }
 
@@ -118,6 +119,7 @@ func (s *Server) handleLeaveSoma(w http.ResponseWriter, r *http.Request) {
 	}
 	s.audit(r, "member.leave", sm.ID, u.Username)
 	accessChanged(r)
+	runtimeOf(r).DropUser(u.ID)
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"id": sm.ID})
 }
 

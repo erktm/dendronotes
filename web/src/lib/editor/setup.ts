@@ -5,16 +5,19 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { indentOnInput, syntaxHighlighting } from '@codemirror/language'
 import { highlightSelectionMatches, search, searchKeymap } from '@codemirror/search'
-import { Annotation, Compartment, EditorState, type Extension } from '@codemirror/state'
+import { Compartment, EditorSelection, EditorState, type Extension } from '@codemirror/state'
 import { drawSelection, dropCursor, EditorView, highlightSpecialChars, keymap, placeholder } from '@codemirror/view'
 import { tagHighlighter, tags } from '@lezer/highlight'
 import { outline, type Heading } from '../outline'
 import { dirname, displayName } from '../paths'
 import { livePreview, refreshDecorations, synapseHost, type SynapseHost } from './livePreview'
+import { presence, setPeers, type PeerCursor } from './presence'
 import { SynapseSyntax } from './synapseSyntax'
 
 export interface EditorOptions {
   doc: string
+  /** The collaborative editing plugin (@codemirror/collab) of the note. */
+  collab: Extension
   livePreview: boolean
   readOnly: boolean
   label: string
@@ -24,7 +27,10 @@ export interface EditorOptions {
   notes: () => readonly string[]
   /** Headings of another note, offered when typing [[Note# . */
   headings: (path: string) => Promise<readonly Heading[]>
-  onChange: (doc: string) => void
+  /** The document changed (typing, or updates from others). */
+  onChange: (view: EditorView) => void
+  /** The selection moved (also when the document changed). */
+  onSelection: (view: EditorView) => void
   onCursor: (line: number, col: number) => void
   onVimMode: (mode: string | null) => void
   /** Files pasted or dropped into the editor at a position. */
@@ -32,8 +38,7 @@ export interface EditorOptions {
 }
 
 export interface EditorHandle {
-  doc(): string
-  replaceDoc(text: string): void
+  readonly view: EditorView
   setLivePreview(on: boolean): void
   setReadOnly(on: boolean): void
   setVim(on: boolean): Promise<void>
@@ -44,11 +49,14 @@ export interface EditorHandle {
   scrollToLine(line: number): void
   /** Inserts text at a position (as a user edit) and puts the cursor after it. */
   insertAt(pos: number, text: string): void
+  /** Shows the cursors of the others. */
+  setPeers(peers: PeerCursor[]): void
+  /** Puts back cursor and scroll position (after the editor started over). */
+  restore(sel: { anchor: number; head: number } | null, scrollTop: number): void
+  /** Measures again (after being hidden). */
+  remeasure(): void
   destroy(): void
 }
-
-/** Marks document replacements that come from outside (reload from disk). */
-const external = Annotation.define<boolean>()
 
 // Token classes; colors and sizes live in styles/editor.css.
 const highlighter = tagHighlighter([
@@ -158,6 +166,8 @@ export function createEditor(parent: HTMLElement, o: EditorOptions): EditorHandl
     highlightSelectionMatches(),
     keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, ...completionKeymap, indentWithTab]),
     synapseHost.of(o.host),
+    o.collab,
+    presence,
     previewC.of(o.livePreview ? livePreview : []),
     readOnlyC.of(EditorState.readOnly.of(o.readOnly)),
     EditorView.contentAttributes.of({ 'aria-label': o.label, spellcheck: 'true' }),
@@ -181,7 +191,8 @@ export function createEditor(parent: HTMLElement, o: EditorOptions): EditorHandl
       },
     }),
     EditorView.updateListener.of((u) => {
-      if (u.docChanged && !u.transactions.some((tr) => tr.annotation(external))) o.onChange(u.state.doc.toString())
+      if (u.docChanged) o.onChange(u.view)
+      if (u.docChanged || u.selectionSet || u.focusChanged) o.onSelection(u.view)
       if (u.docChanged || u.selectionSet) {
         const head = u.state.selection.main.head
         const line = u.state.doc.lineAt(head)
@@ -194,10 +205,7 @@ export function createEditor(parent: HTMLElement, o: EditorOptions): EditorHandl
   let vimOn = false
 
   return {
-    doc: () => view.state.doc.toString(),
-    replaceDoc(text) {
-      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text }, annotations: external.of(true) })
-    },
+    view,
     setLivePreview(on) {
       view.dispatch({ effects: previewC.reconfigure(on ? livePreview : []) })
     },
@@ -236,6 +244,19 @@ export function createEditor(parent: HTMLElement, o: EditorOptions): EditorHandl
       const l = view.state.doc.line(n)
       view.dispatch({ selection: { anchor: l.from }, effects: EditorView.scrollIntoView(l.from, { y: 'start', yMargin: 24 }) })
       view.focus()
+    },
+    setPeers(peers) {
+      view.dispatch({ effects: setPeers.of(peers) })
+    },
+    restore(sel, scrollTop) {
+      if (sel) {
+        const n = view.state.doc.length
+        view.dispatch({ selection: EditorSelection.single(Math.min(sel.anchor, n), Math.min(sel.head, n)) })
+      }
+      view.scrollDOM.scrollTop = scrollTop
+    },
+    remeasure() {
+      view.requestMeasure()
     },
     destroy() {
       view.destroy()

@@ -481,3 +481,37 @@
   font-family: var(--font-ui);
   font-size: 0.85em;
 }
+
+/* Editing together: the others' selections and carets, colored by peer. */
+.peer-c0 { --peer: var(--peer-0); }
+.peer-c1 { --peer: var(--peer-1); }
+.peer-c2 { --peer: var(--peer-2); }
+.peer-c3 { --peer: var(--peer-3); }
+.peer-c4 { --peer: var(--peer-4); }
+.peer-c5 { --peer: var(--peer-5); }
+.peer-c6 { --peer: var(--peer-6); }
+.peer-c7 { --peer: var(--peer-7); }
+
+.cm-peer-sel {
+  background: color-mix(in srgb, var(--peer) 22%, transparent);
+}
+.cm-peer-caret {
+  position: relative;
+  margin: 0 -1px;
+  border-left: 2px solid var(--peer);
+  pointer-events: none;
+}
+.cm-peer-name {
+  position: absolute;
+  bottom: 100%;
+  left: -2px;
+  z-index: 5;
+  padding: 0 5px;
+  border-radius: 4px 4px 4px 0;
+  background: var(--peer);
+  color: var(--on-peer);
+  font: 600 10.5px/1.6 var(--font-ui);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0.92;
+}

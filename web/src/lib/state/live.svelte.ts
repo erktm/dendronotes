@@ -3,6 +3,9 @@ import { somaBase } from '../api/base'
 
 export type LiveState = 'connecting' | 'live' | 'offline'
 
+export type CollabEventName = 'collab' | 'presence' | 'saved' | 'notice'
+const COLLAB_EVENTS: CollabEventName[] = ['collab', 'presence', 'saved', 'notice']
+
 export interface LiveHandlers {
   /** Stream (re)connected: reload what is shown, something may have been missed. */
   resync(): void
@@ -10,6 +13,8 @@ export interface LiveHandlers {
   change(c: Change): void
   /** Members, roles or the soma itself changed: reload the soma list. */
   access(): void
+  /** Editing together: updates, cursors, saves and notices of open notes. */
+  collab(name: CollabEventName, data: unknown): void
   /** The stream was refused; the session may have ended. */
   refused(): void
 }
@@ -25,6 +30,10 @@ class Live {
   state = $state<LiveState>('offline')
   /** Increases with every change in the soma; views refetch derived data. */
   version = $state(0)
+  /** The id the server gave this stream ("hello"); notes are joined with it. */
+  stream = $state('')
+
+  private waiters: ((stream: string) => void)[] = []
 
   private source: EventSource | null = null
   private handlers: LiveHandlers | null = null
@@ -42,6 +51,13 @@ class Live {
     this.source = null
     this.handlers = null
     this.state = 'offline'
+    this.stream = ''
+  }
+
+  /** The stream id, once connected (waits for the next "hello" otherwise). */
+  waitStream(): Promise<string> {
+    if (this.state === 'live' && this.stream) return Promise.resolve(this.stream)
+    return new Promise((resolve) => this.waiters.push(resolve))
   }
 
   private connect(): void {
@@ -49,11 +65,33 @@ class Live {
     this.state = 'connecting'
     const es = new EventSource(`${somaBase()}/events`)
     this.source = es
-    es.addEventListener('hello', () => {
+    es.addEventListener('hello', (e) => {
+      let stream = ''
+      try {
+        const data = JSON.parse((e as MessageEvent<string>).data) as { stream?: unknown }
+        if (typeof data.stream === 'string') stream = data.stream
+      } catch {
+        // an older server: no editing together
+      }
+      this.stream = stream
       this.state = 'live'
       this.version++
+      const waiting = this.waiters
+      this.waiters = []
+      for (const w of waiting) w(stream)
       this.handlers?.resync()
     })
+    for (const name of COLLAB_EVENTS) {
+      es.addEventListener(name, (e) => {
+        let data: unknown
+        try {
+          data = JSON.parse((e as MessageEvent<string>).data)
+        } catch {
+          return
+        }
+        this.handlers?.collab(name, data)
+      })
+    }
     es.addEventListener('change', (e) => {
       let c: Change
       try {

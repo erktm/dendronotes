@@ -6,13 +6,13 @@ search indexes are caches that can be rebuilt at any time.
 
 One container, one process, no external services, no external requests (air-gap friendly).
 
-> **Status: milestone 7** – accounts with their own somas, sharing with roles, sign-in through
-> Keycloak (OpenID Connect) and an administration area, on top of the notes app: file tree, an
-> editor with live preview and optional Vim key bindings, a reading view, synapses with
-> backlinks, full-text search with tags, live updates when files change on disk, synapses that
-> follow renamed notes, attachments (images, audio, video and other files) and embedded notes,
-> and a graph of all notes and synapses.
-> Next: editing together in real time (M8), Kubernetes manifests (M5).
+> **Status: milestone 8** – editing together in real time, accounts with their own somas,
+> sharing with roles, sign-in through Keycloak (OpenID Connect) and an administration area, on
+> top of the notes app: file tree, an editor with live preview and optional Vim key bindings, a
+> reading view, synapses with backlinks, full-text search with tags, live updates when files
+> change on disk, synapses that follow renamed notes, attachments (images, audio, video and
+> other files) and embedded notes, and a graph of all notes and synapses.
+> Next: Kubernetes manifests (M5).
 
 ## Vocabulary
 
@@ -79,12 +79,20 @@ admin's first soma.
 - **Renaming and moving.** Synapses in other notes are rewritten so they keep pointing to the
   renamed or moved note (Markdown links included), unless switched off in the settings. A note
   that was changed by someone else in that moment is left alone and reported.
-- **Live updates.** Changes made outside dendronotes – another editor, git, a sync tool or a
-  second browser tab – appear right away: the file tree, search and backlinks update, and an
-  open note reloads. If it has unsaved edits, the comparison below opens instead.
-- **Saving.** Notes save automatically while you type (⌘S / Ctrl+S saves at once). If the
-  file was changed elsewhere in the meantime, nothing is overwritten: a comparison of both
-  versions appears and you choose "Keep mine" or "Use version on disk".
+- **Editing together.** Everyone who has a note open – other people the soma is shared with,
+  or your own second tab – edits the same text at once: changes appear right away, the others'
+  cursors and selections show with their names, and their initials appear at the top. Readers
+  follow along without being able to change anything.
+- **Saving.** The server writes a note about a second after typing stops, at the latest every
+  five seconds while typing goes on ("Saving …", then "Saved"); ⌘S / Ctrl+S saves at once.
+  Files keep their line breaks (also Windows-style) and a byte order mark. Without a
+  connection, changes stay in the tab ("Offline – changes kept here") and are sent as soon as
+  it is back – also if the server restarted meanwhile: they are merged into the current text.
+- **Live updates.** Changes made outside dendronotes – another editor, git, a sync tool –
+  appear right away: the file tree, search and backlinks update, and an open note takes over
+  the change. If it was edited here at the same time, both are merged line by line; where both
+  sides changed the same lines, both versions are kept one after the other (and a notice says
+  so) – nothing is lost.
 
 | Shortcut         | Action                         |
 |------------------|--------------------------------|
@@ -314,8 +322,12 @@ The administration area shows whether the provider is reachable.
   PNG); HTML, scripts and executables are refused. Files are served with the type of their
   extension, `nosniff`, and a sandboxing Content-Security-Policy, so a file opened directly in
   the browser (an SVG, say) can never run scripts. Notes show media only from the soma.
-- The event stream carries only paths and versions, never note content, and ends when the
-  session ends. Search snippets mark matches with control characters, not HTML.
+- `change` events on the event stream carry only paths and versions. Note content travels
+  only to the tabs that joined that note for editing together, which needs read access to the
+  soma; pushing changes needs edit access. The server checks every change set (structure,
+  length against the document, size limit) before applying it, and limits how many updates
+  and cursor moves a tab may send. Streams end when the session ends or the account loses
+  access to the soma. Search snippets mark matches with control characters, not HTML.
 - Note content is untrusted: the reading view renders it with markdown-it and sanitizes the
   result with DOMPurify (no scripts, event handlers, style attributes, forms, frames, SVG or
   `javascript:` URLs). External links open with `rel="noopener noreferrer"`. A test corpus of
@@ -348,6 +360,7 @@ which a test keeps in sync with the server.
 | `GET /api/somas/{soma}/tags`            | All tags with their number of notes                  |
 | `GET /api/somas/{soma}/graph`           | All notes and the synapses between them              |
 | `GET /api/somas/{soma}/events`          | Live updates (Server-Sent Events)                    |
+| `POST /api/somas/{soma}/collab/join`, `/leave`, `/push`, `/presence`; `GET …/collab/pull` | Editing together: open a note with the stream's id, send changes (CodeMirror change sets), cursors, catch up |
 | `GET /api/somas/{soma}/members`         | Who has access, with roles                           |
 | `PUT`, `DELETE /api/somas/{soma}/members/{id}` | Share with an account or change its role; take access away (owner) |
 | `DELETE /api/somas/{soma}/membership`   | Leave a soma shared with you                         |
@@ -378,6 +391,7 @@ internal/soma/     soma access exclusively through os.Root (tree, notes, move, t
 internal/mdparse/  synapses and tags of a note (same rules as web/src/lib/synapses.ts)
 internal/store/    state.db: accounts, sessions, somas and members, audit log (versioned migrations)
 internal/somas/    soma manager: opens somas on demand (index, watcher, live updates), closes idle ones
+internal/collab/   editing together: live documents, change sets (UTF-16), saving, 3-way merge
 internal/index/    SQLite cache per soma: versions, synapses, tags, full-text search
 internal/watch/    file system events (fsnotify) for changes made outside dendronotes
 internal/events/   fan-out of live updates to connected browsers

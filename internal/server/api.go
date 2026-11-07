@@ -62,6 +62,11 @@ func (s *Server) routes() []route {
 		{"GET", "/api/somas/{soma}/tags", s.handleTags, somaViewer},
 		{"GET", "/api/somas/{soma}/graph", s.handleGraph, somaViewer},
 		{"GET", "/api/somas/{soma}/events", s.handleEvents, somaViewer},
+		{"POST", "/api/somas/{soma}/collab/join", s.handleCollabJoin, somaViewer},
+		{"POST", "/api/somas/{soma}/collab/leave", s.handleCollabLeave, somaViewer},
+		{"POST", "/api/somas/{soma}/collab/push", s.handleCollabPush, somaEditor},
+		{"GET", "/api/somas/{soma}/collab/pull", s.handleCollabPull, somaViewer},
+		{"POST", "/api/somas/{soma}/collab/presence", s.handleCollabPresence, somaViewer},
 
 		{"GET", "/api/admin/users", s.handleAdminUsers, adminOnly},
 		{"POST", "/api/admin/users", s.handleAdminCreateUser, adminOnly},
@@ -204,8 +209,17 @@ func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteDecodeError(w, err)
 		return
 	}
+	from, err := soma.CleanPath(body.From)
+	if err != nil {
+		s.somaError(w, r, err)
+		return
+	}
+	// Open documents are saved first and follow the move.
+	move := func() (string, error) {
+		return rt.Collab.Move(from, func() (string, error) { return rt.Soma.Move(from, body.To) })
+	}
 	if !body.UpdateSynapses {
-		to, err := rt.Soma.Move(body.From, body.To)
+		to, err := move()
 		if err != nil {
 			s.somaError(w, r, err)
 			return
@@ -217,12 +231,13 @@ func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 
 	rt.MoveMu.Lock()
 	defer rt.MoveMu.Unlock()
-	edits, err := s.planRelink(r, rt, body.From, body.To)
+	rt.Collab.Flush("") // the rewrite reads what is on disk
+	edits, err := s.planRelink(r, rt, from, body.To)
 	if err != nil {
 		s.somaError(w, r, err)
 		return
 	}
-	to, err := rt.Soma.Move(body.From, body.To)
+	to, err := move()
 	if err != nil {
 		s.somaError(w, r, err)
 		return
@@ -288,7 +303,17 @@ func (s *Server) planRelink(r *http.Request, rt *somas.Runtime, from, to string)
 
 func (s *Server) handleTrash(w http.ResponseWriter, r *http.Request) {
 	rt := runtimeOf(r)
-	dst, err := rt.Soma.Trash(r.PathValue("path"))
+	p, err := soma.CleanPath(r.PathValue("path"))
+	if err != nil {
+		s.somaError(w, r, err)
+		return
+	}
+	// Open documents are saved before they go to the trash, then closed.
+	var dst string
+	err = rt.Collab.Remove(p, func() (err error) {
+		dst, err = rt.Soma.Trash(p)
+		return err
+	})
 	if err != nil {
 		s.somaError(w, r, err)
 		return

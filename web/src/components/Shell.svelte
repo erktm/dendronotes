@@ -9,6 +9,7 @@
   import PromptDialog from './PromptDialog.svelte'
   import ProfileDialog from './ProfileDialog.svelte'
   import ShareDialog from './ShareDialog.svelte'
+  import Peers from './Peers.svelte'
   import EmptyState from './EmptyState.svelte'
   import ConfirmDialog from './ConfirmDialog.svelte'
   import QuickSwitcher from './QuickSwitcher.svelte'
@@ -96,10 +97,9 @@
     const n = app.note
     if (!n || n.status !== 'ready') return null
     if (n.readOnly) return { kind: 'muted', label: strings.saveState.readOnly }
-    if (n.conflict !== null) return { kind: 'warn', label: strings.saveState.conflict }
-    if (n.saving) return { kind: 'muted', label: strings.saveState.saving }
     if (n.failed) return { kind: 'err', label: strings.saveState.failed }
-    if (n.dirty) return { kind: 'muted', label: strings.saveState.edited }
+    if (n.offline && n.unsaved) return { kind: 'warn', label: strings.saveState.offline }
+    if (n.unsaved) return { kind: 'muted', label: strings.saveState.saving }
     return { kind: 'ok', label: strings.saveState.saved }
   })
 
@@ -108,7 +108,7 @@
     const key = e.key.toLowerCase()
     if (key === 's') {
       e.preventDefault()
-      void app.note?.save()
+      void app.note?.push(true)
     } else if (key === 'g' && e.shiftKey) {
       e.preventDefault()
       toggleGraph()
@@ -129,8 +129,9 @@
   }
 
   function onbeforeunload(e: BeforeUnloadEvent) {
+    // Changes the server already has are saved by it; only unsent ones are at risk.
     const n = app.note
-    if (n && (n.dirty || n.conflict !== null)) {
+    if (n && n.pending > 0) {
       void n.flush()
       e.preventDefault()
     }
@@ -187,6 +188,9 @@
         {/if}
       </nav>
       <div class="tools">
+        {#if app.note && noteReady}
+          <Peers peers={app.note.peers} />
+        {/if}
         {#if save}
           <span class="save {save.kind}" role="status">{save.label}</span>
         {/if}
@@ -233,7 +237,7 @@
           <EmptyState />
         {/if}
       </div>
-      {#if app.note && noteReady && settings.showDetails && app.note.conflict === null}
+      {#if app.note && noteReady && settings.showDetails}
         <DetailsPanel session={app.note} />
       {/if}
     </div>

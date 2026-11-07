@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"dendronotes/internal/collab"
 	"dendronotes/internal/events"
 	"dendronotes/internal/index"
 	"dendronotes/internal/soma"
@@ -22,12 +23,14 @@ const (
 	watchDebounce = 150 * time.Millisecond
 )
 
-// Runtime is an open soma: its files, search index and live events.
+// Runtime is an open soma: its files, search index, live events and the
+// notes being edited together.
 type Runtime struct {
-	ID    string
-	Soma  *soma.Soma
-	Index *index.Index
-	Hub   *events.Hub
+	ID     string
+	Soma   *soma.Soma
+	Index  *index.Index
+	Hub    *events.Hub
+	Collab *collab.Manager
 	// MoveMu serializes moves that rewrite synapses in other notes.
 	MoveMu sync.Mutex
 
@@ -38,13 +41,27 @@ type Runtime struct {
 	lastUsed atomic.Int64 // unix nanoseconds
 }
 
-func newRuntime(id string, sm *soma.Soma, indexDir string, rescan time.Duration, log *slog.Logger) (*Runtime, error) {
+func newRuntime(id string, sm *soma.Soma, indexDir string, rescan time.Duration, maxNote int64, log *slog.Logger) (*Runtime, error) {
 	ix, err := index.Open(indexDir, sm, log)
 	if err != nil {
 		return nil, err
 	}
 	ctx, stop := context.WithCancel(context.Background())
 	rt := &Runtime{ID: id, Soma: sm, Index: ix, Hub: events.NewHub(maxStreams), log: log, stop: stop, done: make(chan struct{})}
+	rt.Collab = collab.New(collab.Options{
+		Soma:     sm,
+		MaxBytes: maxNote,
+		Send:     rt.Hub.Send,
+		Saved: func(n soma.Note) {
+			ch, err := rt.Index.Put(context.Background(), n)
+			if err != nil {
+				log.Error("index update after save failed", "path", n.Path, "err", err)
+				return
+			}
+			rt.Publish(ch)
+		},
+		Log: log,
+	})
 	rt.touch()
 	go func() {
 		defer close(rt.done)
@@ -65,10 +82,19 @@ func (rt *Runtime) idleSince(before time.Time) bool {
 	return rt.users.Load() == 0 && rt.Hub.Subscribers() == 0 && rt.lastUsed.Load() < before.UnixNano()
 }
 
+// DropUser ends the event streams of an account (its access ended); its
+// open notes are left.
+func (rt *Runtime) DropUser(userID int64) {
+	for _, id := range rt.Collab.StreamsOf(userID) {
+		rt.Hub.Drop(id)
+	}
+}
+
 // Streams counts the connected event streams.
 func (rt *Runtime) Streams() int { return rt.Hub.Subscribers() }
 
 func (rt *Runtime) close() error {
+	rt.Collab.Close() // writes what is not saved yet
 	rt.Hub.Close()
 	rt.stop()
 	<-rt.done
@@ -193,10 +219,17 @@ func (rt *Runtime) hidden(rel string) bool {
 	return false
 }
 
-// Publish tells connected clients what changed.
+// Publish tells connected clients what changed, and lets open documents
+// pick up changes made to their files elsewhere.
 func (rt *Runtime) Publish(ch index.Changes) {
 	if ch.Empty() {
 		return
+	}
+	for _, n := range ch.Notes {
+		rt.Collab.FileChanged(n.Path)
+	}
+	for _, p := range ch.Removed {
+		rt.Collab.FileChanged(p)
 	}
 	if ch.Notes == nil {
 		ch.Notes = []index.NoteChange{}

@@ -104,7 +104,7 @@ func (m *Manager) start(s store.Soma) (*Runtime, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open soma %s: %w", s.ID, err)
 	}
-	rt, err := newRuntime(s.ID, sm, dir, m.opts.RescanInterval, m.opts.Log.With("soma", s.ID))
+	rt, err := newRuntime(s.ID, sm, dir, m.opts.RescanInterval, m.opts.Soma.MaxNoteBytes, m.opts.Log.With("soma", s.ID))
 	if err != nil {
 		sm.Close()
 		return nil, err

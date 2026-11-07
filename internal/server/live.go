@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"dendronotes/internal/auth"
+	"dendronotes/internal/collab"
 	"dendronotes/internal/events"
 	"dendronotes/internal/httpx"
 )
@@ -17,6 +18,8 @@ const heartbeat = 25 * time.Second
 
 // handleEvents streams changes as Server-Sent Events. Clients resynchronize
 // (tree, open note) after every "hello", which also follows a reconnect.
+// The "hello" names the stream; a tab uses that id to join notes for
+// editing together, whose updates then arrive on this stream as well.
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	rt := runtimeOf(r)
 	sm, _ := somaOf(r)
@@ -26,6 +29,9 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer cancel()
+	u, _ := auth.UserFrom(r.Context())
+	rt.Collab.AddStream(id, collab.User{ID: u.ID, Name: u.Name()})
+	defer rt.Collab.RemoveStream(id)
 
 	rc := http.NewResponseController(w)
 	_ = rc.SetWriteDeadline(time.Time{})

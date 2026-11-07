@@ -47,6 +47,16 @@
   --err: #b0362f;
   --focus: #2f7a4b;
   --shadow: 0 1px 2px rgb(27 45 32 / 0.06), 0 4px 16px rgb(27 45 32 / 0.06);
+  /* Others' cursors and avatars (editing together). */
+  --peer-0: #2563eb;
+  --peer-1: #c2410c;
+  --peer-2: #9333ea;
+  --peer-3: #e11d48;
+  --peer-4: #0f766e;
+  --peer-5: #a16207;
+  --peer-6: #4f46e5;
+  --peer-7: #be185d;
+  --on-peer: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -69,6 +79,15 @@
     --err: #ef7f76;
     --focus: #79c98b;
     --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px rgb(0 0 0 / 0.25);
+    --peer-0: #60a5fa;
+    --peer-1: #fb923c;
+    --peer-2: #c084fc;
+    --peer-3: #fb7185;
+    --peer-4: #2dd4bf;
+    --peer-5: #facc15;
+    --peer-6: #a5b4fc;
+    --peer-7: #f472b6;
+    --on-peer: #0e1411;
   }
 }
 
@@ -91,6 +110,15 @@
   --err: #ef7f76;
   --focus: #79c98b;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px rgb(0 0 0 / 0.25);
+  --peer-0: #60a5fa;
+  --peer-1: #fb923c;
+  --peer-2: #c084fc;
+  --peer-3: #fb7185;
+  --peer-4: #2dd4bf;
+  --peer-5: #facc15;
+  --peer-6: #a5b4fc;
+  --peer-7: #f472b6;
+  --on-peer: #0e1411;
 }
 
 /* Added for the editor, reading view and conflict view (M2). */

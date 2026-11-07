@@ -400,6 +400,7 @@ type openSoma struct {
 	Name    string `json:"name"`
 	Notes   int    `json:"notes"`
 	Streams int    `json:"streams"`
+	Editing int    `json:"editing"` // notes open for editing together
 	Ready   bool   `json:"ready"`
 }
 
@@ -409,7 +410,7 @@ func (s *Server) handleAdminServer(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	open := []openSoma{}
 	for _, rt := range s.somas.Running() {
-		o := openSoma{ID: rt.ID, Notes: len(rt.Index.Resolver().Notes()), Streams: rt.Streams(), Ready: rt.Index.Ready()}
+		o := openSoma{ID: rt.ID, Notes: len(rt.Index.Resolver().Notes()), Streams: rt.Streams(), Editing: len(rt.Collab.Open()), Ready: rt.Index.Ready()}
 		if sm, err := s.store.SomaByID(ctx, rt.ID); err == nil {
 			o.Name = sm.Name
 		}
@@ -443,7 +444,7 @@ func (s *Server) handleAdminServer(w http.ResponseWriter, r *http.Request) {
 		"limits": map[string]int64{
 			"maxNoteBytes": s.cfg.MaxNoteBytes, "maxUploadBytes": s.cfg.MaxUploadBytes,
 		},
-		"settings": settings,
+		"settings":   settings,
 		"localLogin": s.cfg.Auth.LocalLogin,
 		"sso":        s.ssoStatus(),
 	})
