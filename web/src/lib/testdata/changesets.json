@@ -1,0 +1,1173 @@
+{
+ "description": "CodeMirror change sets (ChangeSet.toJSON) with the documents they apply to. Generated with @codemirror/state; the frontend test checks them against CodeMirror, internal/collab against its own implementation. \"strict\" cases are accepted by CodeMirror but never produced by it; the server refuses them.",
+ "cases": [
+  {
+   "name": "insert at start",
+   "doc": "Hello",
+   "changes": [
+    [
+     0,
+     "Hi "
+    ],
+    5
+   ],
+   "result": "Hi Hello"
+  },
+  {
+   "name": "delete at end",
+   "doc": "Hello world",
+   "changes": [
+    5,
+    [
+     6
+    ]
+   ],
+   "result": "Hello"
+  },
+  {
+   "name": "replace a word",
+   "doc": "Hello world",
+   "changes": [
+    6,
+    [
+     5,
+     "there"
+    ]
+   ],
+   "result": "Hello there"
+  },
+  {
+   "name": "insert lines",
+   "doc": "ab",
+   "changes": [
+    1,
+    [
+     0,
+     "x",
+     "y"
+    ],
+    1
+   ],
+   "result": "ax\nyb"
+  },
+  {
+   "name": "delete across lines",
+   "doc": "a\nb\nc",
+   "changes": [
+    1,
+    [
+     3
+    ],
+    1
+   ],
+   "result": "ac"
+  },
+  {
+   "name": "emoji counts two units",
+   "doc": "a😀b",
+   "changes": [
+    3,
+    [
+     1,
+     "c"
+    ]
+   ],
+   "result": "a😀c"
+  },
+  {
+   "name": "after an emoji",
+   "doc": "😀",
+   "changes": [
+    2,
+    [
+     0,
+     "!"
+    ]
+   ],
+   "result": "😀!"
+  },
+  {
+   "name": "umlauts count one unit",
+   "doc": "Grüße",
+   "changes": [
+    2,
+    [
+     1,
+     "ue"
+    ],
+    2
+   ],
+   "result": "Grueße"
+  },
+  {
+   "name": "empty document",
+   "doc": "",
+   "changes": [],
+   "result": ""
+  },
+  {
+   "name": "fill an empty document",
+   "doc": "",
+   "changes": [
+    [
+     0,
+     "# Title",
+     "",
+     "Text"
+    ]
+   ],
+   "result": "# Title\n\nText"
+  },
+  {
+   "name": "CJK",
+   "doc": "日本語",
+   "changes": [
+    1,
+    [
+     1
+    ],
+    1
+   ],
+   "result": "日語"
+  },
+  {
+   "name": "combining accent",
+   "doc": "éx",
+   "changes": [
+    2,
+    [
+     1
+    ]
+   ],
+   "result": "é"
+  },
+  {
+   "name": "empty line kept",
+   "doc": "a\n\nb",
+   "changes": [
+    2,
+    [
+     0,
+     "x"
+    ],
+    2
+   ],
+   "result": "a\nx\nb"
+  },
+  {
+   "name": "random 0",
+   "doc": "[[Note]]\tGartena",
+   "changes": [
+    3,
+    [
+     2,
+     "Garten#taga"
+    ],
+    6,
+    [
+     2,
+     "",
+     ""
+    ],
+    3
+   ],
+   "result": "[[NGarten#tagae]]\tGa\nena"
+  },
+  {
+   "name": "random 1",
+   "doc": "béé\tä\n😀\n#tagéé- [ ] taskä👩‍🌾",
+   "changes": [
+    21,
+    [
+     0,
+     "aa"
+    ],
+    5,
+    [
+     3,
+     "bGarten"
+    ],
+    5
+   ],
+   "result": "béé\tä\n😀\n#tagéé- [aa ] tabGarten👩‍🌾"
+  },
+  {
+   "name": "random 2",
+   "doc": "aß日本日本\t\taéa- [ ] taskäéGarten日本",
+   "changes": [
+    8,
+    [
+     4,
+     "#tagä"
+    ],
+    3,
+    [
+     4,
+     "ä"
+    ],
+    2,
+    [
+     1,
+     "日本"
+    ],
+    7,
+    [
+     2,
+     "",
+     "[[Note]]#tag"
+    ],
+    1
+   ],
+   "result": "aß日本日本\t\t#tagä [ äsk日本éGarte\n[[Note]]#tag本"
+  },
+  {
+   "name": "random 3",
+   "doc": "😀é👩‍🌾😀Gartenaé日本\nßéß👩‍🌾Garten[[Note]]😀äé- [ ] task 😀  日本",
+   "changes": [
+    67
+   ],
+   "result": "😀é👩‍🌾😀Gartenaé日本\nßéß👩‍🌾Garten[[Note]]😀äé- [ ] task 😀  日本"
+  },
+  {
+   "name": "random 4",
+   "doc": "😀bé\né",
+   "changes": [
+    4,
+    [
+     1,
+     "bä👩‍🌾"
+    ],
+    2
+   ],
+   "result": "😀bebä👩‍🌾\né"
+  },
+  {
+   "name": "random 5",
+   "doc": "GartenGartenéé",
+   "changes": [
+    3,
+    [
+     3
+    ],
+    8,
+    [
+     1,
+     "- [ ] task😀é"
+    ]
+   ],
+   "result": "GarGartenée- [ ] task😀é"
+  },
+  {
+   "name": "random 6",
+   "doc": " é😀é日本\t\t日本😀é",
+   "changes": [
+    14
+   ],
+   "result": " é😀é日本\t\t日本😀é"
+  },
+  {
+   "name": "random 7",
+   "doc": "日本\tGarten",
+   "changes": [
+    1,
+    [
+     1,
+     "👩‍🌾a[[Note]]"
+    ],
+    7,
+    [
+     0,
+     "\tä"
+    ]
+   ],
+   "result": "日👩‍🌾a[[Note]]\tGarten\tä"
+  },
+  {
+   "name": "random 8",
+   "doc": "a\n😀#tag é[[Note]]Garten👩‍🌾a👩‍🌾ßa- [ ] task- [ ] taskßaéb日本😀- [ ] task\n#tagGarten👩‍🌾ß- [ ] task",
+   "changes": [
+    69,
+    [
+     2,
+     "- [ ] task"
+    ],
+    11,
+    [
+     3,
+     "- [ ] task "
+    ],
+    8,
+    [
+     4,
+     "Garten"
+    ],
+    6
+   ],
+   "result": "a\n😀#tag é[[Note]]Garten👩‍🌾a👩‍🌾ßa- [ ] task- [ ] taskßaéb日本😀- [- [ ] task task\n#tagG- [ ] task en👩‍🌾ßGarten] task"
+  },
+  {
+   "name": "random 9",
+   "doc": "- [ ] task- [ ] taskGartenäéa\nß- [ ] task",
+   "changes": [
+    8,
+    [
+     3,
+     "[[Note]]Garten",
+     ""
+    ],
+    29,
+    [
+     2,
+     "",
+     ""
+    ]
+   ],
+   "result": "- [ ] ta[[Note]]Garten\n [ ] taskGartenäéa\nß- [ ] ta\n"
+  },
+  {
+   "name": "random 10",
+   "doc": "aä",
+   "changes": [
+    2,
+    [
+     0,
+     "👩‍🌾👩‍🌾"
+    ]
+   ],
+   "result": "aä👩‍🌾👩‍🌾"
+  },
+  {
+   "name": "random 11",
+   "doc": "éGartenGarten",
+   "changes": [
+    4,
+    [
+     0,
+     "b"
+    ],
+    6,
+    [
+     2,
+     "[[Note]]"
+    ],
+    1
+   ],
+   "result": "éGarbtenGar[[Note]]n"
+  },
+  {
+   "name": "random 12",
+   "doc": "日本 [[Note]]- [ ] task- [ ] taské- [ ] taskäééé\n- [ ] taska- [ ] taskGarten- [ ] taskb日本",
+   "changes": [
+    50,
+    [
+     2,
+     "[[Note]]"
+    ],
+    36,
+    [
+     0,
+     "é",
+     "日本"
+    ]
+   ],
+   "result": "日本 [[Note]]- [ ] task- [ ] taské- [ ] taskäééé\n- [[Note]]] taska- [ ] taskGarten- [ ] taskb日本é\n日本"
+  },
+  {
+   "name": "random 13",
+   "doc": "[[Note]][[Note]]日本[[Note]]日本日本\t\t ß",
+   "changes": [
+    29,
+    [
+     1,
+     "é"
+    ],
+    4
+   ],
+   "result": "[[Note]][[Note]]日本[[Note]]日本日é\t\t ß"
+  },
+  {
+   "name": "random 14",
+   "doc": "#tag 👩‍🌾ébb",
+   "changes": [
+    12,
+    [
+     1,
+     "日本 é"
+    ]
+   ],
+   "result": "#tag 👩‍🌾éb日本 é"
+  },
+  {
+   "name": "random 15",
+   "doc": " \tGarten- [ ] task- [ ] task日本\taß",
+   "changes": [
+    18,
+    [
+     1,
+     "#tag\t- [ ] task"
+    ],
+    10,
+    [
+     1
+    ],
+    3,
+    [
+     0,
+     "日本Garten"
+    ]
+   ],
+   "result": " \tGarten- [ ] task#tag\t- [ ] task [ ] task日\taß日本Garten"
+  },
+  {
+   "name": "random 16",
+   "doc": "#tagGartené😀ß\n #tag👩‍🌾é#tag#tagé ä👩‍🌾#tag\tb日本\t- [ ] taskbaGarten👩‍🌾日本",
+   "changes": [
+    28,
+    [
+     4,
+     "[[Note]][[Note]]"
+    ],
+    2,
+    [
+     0,
+     "[[Note]]- [ ] task"
+    ],
+    25,
+    [
+     4
+    ],
+    7,
+    [
+     3,
+     "é"
+    ],
+    5
+   ],
+   "result": "#tagGartené😀ß\n #tag👩‍🌾é#[[Note]][[Note]]ta[[Note]]- [ ] taskgé ä👩‍🌾#tag\tb日本\t- [ ] baGarteé‍🌾日本"
+  },
+  {
+   "name": "random 17",
+   "doc": "😀é ßGartenaé👩‍🌾😀#tag#tagéß\n[[Note]]👩‍🌾[[Note]]- [ ] taské\n#tag\n",
+   "changes": [
+    9,
+    [
+     2,
+     " "
+    ],
+    50,
+    [
+     1,
+     "é "
+    ],
+    6,
+    [
+     0,
+     "ä "
+    ],
+    4
+   ],
+   "result": "😀é ßGar naé👩‍🌾😀#tag#tagéß\n[[Note]]👩‍🌾[[Note]]- [ ] é aské\n#ä tag\n"
+  },
+  {
+   "name": "random 18",
+   "doc": "b日本ß😀é",
+   "changes": [
+    3,
+    [
+     3,
+     "Garten"
+    ],
+    1,
+    [
+     0,
+     "- [ ] task"
+    ],
+    1,
+    [
+     0,
+     "- [ ] task日本é"
+    ]
+   ],
+   "result": "b日本Gartene- [ ] tasḱ- [ ] task日本é"
+  },
+  {
+   "name": "random 19",
+   "doc": "👩‍🌾#tagb[[Note]]ß😀",
+   "changes": [
+    7,
+    [
+     3,
+     "👩‍🌾b"
+    ],
+    11
+   ],
+   "result": "👩‍🌾#t👩‍🌾b[[Note]]ß😀"
+  },
+  {
+   "name": "random 20",
+   "doc": "ä👩‍🌾 #tagé bé- [ ] taskGarten[[Note]]\nä😀a👩‍🌾😀日本ä日本ßa",
+   "changes": [
+    53,
+    [
+     0,
+     "b"
+    ],
+    5
+   ],
+   "result": "ä👩‍🌾 #tagé bé- [ ] taskGarten[[Note]]\nä😀a👩‍🌾😀日本bä日本ßa"
+  },
+  {
+   "name": "random 21",
+   "doc": " [[Note]]Gartené[[Note]]éé- [ ] taskGartenä#tag#tag[[Note]]- [ ] task\té\t\n",
+   "changes": [
+    15,
+    [
+     3,
+     "ß"
+    ],
+    44,
+    [
+     3,
+     "👩‍🌾#tag👩‍🌾"
+    ],
+    10,
+    [
+     0,
+     "é"
+    ],
+    1
+   ],
+   "result": " [[Note]]GartenßNote]]éé- [ ] taskGartenä#tag#tag[[Note]]-👩‍🌾#tag👩‍🌾] task\té\té\n"
+  },
+  {
+   "name": "random 22",
+   "doc": "#tag😀ä  😀- [ ] taskä#tag\né- [ ] task😀 ß日本[[Note]]😀ßa日本 ba ",
+   "changes": [
+    27,
+    [
+     2,
+     "- [ ] task"
+    ],
+    34
+   ],
+   "result": "#tag😀ä  😀- [ ] taskä#tag\n- [ ] task- [ ] task😀 ß日本[[Note]]😀ßa日本 ba "
+  },
+  {
+   "name": "random 23",
+   "doc": "日本#tag😀😀#tag\t日本é日本ß\néä👩‍🌾Garten日本#tag",
+   "changes": [
+    18,
+    [
+     0,
+     "😀é"
+    ],
+    24
+   ],
+   "result": "日本#tag😀😀#tag\t日本é😀é日本ß\néä👩‍🌾Garten日本#tag"
+  },
+  {
+   "name": "random 24",
+   "doc": "é😀- [ ] task- [ ] task  - [ ] task\té#tag\t#tag#tagßGartena[[Note]]#tag- [ ] task",
+   "changes": [
+    [
+     4
+    ],
+    71,
+    [
+     0,
+     "  b"
+    ],
+    3,
+    [
+     2
+    ]
+   ],
+   "result": " [ ] task- [ ] task  - [ ] task\té#tag\t#tag#tagßGartena[[Note]]#tag- [ ]  b ta"
+  },
+  {
+   "name": "random 25",
+   "doc": "a",
+   "changes": [
+    1,
+    [
+     0,
+     "é"
+    ]
+   ],
+   "result": "aé"
+  },
+  {
+   "name": "random 26",
+   "doc": "[[Note]]😀😀\ta- [ ] taské👩‍🌾 ß日本- [ ] taské#tagb\n 日本#tag\tGarten",
+   "changes": [
+    47,
+    [
+     2,
+     "éGartenb"
+    ],
+    6,
+    [
+     0,
+     "é\t#tag"
+    ],
+    5,
+    [
+     1,
+     "\té"
+    ],
+    5
+   ],
+   "result": "[[Note]]😀😀\ta- [ ] taské👩‍🌾 ß日本- [ ] taské#éGartenbgb\n 日本é\t#tag#tag\t\téarten"
+  },
+  {
+   "name": "random 27",
+   "doc": " Garten 👩‍🌾 ä😀ä[[Note]]éßbGartenß😀Gartenä\té",
+   "changes": [
+    25,
+    [
+     4,
+     "",
+     "😀"
+    ],
+    18,
+    [
+     0,
+     "日本"
+    ]
+   ],
+   "result": " Garten 👩‍🌾 ä😀ä[[Note]\n😀Gartenß😀Gartenä\té日本"
+  },
+  {
+   "name": "random 28",
+   "doc": "ä👩‍🌾a\n[[Note]]ä b#tag",
+   "changes": [
+    17,
+    [
+     3,
+     "  "
+    ],
+    2,
+    [
+     0,
+     "ß- [ ] taska"
+    ],
+    1
+   ],
+   "result": "ä👩‍🌾a\n[[Note]]ä  taß- [ ] taskag"
+  },
+  {
+   "name": "random 29",
+   "doc": "- [ ] task ßaa[[Note]]äaä\nßßä日本[[Note]]👩‍🌾ß 😀- [ ] taskéGarten a",
+   "changes": [
+    1,
+    [
+     3,
+     "- [ ] task[[Note]]"
+    ],
+    28,
+    [
+     2,
+     "日本"
+    ],
+    5,
+    [
+     3,
+     "Garten"
+    ],
+    26
+   ],
+   "result": "-- [ ] task[[Note]]] task ßaa[[Note]]äaä\nßßä日本[日本ote]]Garten🌾ß 😀- [ ] taskéGarten a"
+  },
+  {
+   "name": "random 30",
+   "doc": "👩‍🌾ß👩‍🌾 - [ ] taskaGarten",
+   "changes": [
+    9,
+    [
+     4
+    ],
+    16
+   ],
+   "result": "👩‍🌾ß👩‍ [ ] taskaGarten"
+  },
+  {
+   "name": "random 31",
+   "doc": "😀bé😀👩‍🌾#tag日本👩‍🌾👩‍🌾\n",
+   "changes": [
+    29
+   ],
+   "result": "😀bé😀👩‍🌾#tag日本👩‍🌾👩‍🌾\n"
+  },
+  {
+   "name": "random 32",
+   "doc": "日本👩‍🌾bé\n😀",
+   "changes": [
+    1,
+    [
+     4,
+     "é👩‍🌾"
+    ],
+    7
+   ],
+   "result": "日é👩‍🌾🌾bé\n😀"
+  },
+  {
+   "name": "random 33",
+   "doc": "Garten\n[[Note]]- [ ] task#tag[[Note]] 日本b日本😀",
+   "changes": [
+    12,
+    [
+     4
+    ],
+    29
+   ],
+   "result": "Garten\n[[Not [ ] task#tag[[Note]] 日本b日本😀"
+  },
+  {
+   "name": "random 34",
+   "doc": "",
+   "changes": [],
+   "result": ""
+  },
+  {
+   "name": "random 35",
+   "doc": "\t👩‍🌾\n\nß\t[[Note]]\n😀\tß",
+   "changes": [
+    22,
+    [
+     1
+    ]
+   ],
+   "result": "\t👩‍🌾\n\nß\t[[Note]]\n😀\t"
+  },
+  {
+   "name": "random 36",
+   "doc": "bbaä 😀- [ ] taskGartenGartenb😀\n\nb\nGarten\té- [ ] taska",
+   "changes": [
+    42,
+    [
+     1,
+     "- [ ] task👩‍🌾"
+    ],
+    12
+   ],
+   "result": "bbaä 😀- [ ] taskGartenGartenb😀\n\nb\nGarten- [ ] task👩‍🌾é- [ ] taska"
+  },
+  {
+   "name": "random 37",
+   "doc": "- [ ] task😀[[Note]]éb- [ ] task😀ß\n\n#tag😀bbäb\t😀日本👩‍🌾😀\né\n👩‍🌾",
+   "changes": [
+    18,
+    [
+     2
+    ],
+    49
+   ],
+   "result": "- [ ] task😀[[Noteéb- [ ] task😀ß\n\n#tag😀bbäb\t😀日本👩‍🌾😀\né\n👩‍🌾"
+  },
+  {
+   "name": "random 38",
+   "doc": "- [ ] task- [ ] task#tagb日本👩‍🌾ß\n#tag\t\t[[Note]]#tagß- [ ] taské\n😀- [ ] taské\n#tag👩‍🌾😀#taga",
+   "changes": [
+    60,
+    [
+     0,
+     "a[[Note]]👩‍🌾"
+    ],
+    36
+   ],
+   "result": "- [ ] task- [ ] task#tagb日本👩‍🌾ß\n#tag\t\t[[Note]]#tagß- [ ] ta[[Note]]👩‍🌾aské\n😀- [ ] taské\n#tag👩‍🌾😀#taga"
+  },
+  {
+   "name": "random 39",
+   "doc": "ä",
+   "changes": [
+    1,
+    [
+     0,
+     "b"
+    ]
+   ],
+   "result": "äb"
+  },
+  {
+   "name": "random 40",
+   "doc": " 日本ä\t#tag👩‍🌾#tag#tag\täéb\n\té é😀\n",
+   "changes": [
+    32,
+    [
+     0,
+     "é"
+    ],
+    3
+   ],
+   "result": " 日本ä\t#tag👩‍🌾#tag#tag\täéb\n\té éé😀\n"
+  },
+  {
+   "name": "random 41",
+   "doc": "[[Note]]Garten👩‍🌾\n- [ ] task\né",
+   "changes": [
+    3,
+    [
+     1,
+     "ß日本é"
+    ],
+    28
+   ],
+   "result": "[[Nß日本éte]]Garten👩‍🌾\n- [ ] task\né"
+  },
+  {
+   "name": "random 42",
+   "doc": " b日本[[Note]]bé\n\t👩‍🌾- [ ] taskGarten \n[[Note]]Garten日本#tag- [ ] task日本😀bß#tag日本é",
+   "changes": [
+    2,
+    [
+     4,
+     "Garten"
+    ],
+    78
+   ],
+   "result": " bGartenNote]]bé\n\t👩‍🌾- [ ] taskGarten \n[[Note]]Garten日本#tag- [ ] task日本😀bß#tag日本é"
+  },
+  {
+   "name": "random 43",
+   "doc": "bé👩‍🌾\nba\tä😀- [ ] task日本\tb[[Note]]😀👩‍🌾éGarten",
+   "changes": [
+    18,
+    [
+     2,
+     "\t"
+    ],
+    30
+   ],
+   "result": "bé👩‍🌾\nba\tä😀- [ \ttask日本\tb[[Note]]😀👩‍🌾éGarten"
+  },
+  {
+   "name": "random 44",
+   "doc": "\n日本äéßßß👩‍🌾éß\nbä👩‍🌾#tag\n\n\nb#tagé👩‍🌾ä\t 😀é",
+   "changes": [
+    32,
+    [
+     2,
+     "ß👩‍🌾"
+    ],
+    8,
+    [
+     2,
+     "👩‍🌾éa"
+    ],
+    2,
+    [
+     2,
+     "ß"
+    ]
+   ],
+   "result": "\n日本äéßßß👩‍🌾éß\nbä👩‍🌾#tag\n\n\nb#ß👩‍🌾gé👩‍🌾ä👩‍🌾éa😀ß"
+  },
+  {
+   "name": "random 45",
+   "doc": "b- [ ] taskä#tag👩‍🌾éä\n😀\té👩‍🌾\tß[[Note]] b",
+   "changes": [
+    6,
+    [
+     2,
+     "é"
+    ],
+    30,
+    [
+     3,
+     "éé"
+    ],
+    2,
+    [
+     3,
+     "\té"
+    ],
+    1
+   ],
+   "result": "b- [ ]éaskä#tag👩‍🌾éä\n😀\té👩‍🌾\tß[ééte\téb"
+  },
+  {
+   "name": "random 46",
+   "doc": " ",
+   "changes": [
+    1,
+    [
+     0,
+     "😀 "
+    ]
+   ],
+   "result": " 😀 "
+  },
+  {
+   "name": "random 47",
+   "doc": "é",
+   "changes": [
+    [
+     1,
+     "a"
+    ],
+    1,
+    [
+     0,
+     "é",
+     ""
+    ]
+   ],
+   "result": "áé\n"
+  },
+  {
+   "name": "random 48",
+   "doc": "ä😀日本é aaäbaGartenb- [ ] taskßé[[Note]]日本",
+   "changes": [
+    40,
+    [
+     2
+    ]
+   ],
+   "result": "ä😀日本é aaäbaGartenb- [ ] taskßé[[Note]]"
+  },
+  {
+   "name": "random 49",
+   "doc": "b\t- [ ] taské[[Note]]äa#tag\nGarten👩‍🌾äé👩‍🌾 - [ ] taskaßßaßb",
+   "changes": [
+    16,
+    [
+     0,
+     "[[Note]]"
+    ],
+    26,
+    [
+     3,
+     "👩‍🌾👩‍🌾"
+    ],
+    12,
+    [
+     3,
+     "ßb\t"
+    ],
+    3,
+    [
+     0,
+     "ß[[Note]]"
+    ],
+    1
+   ],
+   "result": "b\t- [ ] taské[[[[Note]]Note]]äa#tag\nGarten👩‍🌾äé👩‍🌾👩‍🌾🌾 - [ ] tasßb\tßaßß[[Note]]b"
+  },
+  {
+   "name": "random 50",
+   "doc": "\t日本[[Note]]日本",
+   "changes": [
+    10,
+    [
+     3
+    ]
+   ],
+   "result": "\t日本[[Note]"
+  },
+  {
+   "name": "random 51",
+   "doc": "é äé👩‍🌾ää日本",
+   "changes": [
+    15
+   ],
+   "result": "é äé👩‍🌾ää日本"
+  },
+  {
+   "name": "random 52",
+   "doc": "[[Note]]é日本\néé#tag[[Note]][[Note]]a👩‍🌾#tag👩‍🌾[[Note]]- [ ] task- [ ] taskéé#tag#tag- [ ] task",
+   "changes": [
+    96,
+    [
+     0,
+     "[[Note]][[Note]]a"
+    ],
+    4,
+    [
+     0,
+     "日本\t#tag"
+    ],
+    2
+   ],
+   "result": "[[Note]]é日本\néé#tag[[Note]][[Note]]a👩‍🌾#tag👩‍🌾[[Note]]- [ ] task- [ ] taskéé#tag#tag- [ [[Note]][[Note]]a] ta日本\t#tagsk"
+  },
+  {
+   "name": "random 53",
+   "doc": "日本ß\n😀[[Note]]a- [ ] task\t ä日本#tag👩‍🌾éa日本éß- [ ] task",
+   "changes": [
+    30,
+    [
+     4,
+     "#tagaé"
+    ],
+    15,
+    [
+     1,
+     "😀 é"
+    ],
+    4,
+    [
+     0,
+     "Garten",
+     "\t"
+    ],
+    2
+   ],
+   "result": "日本ß\n😀[[Note]]a- [ ] task\t ä日本#tagaé👩‍🌾éa日本éß- [😀 é] taGarten\n\tsk"
+  },
+  {
+   "name": "random 54",
+   "doc": "äéb👩‍🌾#tag[[Note]]- [ ] task日本GartenGarten日本ß👩‍🌾Garten日本ß#tag#tagGartenß  #tag ",
+   "changes": [
+    21,
+    [
+     0,
+     "\téé"
+    ],
+    62
+   ],
+   "result": "äéb👩‍🌾#tag[[Note]]-\téé [ ] task日本GartenGarten日本ß👩‍🌾Garten日本ß#tag#tagGartenß  #tag "
+  },
+  {
+   "name": "random 55",
+   "doc": "\t \té👩‍🌾日本\n#taga😀a\n日本[[Note]][[Note]][[Note]]#tag😀",
+   "changes": [
+    54
+   ],
+   "result": "\t \té👩‍🌾日本\n#taga😀a\n日本[[Note]][[Note]][[Note]]#tag😀"
+  },
+  {
+   "name": "random 56",
+   "doc": "- [ ] task 👩‍🌾a日本",
+   "changes": [
+    5,
+    [
+     4
+    ],
+    4,
+    [
+     4
+    ],
+    2,
+    [
+     0,
+     "a"
+    ]
+   ],
+   "result": "- [ ]k 👩日本a"
+  },
+  {
+   "name": "random 57",
+   "doc": "日本aßäGartena日本béé日本é\ta\té👩‍🌾é- [ ] taskb\t",
+   "changes": [
+    46
+   ],
+   "result": "日本aßäGartena日本béé日本é\ta\té👩‍🌾é- [ ] taskb\t"
+  },
+  {
+   "name": "random 58",
+   "doc": "éé👩‍🌾#tagä#tag ß \täa",
+   "changes": [
+    7,
+    [
+     1,
+     "ä"
+    ],
+    1,
+    [
+     4,
+     "b日本"
+    ],
+    7,
+    [
+     0,
+     "aäa"
+    ],
+    2,
+    [
+     0,
+     "😀a"
+    ]
+   ],
+   "result": "éé👩‍🌾ätb日本tag ß \taäaäa😀a"
+  },
+  {
+   "name": "random 59",
+   "doc": "éé 👩‍🌾Garten  #tag\n#tag- [ ] task👩‍🌾 #tag\t",
+   "changes": [
+    26,
+    [
+     4
+    ],
+    18
+   ],
+   "result": "éé 👩‍🌾Garten  #tag\n#ta ] task👩‍🌾 #tag\t"
+  }
+ ],
+ "invalid": [
+  {
+   "name": "wrong length",
+   "doc": "abc",
+   "changes": [
+    2
+   ]
+  },
+  {
+   "name": "longer than the document",
+   "doc": "abc",
+   "changes": [
+    2,
+    [
+     5
+    ]
+   ]
+  },
+  {
+   "name": "not an array",
+   "doc": "a",
+   "changes": {
+    "a": 1
+   }
+  },
+  {
+   "name": "line that is not text",
+   "doc": "a",
+   "changes": [
+    [
+     1,
+     5
+    ]
+   ]
+  },
+  {
+   "name": "negative length",
+   "doc": "abc",
+   "changes": [
+    -1,
+    4
+   ],
+   "strict": true
+  },
+  {
+   "name": "fractional length",
+   "doc": "abc",
+   "changes": [
+    1.5,
+    1.5
+   ],
+   "strict": true
+  },
+  {
+   "name": "line break inside a line",
+   "doc": "a",
+   "changes": [
+    [
+     1,
+     "x\ny"
+    ]
+   ],
+   "strict": true
+  }
+ ]
+}
