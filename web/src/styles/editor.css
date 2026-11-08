@@ -146,7 +146,7 @@
 .cm-synapse.cm-unresolved {
   color: var(--text-muted);
   text-decoration-style: dashed;
-  text-decoration-color: var(--text-faint);
+  text-decoration-color: var(--accent-2);
 }
 .cm-md-active .cm-synapse,
 .cm-md-active .cm-link {
@@ -341,7 +341,7 @@
 .reading a.synapse.unresolved {
   color: var(--text-muted);
   text-decoration-style: dashed;
-  text-decoration-color: var(--text-faint);
+  text-decoration-color: var(--accent-2);
 }
 .reading blockquote {
   padding: 2px 0 2px 16px;

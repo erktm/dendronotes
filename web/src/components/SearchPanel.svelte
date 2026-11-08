@@ -284,14 +284,13 @@
     border: 1px solid var(--line);
     border-radius: 999px;
     background: var(--bg);
-    color: var(--text-muted);
+    color: var(--accent-2);
     font: inherit;
     font-size: var(--text-xs);
     cursor: pointer;
   }
   .tag:hover {
-    border-color: var(--accent);
-    color: var(--accent-strong);
+    border-color: var(--accent-2);
   }
   .n {
     color: var(--text-faint);

@@ -206,7 +206,7 @@
     background: var(--accent);
   }
   .unresolved .dot {
-    border: 1px dashed var(--text-faint);
+    border: 1px dashed var(--accent-2);
     background: transparent;
   }
   .label {

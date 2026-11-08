@@ -1,6 +1,8 @@
 // Per-browser settings, stored in localStorage. Nothing is written into the
 // soma, so the notes stay plain Markdown.
 
+import { DEFAULT_PALETTE, PALETTES, THEME_COLORS, type Palette } from '../palettes'
+
 export type ThemeChoice = 'system' | 'light' | 'dark'
 export type ViewMode = 'edit' | 'read'
 export type NoteFont = 'sans' | 'serif'
@@ -14,6 +16,7 @@ interface Stored {
   readableWidth: boolean
   noteFont: NoteFont
   theme: ThemeChoice
+  palette: Palette
   showDetails: boolean
   view: ViewMode
   updateSynapses: boolean
@@ -29,6 +32,7 @@ const DEFAULTS: Stored = {
   readableWidth: true,
   noteFont: 'sans',
   theme: 'system',
+  palette: DEFAULT_PALETTE,
   showDetails: true,
   view: 'edit',
   updateSynapses: true,
@@ -52,6 +56,7 @@ function load(): Stored {
       readableWidth: bool('readableWidth'),
       noteFont: pick('noteFont', ['sans', 'serif'] as const),
       theme: pick('theme', ['system', 'light', 'dark'] as const),
+      palette: pick('palette', PALETTES),
       showDetails: bool('showDetails'),
       view: pick('view', ['edit', 'read'] as const),
       updateSynapses: bool('updateSynapses'),
@@ -71,6 +76,7 @@ class Settings {
   readableWidth: boolean
   noteFont: NoteFont
   theme: ThemeChoice
+  palette: Palette
   showDetails: boolean
   view: ViewMode
   updateSynapses: boolean
@@ -86,6 +92,7 @@ class Settings {
     this.readableWidth = $state(s.readableWidth)
     this.noteFont = $state(s.noteFont)
     this.theme = $state(s.theme)
+    this.palette = $state(s.palette)
     this.showDetails = $state(s.showDetails)
     this.view = $state(s.view)
     this.updateSynapses = $state(s.updateSynapses)
@@ -102,6 +109,7 @@ class Settings {
           readableWidth: this.readableWidth,
           noteFont: this.noteFont,
           theme: this.theme,
+          palette: this.palette,
           showDetails: this.showDetails,
           view: this.view,
           updateSynapses: this.updateSynapses,
@@ -120,6 +128,13 @@ class Settings {
         const root = document.documentElement
         if (this.theme === 'system') delete root.dataset.theme
         else root.dataset.theme = this.theme
+      })
+      $effect(() => {
+        document.documentElement.dataset.palette = this.palette
+        const colors = THEME_COLORS[this.palette]
+        for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
+          meta.content = meta.media.includes('dark') ? colors.dark : colors.light
+        }
       })
     })
   }

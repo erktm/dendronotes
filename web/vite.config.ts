@@ -30,6 +30,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    // palettes.test.ts reads the design tokens as text (tokens.css?raw).
+    css: { include: [/tokens\.css/] },
   },
   server: {
     port: 5173,

@@ -3,6 +3,7 @@
   import { app } from '../lib/state/app.svelte'
   import { settings, type NoteFont, type ThemeChoice } from '../lib/state/settings.svelte'
   import { strings } from '../lib/strings'
+  import { PALETTES } from '../lib/palettes'
 
   let dialog: HTMLDialogElement | undefined = $state()
 
@@ -65,6 +66,32 @@
         {/each}
       </div>
     </div>
+    <div class="setting">
+      <span class="name" id="set-palette">{strings.settings.palette}<span class="desc">{strings.settings.paletteDesc}</span></span>
+    </div>
+    <div class="palettes" role="group" aria-labelledby="set-palette">
+      {#each PALETTES as p (p)}
+        <button
+          type="button"
+          class="palette"
+          aria-pressed={settings.palette === p}
+          title={strings.settings.palettes[p].desc}
+          onclick={() => (settings.palette = p)}
+        >
+          <!-- Drawn in the palette itself: data-palette scopes its tokens. -->
+          <span class="preview" data-palette={p} aria-hidden="true">
+            <span class="side"><span class="bar"></span><span class="bar short"></span></span>
+            <span class="body">
+              <span class="bar text"></span>
+              <span class="bar"></span>
+              <span class="dots"><span class="dot"></span><span class="dot"></span><span class="dot second"></span></span>
+            </span>
+          </span>
+          <span class="pname">{strings.settings.palettes[p].name}</span>
+        </button>
+      {/each}
+    </div>
+    <p class="note palette-desc">{strings.settings.palettes[settings.palette].desc}</p>
     <div class="setting">
       <label for="set-details">{strings.settings.details}<span class="desc">{strings.settings.detailsDesc}</span></label>
       <input id="set-details" class="switch" type="checkbox" role="switch" bind:checked={settings.showDetails} />
@@ -217,5 +244,95 @@
     background: var(--bg-raised);
     color: var(--text);
     box-shadow: var(--shadow);
+  }
+  .palettes {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .palette {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px 6px 7px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 550;
+    text-align: left;
+    cursor: pointer;
+  }
+  .palette:hover {
+    border-color: var(--line-strong);
+    color: var(--text);
+  }
+  .palette[aria-pressed='true'] {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+    color: var(--text);
+  }
+  .palette:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  .preview {
+    display: flex;
+    height: 52px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--bg);
+  }
+  .side,
+  .body {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 8px 7px;
+  }
+  .side {
+    width: 32%;
+    border-right: 1px solid var(--line);
+    background: var(--bg-raised);
+  }
+  .body {
+    flex: 1;
+  }
+  .bar {
+    width: 85%;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--text-faint);
+  }
+  .bar.short {
+    width: 55%;
+    background: var(--accent);
+  }
+  .bar.text {
+    width: 60%;
+    background: var(--text);
+  }
+  .dots {
+    display: flex;
+    gap: 4px;
+    margin-top: auto;
+  }
+  .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .dot.second {
+    background: var(--accent-2);
+  }
+  .pname {
+    padding: 0 2px;
+  }
+  .palette-desc {
+    margin: 8px 0 6px;
   }
 </style>

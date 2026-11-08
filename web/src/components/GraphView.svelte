@@ -132,6 +132,8 @@
   interface Palette {
     accent: string
     accentStrong: string
+    /** Notes that do not exist yet (unresolved synapses). */
+    accent2: string
     line: string
     text: string
     muted: string
@@ -147,6 +149,7 @@
     return {
       accent: v('--accent'),
       accentStrong: v('--accent-strong'),
+      accent2: v('--accent-2'),
       line: v('--line-strong'),
       text: v('--text'),
       muted: v('--text-muted'),
@@ -159,6 +162,7 @@
   // Colors follow the theme.
   $effect(() => {
     void settings.theme
+    void settings.palette
     const dark = window.matchMedia('(prefers-color-scheme: dark)')
     const update = () => {
       if (!canvas) return
@@ -221,7 +225,7 @@
         ctx.fillStyle = p.bg
         ctx.fill()
         ctx.setLineDash([2 * px, 2 * px])
-        ctx.strokeStyle = p.faint
+        ctx.strokeStyle = p.accent2
         ctx.lineWidth = 1.2 * px
         ctx.stroke()
         ctx.setLineDash([])
