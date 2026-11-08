@@ -96,6 +96,26 @@ func (s *Store) UserByUsername(ctx context.Context, name string) (User, error) {
 	return scanUser(s.db.QueryRowContext(ctx, `SELECT `+userCols+` FROM users WHERE username = ?`, name))
 }
 
+// UserByLogin returns the account someone signs in to with a password: by
+// user name, else – if login looks like an e-mail address – the one account
+// with a password that has this address (case-insensitive). An address
+// shared by several such accounts identifies none of them.
+func (s *Store) UserByLogin(ctx context.Context, login string) (User, error) {
+	u, err := s.UserByUsername(ctx, login)
+	if !errors.Is(err, ErrNotFound) || !strings.Contains(login, "@") {
+		return u, err
+	}
+	found, err := s.queryUsers(ctx, `SELECT `+userCols+` FROM users
+		WHERE source = 'local' AND email != '' AND lower(email) = lower(?) LIMIT 2`, login)
+	if err != nil {
+		return User{}, err
+	}
+	if len(found) != 1 {
+		return User{}, ErrNotFound
+	}
+	return found[0], nil
+}
+
 // UserByOIDC returns the account of an OpenID Connect identity.
 func (s *Store) UserByOIDC(ctx context.Context, issuer, subject string) (User, error) {
 	return scanUser(s.db.QueryRowContext(ctx, `SELECT `+userCols+` FROM users

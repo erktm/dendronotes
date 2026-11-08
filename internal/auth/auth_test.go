@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -227,6 +228,39 @@ func TestLoginRateLimits(t *testing.T) {
 	}
 	if rec := login(f.a, "anna", "correct horse"+strings.Repeat("x", 2000)); rec.Code == 200 {
 		t.Fatal("overlong password accepted")
+	}
+}
+
+func TestLoginWithEmail(t *testing.T) {
+	f := newFixture(t, ModeLocal)
+	ctx := context.Background()
+	hash, _ := HashPassword("correct horse", cheap)
+	if _, err := f.st.CreateUser(ctx, store.User{Username: "anna", Email: "Anna@Example.org", Role: store.RoleUser,
+		Source: store.SourceLocal, PasswordHash: hash}); err != nil {
+		t.Fatal(err)
+	}
+	from := func(remote, user, password string) int {
+		body, _ := json.Marshal(map[string]string{"username": user, "password": password})
+		req := httptest.NewRequest("POST", "/api/auth/login", strings.NewReader(string(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.RemoteAddr = remote
+		rec := httptest.NewRecorder()
+		f.a.HandleLogin(rec, req)
+		return rec.Code
+	}
+	if code := from("10.0.0.1:1", "anna@example.ORG", "correct horse"); code != 200 {
+		t.Fatalf("sign-in by e-mail: %d", code)
+	}
+	if code := from("10.0.0.1:1", "nobody@example.org", "correct horse"); code != 401 {
+		t.Fatalf("unknown address: %d", code)
+	}
+	// User name and address share one budget, even from different addresses.
+	for i := range 5 {
+		who := []string{"anna", "anna@example.org"}[i%2]
+		from(fmt.Sprintf("10.0.1.%d:1", i), who, "wrong")
+	}
+	if code := from("10.0.2.1:1", "anna@example.org", "correct horse"); code != 429 {
+		t.Fatalf("alternating user name and e-mail must hit the limit: %d", code)
 	}
 }
 

@@ -50,8 +50,15 @@ paths:
           application/json:
             schema:
               type: object
-              required: [password]
+              required: [username, password]
               properties:
+                username:
+                  type: string
+                  maxLength: 254
+                  description: >
+                    User name, or the e-mail address of an account with a password (case-insensitive);
+                    an address shared by several accounts signs in to none of them. User name and address
+                    share one limit of attempts.
                 password: { type: string, maxLength: 1024 }
       responses:
         "200":

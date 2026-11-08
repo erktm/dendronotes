@@ -2,6 +2,9 @@ package server
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -159,4 +162,33 @@ func TestAdminSomasSessionsServerAudit(t *testing.T) {
 	if len(audit) == 0 || audit[0].Action != "login" {
 		t.Errorf("audit: %+v", audit)
 	}
+}
+
+func TestLoginWithEmail(t *testing.T) {
+	s := newTestServer(t, testFS())
+	admin := newClient(t, s)
+	admin.login()
+	create := func(name, email string) {
+		t.Helper()
+		body := fmt.Sprintf(`{"username":%q,"email":%q,"password":"%s password long","role":"user"}`, name, email, name)
+		expect(t, admin.do("POST", "/api/admin/users", body), 201, "")
+	}
+	create("anna", "Anna@Example.org")
+	create("ben", "team@example.org")
+	create("cara", "team@example.org")
+
+	login := func(user, password string) *httptest.ResponseRecorder {
+		body, _ := json.Marshal(map[string]string{"username": user, "password": password})
+		return newClient(t, s).do("POST", "/api/auth/login", string(body))
+	}
+	// The address works in any case and signs in to that account.
+	rec := login(" anna@EXAMPLE.org ", "anna password long")
+	expect(t, rec, 200, "")
+	if u := decode[struct{ User store.User }](t, rec).User; u.Username != "anna" {
+		t.Errorf("signed in as %q", u.Username)
+	}
+	// An address shared by two accounts identifies neither (the shared
+	// attempt budget is tested in internal/auth).
+	expect(t, login("team@example.org", "ben password long"), 401, "invalid_credentials")
+	expect(t, login("ben", "ben password long"), 200, "")
 }

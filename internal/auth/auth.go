@@ -35,6 +35,7 @@ const (
 	cookieInsecure = "dendronotes_session"
 	maxPasswordLen = 1024
 	maxUsernameLen = 64
+	maxLoginLen    = 254 // user name or e-mail address at sign-in
 )
 
 // MinPasswordLength applies to passwords set in the app.
@@ -359,7 +360,8 @@ func (a *Authenticator) HandleMethods(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, m)
 }
 
-// HandleLogin checks user name and password and starts a session.
+// HandleLogin checks user name (or e-mail address) and password and starts a
+// session.
 func (a *Authenticator) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	if a.cfg.Mode != ModeLocal {
 		httpx.Error(w, http.StatusNotFound, "not_available")
@@ -375,10 +377,23 @@ func (a *Authenticator) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name := strings.TrimSpace(body.Username)
+	// The account is looked up before the limits so that its user name and
+	// its e-mail address share one budget of attempts.
+	var (
+		u   store.User
+		err = store.ErrNotFound
+	)
+	if name != "" && len(name) <= maxLoginLen {
+		u, err = a.store.UserByLogin(r.Context(), name)
+	}
+	userKey := "u:" + strings.ToLower(name)
+	if err == nil {
+		userKey = "u:" + strings.ToLower(u.Username)
+	}
 	for _, l := range []struct {
 		lim *rateLimiter
 		key string
-	}{{a.limiter, ip}, {a.byUser, "u:" + strings.ToLower(name)}} {
+	}{{a.limiter, ip}, {a.byUser, userKey}} {
 		if ok, wait := l.lim.allow(l.key); !ok {
 			secs := int(math.Ceil(wait.Seconds()))
 			w.Header().Set("Retry-After", strconv.Itoa(secs))
@@ -393,16 +408,15 @@ func (a *Authenticator) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		a.store.Audit(r.Context(), store.AuditEntry{Actor: name, Action: "login.failed", Detail: reason, IP: ip})
 		httpx.Error(w, http.StatusUnauthorized, "invalid_credentials")
 	}
-	if name == "" || len(name) > maxUsernameLen || body.Password == "" || len(body.Password) > maxPasswordLen {
+	if name == "" || len(name) > maxLoginLen || body.Password == "" || len(body.Password) > maxPasswordLen {
 		fail("malformed")
 		return
 	}
-	if a.cfg.PasswordsAdminOnly && !strings.EqualFold(name, a.cfg.AdminUsername) {
+	if a.cfg.PasswordsAdminOnly && (err != nil || !strings.EqualFold(u.Username, a.cfg.AdminUsername)) {
 		fail("password sign-in is off")
 		return
 	}
 
-	u, err := a.store.UserByUsername(r.Context(), name)
 	hash := a.dummy
 	if err == nil && u.Source == store.SourceLocal {
 		if h, perr := ParseHash(u.PasswordHash); perr == nil {

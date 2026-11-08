@@ -252,7 +252,8 @@ docker run --rm -it dendronotes:<version> hash-password
 ```
 
 Further accounts are created by an admin in the administration area. People sign in with user
-name and password (at least 10 characters) and can change the password in their profile.
+name or e-mail address and password (at least 10 characters) and can change the password in
+their profile. An e-mail address only works when exactly one account with a password has it.
 Passwords are stored as argon2id hashes. Sign-in attempts are rate-limited per client IP, per
 account and globally; sessions are stored only as SHA-256 hashes in `state.db` and sent as
 `HttpOnly`, `SameSite=Strict` cookies (`__Host-` prefixed and `Secure` over HTTPS).
