@@ -522,7 +522,6 @@ export const strings = {
     errorText: 'Something went wrong while loading it.',
     retry: 'Try again',
     readOnly: 'This note is a symbolic link and can only be read here.',
-    viewerOnly: 'This soma is shared with you for reading. Ask its owner if you want to edit it.',
   },
 
   saveState: {

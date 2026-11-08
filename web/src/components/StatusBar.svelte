@@ -1,14 +1,14 @@
 <script lang="ts">
   import Peers from './Peers.svelte'
   import type { NoteSession } from '../lib/state/note.svelte'
-  import { settings } from '../lib/state/settings.svelte'
+  import { viewOf } from '../lib/view'
   import { editorStatus } from '../lib/state/status.svelte'
   import { strings } from '../lib/strings'
 
   let { session }: { session: NoteSession } = $props()
 
   const words = $derived(session.content.match(/[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu)?.length ?? 0)
-  const editing = $derived(settings.view !== 'read')
+  const editing = $derived(viewOf(session) !== 'read')
 </script>
 
 <footer class="statusbar">

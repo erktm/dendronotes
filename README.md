@@ -82,7 +82,7 @@ admin's first soma.
 - **Editing together.** Everyone who has a note open – other people the soma is shared with,
   or your own second tab – edits the same text at once: changes appear right away, the others'
   cursors and selections show with their names, and the bar at the bottom of the note shows who
-  else is in it. Readers follow along without being able to change anything.
+  else is in it. Readers follow along in the reading view without being able to change anything.
 - **Saving.** The server writes a note about a second after typing stops, at the latest every
   five seconds while typing goes on ("Saving …", then "Saved"); ⌘S / Ctrl+S saves at once.
   Files keep their line breaks (also Windows-style) and a byte order mark. Without a

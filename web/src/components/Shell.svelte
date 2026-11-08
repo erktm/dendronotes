@@ -144,7 +144,7 @@
     } else if (key === 'o') {
       e.preventDefault()
       app.switcherOpen = true
-    } else if (key === 'e' && noteReady) {
+    } else if (key === 'e' && noteReady && !app.note?.readOnly) {
       e.preventDefault()
       settings.toggleView()
     } else if (key === ',') {
@@ -211,14 +211,17 @@
           <span class="save {save.kind}" role="status">{save.label}</span>
         {/if}
         {#if noteReady}
-          <div class="segmented" role="group" aria-label={strings.view.label}>
-            <button type="button" aria-pressed={settings.view === 'edit'} title={strings.view.editHint} onclick={() => (settings.view = 'edit')}>
-              {strings.view.edit}
-            </button>
-            <button type="button" aria-pressed={settings.view === 'read'} title={strings.view.readHint} onclick={() => (settings.view = 'read')}>
-              {strings.view.read}
-            </button>
-          </div>
+          <!-- Notes you can't change only have the reading view (lib/view.ts). -->
+          {#if !app.note?.readOnly}
+            <div class="segmented" role="group" aria-label={strings.view.label}>
+              <button type="button" aria-pressed={settings.view === 'edit'} title={strings.view.editHint} onclick={() => (settings.view = 'edit')}>
+                {strings.view.edit}
+              </button>
+              <button type="button" aria-pressed={settings.view === 'read'} title={strings.view.readHint} onclick={() => (settings.view = 'read')}>
+                {strings.view.read}
+              </button>
+            </div>
+          {/if}
           <button
             type="button"
             class="icon-btn"

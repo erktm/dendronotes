@@ -148,6 +148,16 @@ describe('NoteSession (editing together)', () => {
     expect(view.state.doc.toString()).toBe(server.text)
   })
 
+  it('tells viewers apart from symbolic links', async () => {
+    Object.assign(server, { doc: 'd1', text: 'x', version: 0, updates: [], dropEvery: 0, sent: 0 })
+    const viewer = new NoteSession('Shared.md', { toast: () => {}, canEdit: false, stream: async () => 'v' })
+    await viewer.load()
+    expect([viewer.readOnly, viewer.readOnlyReason]).toEqual([true, 'viewer'])
+    const editor = new NoteSession('Shared.md', { toast: () => {}, canEdit: true, stream: async () => 'e' })
+    await editor.load()
+    expect([editor.readOnly, editor.readOnlyReason]).toEqual([false, null])
+  })
+
   it('brings local changes back when the server lost the document', async () => {
     Object.assign(server, { doc: 'd1', text: 'one', version: 0, updates: [], dropEvery: 0, sent: 0, recovered: null })
     const { s, view } = await open('r')

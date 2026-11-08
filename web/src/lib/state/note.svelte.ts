@@ -93,6 +93,15 @@ export class NoteSession {
     return this.fileReadOnly || !this.host.canEdit
   }
 
+  /**
+   * Why nothing can be changed. The server marks notes read-only for viewers
+   * too, so the role decides first; a symbolic link otherwise.
+   */
+  get readOnlyReason(): 'viewer' | 'file' | null {
+    if (!this.host.canEdit) return 'viewer'
+    return this.fileReadOnly ? 'file' : null
+  }
+
   /** Changes exist that are not in the file yet. */
   get unsaved(): boolean {
     return this.pending > 0 || this.synced > this.savedVersion
