@@ -30,7 +30,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	}
 	defer cancel()
 	u, _ := auth.UserFrom(r.Context())
-	rt.Collab.AddStream(id, collab.User{ID: u.ID, Name: u.Name()})
+	rt.Collab.AddStream(id, collab.User{ID: u.ID, Name: u.Name(), Avatar: u.Avatar})
 	defer rt.Collab.RemoveStream(id)
 
 	rc := http.NewResponseController(w)

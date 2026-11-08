@@ -179,6 +179,72 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Error" }
+  /api/me/avatar:
+    put:
+      summary: Design your avatar (shown when you have no photo)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AvatarStyle" }
+      responses:
+        "200":
+          description: Your account with the new avatar.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/me/avatar/photo:
+    put:
+      summary: Upload a profile photo
+      description: >
+        A square PNG of 64 to 512 pixels, at most 1 MiB (the web app crops and scales the
+        photo in the browser). The server decodes it and stores it encoded anew, without
+        metadata. Error codes unsupported_type (415), too_large (413), invalid_photo (400).
+      requestBody:
+        required: true
+        content:
+          image/png:
+            schema: { type: string, format: binary }
+      responses:
+        "200":
+          description: Your account; avatar.photo is the new version.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "413": { $ref: "#/components/responses/Error" }
+        "415": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Remove your profile photo (the designed avatar shows again)
+      responses:
+        "200":
+          description: Your account.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/users/{id}/avatar:
+    get:
+      summary: The profile photo of an account
+      description: >
+        For the account itself, admins and people who share a soma with it; anyone else
+        gets 404, as for an account without photo. With v set to the current version
+        (avatar.photo) the answer may be cached for good.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: v, in: query, schema: { type: integer } }
+      responses:
+        "200":
+          description: The photo.
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+        "304": { description: Not modified (If-None-Match). }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/Error" }
   /api/users/search:
     get:
       summary: Find people to share a soma with (user and display name start with q)
@@ -977,6 +1043,20 @@ components:
         disabled: { type: boolean }
         createdAt: { type: string, format: date-time }
         lastLoginAt: { type: string, format: date-time }
+        avatar: { $ref: "#/components/schemas/Avatar" }
+    AvatarStyle:
+      type: object
+      required: [color, pattern, initials]
+      properties:
+        color: { type: integer, minimum: 0, maximum: 7 }
+        pattern: { type: string, enum: [plain, dendrite, rings, vesicles] }
+        initials: { type: string, maxLength: 2, description: Up to two letters or digits; empty means derived from the name. }
+    Avatar:
+      allOf:
+        - $ref: "#/components/schemas/AvatarStyle"
+        - type: object
+          properties:
+            photo: { type: integer, description: Version of the uploaded photo (GET /api/users/{id}/avatar?v=…), 0 when there is none. }
     CollabTarget:
       type: object
       required: [stream, path]
@@ -1008,7 +1088,9 @@ components:
             type: object
             properties:
               id: { type: string }
+              user: { type: integer, description: Id of the account. }
               name: { type: string }
+              avatar: { $ref: "#/components/schemas/Avatar" }
               color: { type: integer, minimum: 0, maximum: 7 }
               sel: { type: object, properties: { anchor: { type: integer }, head: { type: integer } } }
         conflict: { type: boolean }
@@ -1018,6 +1100,7 @@ components:
         id: { type: integer }
         username: { type: string }
         displayName: { type: string }
+        avatar: { $ref: "#/components/schemas/Avatar", description: Only in member lists. }
     Members:
       type: object
       properties:

@@ -43,6 +43,7 @@ type User struct {
 	Disabled     bool      `json:"disabled"`
 	CreatedAt    time.Time `json:"createdAt"`
 	LastLoginAt  time.Time `json:"lastLoginAt"`
+	Avatar       Avatar    `json:"avatar"`
 }
 
 // Name is what the UI shows: the display name, else the user name.
@@ -53,19 +54,22 @@ func (u User) Name() string {
 	return u.Username
 }
 
-const userCols = `id, username, display_name, email, role, source, password_hash, oidc_issuer, oidc_subject, disabled, created_at, last_login_at`
+const userCols = `id, username, display_name, email, role, source, password_hash, oidc_issuer, oidc_subject, disabled, created_at, last_login_at, avatar_style, avatar_photo`
 
 func scanUser(row interface{ Scan(...any) error }) (User, error) {
 	var (
 		u              User
 		created, login int64
+		style          string
+		photo          int64
 	)
 	err := row.Scan(&u.ID, &u.Username, &u.DisplayName, &u.Email, &u.Role, &u.Source, &u.PasswordHash,
-		&u.OIDCIssuer, &u.OIDCSubject, &u.Disabled, &created, &login)
+		&u.OIDCIssuer, &u.OIDCSubject, &u.Disabled, &created, &login, &style, &photo)
 	if errors.Is(err, sql.ErrNoRows) {
 		return User{}, ErrNotFound
 	}
 	u.CreatedAt, u.LastLoginAt = fromUnix(created), fromUnix(login)
+	u.Avatar = avatarOf(u.ID, style, photo)
 	return u, err
 }
 
@@ -300,13 +304,16 @@ func (s *Store) LookupSession(ctx context.Context, token string, ttl time.Durati
 	var (
 		u              User
 		created, login int64
+		style          string
+		photo          int64
 	)
 	err := row.Scan(&sid, &expires, &seen, &u.ID, &u.Username, &u.DisplayName, &u.Email, &u.Role, &u.Source,
-		&u.PasswordHash, &u.OIDCIssuer, &u.OIDCSubject, &u.Disabled, &created, &login)
+		&u.PasswordHash, &u.OIDCIssuer, &u.OIDCSubject, &u.Disabled, &created, &login, &style, &photo)
 	if err != nil {
 		return User{}, 0, false
 	}
 	u.CreatedAt, u.LastLoginAt = fromUnix(created), fromUnix(login)
+	u.Avatar = avatarOf(u.ID, style, photo)
 	now := s.unixNow()
 	if now >= expires || u.Disabled {
 		return User{}, 0, false

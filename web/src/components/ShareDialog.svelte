@@ -1,5 +1,6 @@
 <script lang="ts">
   import Icon from './Icon.svelte'
+  import Avatar from './Avatar.svelte'
   import { app } from '../lib/state/app.svelte'
   import * as api from '../lib/api/soma'
   import type { Member, Person } from '../lib/api/soma'
@@ -169,7 +170,7 @@
         {#each members as m (m.id)}
           {@const me = m.id === app.user?.id}
           <li>
-            <span class="avatar" aria-hidden="true"><Icon name="user" size={14} /></span>
+            <Avatar id={m.id} name={name(m)} avatar={m.avatar} size={28} />
             <span class="who">
               <strong>{name(m)}{#if me}<span class="faint"> ({t.you})</span>{/if}</strong>
               <span class="faint">{m.username}</span>

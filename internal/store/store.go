@@ -83,6 +83,13 @@ var migrations = []string{
 		detail   TEXT NOT NULL DEFAULT '',
 		ip       TEXT NOT NULL DEFAULT ''
 	);`,
+	// 2: avatars – a designed picture per account and an optional photo
+	`ALTER TABLE users ADD COLUMN avatar_style TEXT NOT NULL DEFAULT '';
+	ALTER TABLE users ADD COLUMN avatar_photo INTEGER NOT NULL DEFAULT 0;
+	CREATE TABLE avatars (
+		user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+		image   BLOB NOT NULL
+	);`,
 }
 
 // Store is the state database.

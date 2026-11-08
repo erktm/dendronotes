@@ -22,6 +22,7 @@ import (
 
 	"dendronotes/internal/events"
 	"dendronotes/internal/soma"
+	"dendronotes/internal/store"
 )
 
 // Errors for the HTTP layer (besides those of internal/soma).
@@ -46,8 +47,9 @@ const (
 
 // User is the account behind an event stream.
 type User struct {
-	ID   int64
-	Name string
+	ID     int64
+	Name   string
+	Avatar store.Avatar
 }
 
 // Update is one change set of one client, in CodeMirror's JSON form.
@@ -64,10 +66,13 @@ type Selection struct {
 
 // Peer is someone in a note, as others see them.
 type Peer struct {
-	ID    string     `json:"id"`
-	Name  string     `json:"name"`
-	Color int        `json:"color"`
-	Sel   *Selection `json:"sel,omitempty"`
+	ID   string `json:"id"`
+	User int64  `json:"user"`
+	Name string `json:"name"`
+	// Avatar of the account, shown with the others in the note.
+	Avatar store.Avatar `json:"avatar"`
+	Color  int          `json:"color"`
+	Sel    *Selection   `json:"sel,omitempty"`
 }
 
 // Recover carries the state of a client that lost its document (server

@@ -254,7 +254,7 @@ func (d *doc) notice(kind string, extra map[string]any) {
 func (d *doc) peerList() []Peer {
 	out := make([]Peer, 0, len(d.peers))
 	for _, p := range d.peers {
-		out = append(out, Peer{ID: p.id, Name: p.user.Name, Color: p.color, Sel: p.sel})
+		out = append(out, Peer{ID: p.id, User: p.user.ID, Name: p.user.Name, Avatar: p.user.Avatar, Color: p.color, Sel: p.sel})
 	}
 	return out
 }

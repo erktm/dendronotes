@@ -1,5 +1,6 @@
 <script lang="ts">
   import Icon from './Icon.svelte'
+  import Avatar from './Avatar.svelte'
   import { app } from '../lib/state/app.svelte'
   import * as admin from '../lib/api/admin'
   import type { User } from '../lib/api/soma'
@@ -141,9 +142,14 @@
             {@const me = u.id === app.user?.id}
             <tr>
               <td>
-                <strong>{u.displayName || u.username}</strong>
-                {#if me}<span class="admin-pill accent">{t.you}</span>{/if}
-                <div class="admin-faint">{u.username}{u.email ? ` · ${u.email}` : ''}</div>
+                <div class="person">
+                  <Avatar id={u.id} name={u.displayName || u.username} avatar={u.avatar} size={30} />
+                  <div>
+                    <strong>{u.displayName || u.username}</strong>
+                    {#if me}<span class="admin-pill accent">{t.you}</span>{/if}
+                    <div class="admin-faint">{u.username}{u.email ? ` · ${u.email}` : ''}</div>
+                  </div>
+                </div>
               </td>
               <td><span class="admin-pill" class:accent={u.role === 'admin'}>{u.role === 'admin' ? t.roleAdmin : t.roleUser}</span></td>
               <td class="admin-muted">{strings.profile.sources[u.source] ?? u.source}</td>
@@ -218,6 +224,11 @@
 </dialog>
 
 <style>
+  .person {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
   .error {
     margin-top: 10px !important;
     color: var(--err) !important;

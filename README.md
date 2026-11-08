@@ -81,7 +81,7 @@ admin's first soma.
   that was changed by someone else in that moment is left alone and reported.
 - **Editing together.** Everyone who has a note open – other people the soma is shared with,
   or your own second tab – edits the same text at once: changes appear right away, the others'
-  cursors and selections show with their names, and their initials appear at the top. Readers
+  cursors and selections show with their names, and their pictures appear at the top. Readers
   follow along without being able to change anything.
 - **Saving.** The server writes a note about a second after typing stops, at the latest every
   five seconds while typing goes on ("Saving …", then "Saved"); ⌘S / Ctrl+S saves at once.
@@ -132,8 +132,14 @@ up to `DENDRONOTES_MAX_UPLOAD_MB`. The content must match the extension.
   else is in and lets you leave. For readers the soma is read-only: no editing, uploads,
   renaming or deleting – the server refuses such requests as well. Changes to sharing take
   effect at once, also in browsers that have the soma open.
-- **Profile** (click your name at the bottom of the sidebar): display name, e-mail and, for
-  accounts with a password, a new password. Changing it signs out your other sessions.
+- **Profile** (your picture at the top right, which also signs you out): profile picture,
+  display name, e-mail and, for accounts with a password, a new password. Changing it signs
+  out your other sessions.
+- **Profile pictures**: design one from a color, a pattern (dendrite, myelin rings, vesicles)
+  and your initials, or upload a photo and place it in a circle. The browser crops the photo to
+  a small square; the server stores it in `state.db`, encoded anew without metadata, and shows
+  it only to people you share a soma with (and to admins). Pictures appear in the header, next
+  to the others editing a note, in the sharing dialog and in the administration.
 - **Administration** (the shield in the left rail, admins only):
   - *Users*: create accounts, change role, disable, set a new password, sign out everywhere,
     delete. A deleted account's somas go to an account you choose or to the trash. The last
@@ -178,8 +184,8 @@ docker run -d --name dendronotes -p 8080:8080 \
 The image runs as UID 65532. `/somas` holds the notes (one folder per soma), `/data` the
 account database `state.db` and the search indexes; both must be writable.
 
-**Backups** need both: the somas directory and `state.db` (accounts, sessions, who owns which
-soma). Stop the container for the backup or use a volume snapshot, since `state.db` is written
+**Backups** need both: the somas directory and `state.db` (accounts, sessions, profile pictures,
+who owns which soma). Stop the container for the backup or use a volume snapshot, since `state.db` is written
 while running. The indexes in `/data/index` are caches and can be left out. Before a new
 release changes the database format, dendronotes copies it to `state.db.v<n>.bak`; it refuses
 to open a database written by a newer release.
@@ -351,6 +357,7 @@ which a test keeps in sync with the server.
 |-----------------------------------------|------------------------------------------------------|
 | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | Session handling         |
 | `PATCH /api/me`, `POST /api/me/password` | Own profile and password                            |
+| `PUT /api/me/avatar`, `PUT`/`DELETE /api/me/avatar/photo`, `GET /api/users/{id}/avatar` | Profile picture: design, photo |
 | `GET /api/somas`, `POST /api/somas`     | The account's somas; create one                      |
 | `PATCH /api/somas/{soma}`, `DELETE /api/somas/{soma}` | Rename, hand over or delete a soma (owner) |
 | `GET /api/somas/{soma}/tree`            | All visible files and folders                        |
@@ -396,7 +403,8 @@ cmd/dendronotes/   entry point: serve, hash-password, healthcheck, version
 internal/config/   read and validate DENDRONOTES_* environment variables
 internal/soma/     soma access exclusively through os.Root (tree, notes, move, trash)
 internal/mdparse/  synapses and tags of a note (same rules as web/src/lib/synapses.ts)
-internal/store/    state.db: accounts, sessions, somas and members, audit log (versioned migrations)
+internal/store/    state.db: accounts, sessions, avatars, somas and members, audit log (versioned migrations)
+internal/avatar/   checks uploaded profile photos and encodes them anew (square PNG, no metadata)
 internal/somas/    soma manager: opens somas on demand (index, watcher, live updates), closes idle ones
 internal/collab/   editing together: live documents, change sets (UTF-16), saving, 3-way merge
 internal/index/    SQLite cache per soma: versions, synapses, tags, full-text search

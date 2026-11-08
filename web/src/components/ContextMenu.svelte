@@ -10,10 +10,17 @@
 </script>
 
 <script lang="ts">
+  import type { Snippet } from 'svelte'
   import Icon from './Icon.svelte'
   import { cssVars } from '../lib/actions'
 
-  let { x, y, items, onclose }: { x: number; y: number; items: MenuItem[]; onclose: () => void } = $props()
+  let {
+    x,
+    y,
+    items,
+    onclose,
+    header,
+  }: { x: number; y: number; items: MenuItem[]; onclose: () => void; header?: Snippet } = $props()
 
   let menu: HTMLDivElement | undefined = $state()
   let pos = $state({ left: -9999, top: -9999 })
@@ -60,6 +67,9 @@
   use:cssVars={{ left: `${pos.left}px`, top: `${pos.top}px` }}
   {onkeydown}
 >
+  {#if header}
+    <div class="header">{@render header()}</div>
+  {/if}
   {#each items as item (item.label)}
     <button
       type="button"
@@ -108,5 +118,10 @@
   }
   .danger {
     color: var(--err);
+  }
+  .header {
+    margin: 0 0 5px;
+    padding: 6px var(--space-3) 10px;
+    border-bottom: 1px solid var(--line);
   }
 </style>

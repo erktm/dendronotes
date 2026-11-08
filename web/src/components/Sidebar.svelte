@@ -88,18 +88,6 @@
 
   <footer class="foot">
     <StatusChip state={shownState} />
-    <button
-      type="button"
-      class="user"
-      title={strings.auth.signedInAs(app.user?.username ?? '')}
-      aria-label={strings.auth.profile}
-      onclick={() => (app.profileOpen = true)}
-    >
-      {app.user?.displayName || app.user?.username}
-    </button>
-    <button type="button" aria-label={strings.auth.signOut} title={strings.auth.signOut} onclick={() => void app.logout()}>
-      <Icon name="logout" size={17} />
-    </button>
   </footer>
 </aside>
 
@@ -150,18 +138,5 @@
     gap: var(--space-2);
     padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
     border-top: 1px solid var(--line);
-  }
-  .user {
-    display: block;
-    flex: 1;
-    width: auto;
-    min-width: 0;
-    padding: 0 6px;
-    overflow: hidden;
-    color: var(--text-muted);
-    font-size: var(--text-sm);
-    text-align: right;
-    white-space: nowrap;
-    text-overflow: ellipsis;
   }
 </style>

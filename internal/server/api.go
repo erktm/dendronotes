@@ -37,6 +37,10 @@ func (s *Server) routes() []route {
 
 		{"PATCH", "/api/me", s.handleUpdateProfile, signedIn},
 		{"POST", "/api/me/password", s.handleChangePassword, signedIn},
+		{"PUT", "/api/me/avatar", s.handleSetAvatar, signedIn},
+		{"PUT", "/api/me/avatar/photo", s.handleSetAvatarPhoto, signedIn},
+		{"DELETE", "/api/me/avatar/photo", s.handleRemoveAvatarPhoto, signedIn},
+		{"GET", "/api/users/{id}/avatar", s.handleAvatarPhoto, signedIn},
 
 		{"GET", "/api/somas", s.handleListSomas, signedIn},
 		{"POST", "/api/somas", s.handleCreateSoma, signedIn},

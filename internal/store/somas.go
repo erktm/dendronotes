@@ -42,6 +42,9 @@ type Person struct {
 	ID          int64  `json:"id"`
 	Username    string `json:"username"`
 	DisplayName string `json:"displayName"`
+	// Avatar is set where people are shown with their picture (members,
+	// search results).
+	Avatar *Avatar `json:"avatar,omitempty"`
 }
 
 // Membership is a soma as one user sees it.
@@ -254,7 +257,7 @@ func (s *Store) MemberRole(ctx context.Context, somaID string, userID int64) (st
 
 // Members lists the people with access to a soma, owner first.
 func (s *Store) Members(ctx context.Context, somaID string) ([]Member, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT u.id, u.username, u.display_name, m.role
+	rows, err := s.db.QueryContext(ctx, `SELECT u.id, u.username, u.display_name, u.avatar_style, u.avatar_photo, m.role
 		FROM soma_members m JOIN users u ON u.id = m.user_id WHERE m.soma_id = ?
 		ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'editor' THEN 1 ELSE 2 END, u.username COLLATE NOCASE`, somaID)
 	if err != nil {
@@ -263,10 +266,16 @@ func (s *Store) Members(ctx context.Context, somaID string) ([]Member, error) {
 	defer rows.Close()
 	out := []Member{}
 	for rows.Next() {
-		var m Member
-		if err := rows.Scan(&m.ID, &m.Username, &m.DisplayName, &m.Role); err != nil {
+		var (
+			m     Member
+			style string
+			photo int64
+		)
+		if err := rows.Scan(&m.ID, &m.Username, &m.DisplayName, &style, &photo, &m.Role); err != nil {
 			return nil, err
 		}
+		a := avatarOf(m.ID, style, photo)
+		m.Avatar = &a
 		out = append(out, m)
 	}
 	return out, rows.Err()

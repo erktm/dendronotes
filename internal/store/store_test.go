@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/ncruces/go-sqlite3/driver"
 )
 
 var discard = slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -250,6 +252,109 @@ func TestReopenAndVersionChecks(t *testing.T) {
 		t.Errorf("a newer schema must be refused, not touched: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, FileName)); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestAvatars(t *testing.T) {
+	s := open(t, t.TempDir())
+	ctx := context.Background()
+	anna := user(t, s, "anna", RoleAdmin)
+	ben := user(t, s, "ben", RoleUser)
+	cleo := user(t, s, "cleo", RoleUser)
+
+	// Without a design every account gets a color from its id.
+	if a := anna.Avatar; a.Pattern != "plain" || a.Color != int(anna.ID%AvatarColors) || a.Photo != 0 || a.Initials != "" {
+		t.Errorf("default avatar: %+v", a)
+	}
+
+	u, err := s.SetAvatarStyle(ctx, ben.ID, AvatarStyle{Color: 5, Pattern: "rings", Initials: " bö "})
+	if err != nil || u.Avatar != (Avatar{Color: 5, Pattern: "rings", Initials: "BÖ"}) {
+		t.Fatalf("set style: %+v %v", u.Avatar, err)
+	}
+	for _, bad := range []AvatarStyle{
+		{Color: AvatarColors, Pattern: "plain"},
+		{Color: -1, Pattern: "plain"},
+		{Color: 0, Pattern: "<script>"},
+		{Color: 0, Pattern: "plain", Initials: "ABC"},
+		{Color: 0, Pattern: "plain", Initials: "A!"},
+	} {
+		if _, err := s.SetAvatarStyle(ctx, ben.ID, bad); !errors.Is(err, ErrInvalidAvatar) {
+			t.Errorf("%+v: want ErrInvalidAvatar, got %v", bad, err)
+		}
+	}
+
+	// Photos get a new version on every upload and leave the design alone.
+	u, err = s.SetAvatarPhoto(ctx, ben.ID, []byte("one"))
+	if err != nil || u.Avatar.Photo == 0 || u.Avatar.Pattern != "rings" {
+		t.Fatalf("set photo: %+v %v", u.Avatar, err)
+	}
+	first := u.Avatar.Photo
+	u, _ = s.SetAvatarPhoto(ctx, ben.ID, []byte("two"))
+	if u.Avatar.Photo <= first {
+		t.Errorf("version did not move on: %d → %d", first, u.Avatar.Photo)
+	}
+	if img, v, err := s.AvatarPhoto(ctx, ben.ID); err != nil || string(img) != "two" || v != u.Avatar.Photo {
+		t.Errorf("photo: %q %d %v", img, v, err)
+	}
+	// The session lookup carries the avatar as well.
+	token, err := s.CreateSession(ctx, ben.ID, time.Hour, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if su, _, ok := s.LookupSession(ctx, token, time.Hour); !ok || su.Avatar != u.Avatar {
+		t.Errorf("session user avatar: %+v %v", su.Avatar, ok)
+	}
+	u, err = s.RemoveAvatarPhoto(ctx, ben.ID)
+	if err != nil || u.Avatar.Photo != 0 {
+		t.Fatalf("remove photo: %+v %v", u.Avatar, err)
+	}
+	if _, _, err := s.AvatarPhoto(ctx, ben.ID); !errors.Is(err, ErrNotFound) {
+		t.Errorf("removed photo: %v", err)
+	}
+	if _, err := s.SetAvatarPhoto(ctx, 9999, []byte("x")); !errors.Is(err, ErrNotFound) {
+		t.Errorf("unknown account: %v", err)
+	}
+
+	// Members carry their avatars; sharing a soma is what links people.
+	if _, err := s.CreateSoma(ctx, "somaaaaaaa", "Shared", "shared", anna.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetMember(ctx, "somaaaaaaa", ben.ID, MemberViewer); err != nil {
+		t.Fatal(err)
+	}
+	members, err := s.Members(ctx, "somaaaaaaa")
+	if err != nil || len(members) != 2 || members[1].Avatar == nil || members[1].Avatar.Pattern != "rings" {
+		t.Fatalf("members: %+v %v", members, err)
+	}
+	for _, c := range []struct {
+		a, b int64
+		want bool
+	}{{anna.ID, ben.ID, true}, {ben.ID, anna.ID, true}, {anna.ID, cleo.ID, false}, {cleo.ID, cleo.ID, false}} {
+		if got, err := s.SharesSoma(ctx, c.a, c.b); err != nil || got != c.want {
+			t.Errorf("SharesSoma(%d, %d) = %v %v", c.a, c.b, got, err)
+		}
+	}
+}
+
+func TestMigrationKeepsAccounts(t *testing.T) {
+	// A state.db at schema version 1 (before avatars) opens and keeps its accounts.
+	dir := t.TempDir()
+	db, err := driver.Open("file:" + filepath.ToSlash(filepath.Join(dir, FileName)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(migrations[0] + `; PRAGMA user_version = 1;
+		INSERT INTO users (username, role, source, created_at) VALUES ('anna', 'admin', 'local', 1)`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	s := open(t, dir)
+	u, err := s.UserByUsername(context.Background(), "anna")
+	if err != nil || u.Avatar.Pattern != "plain" {
+		t.Fatalf("after migration: %+v %v", u, err)
+	}
+	if _, err := s.SetAvatarPhoto(context.Background(), u.ID, []byte("x")); err != nil {
 		t.Error(err)
 	}
 }

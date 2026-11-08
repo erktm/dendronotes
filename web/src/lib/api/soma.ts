@@ -36,6 +36,24 @@ export interface User {
   disabled: boolean
   createdAt: string
   lastLoginAt: string
+  avatar: Avatar
+}
+
+export type AvatarPattern = 'plain' | 'dendrite' | 'rings' | 'vesicles'
+
+/** The designed part of an avatar. */
+export interface AvatarStyle {
+  /** Index into the avatar colors (0 … 7). */
+  color: number
+  pattern: AvatarPattern
+  /** Up to two letters or digits; empty: taken from the name. */
+  initials: string
+}
+
+/** How an account appears: its design and, if uploaded, a photo shown instead. */
+export interface Avatar extends AvatarStyle {
+  /** Version of the photo (GET /api/users/{id}/avatar?v=…), 0 when there is none. */
+  photo: number
 }
 
 export interface Me {
@@ -50,6 +68,8 @@ export interface Person {
   id: number
   username: string
   displayName: string
+  /** Set in member lists. */
+  avatar?: Avatar
 }
 
 /** A soma as the signed-in account sees it. */
@@ -140,6 +160,10 @@ export const searchUsers = (q: string, signal?: AbortSignal) =>
 export const deleteSoma = (id: string) => request<{ id: string }>('DELETE', `/api/somas/${encodeURIComponent(id)}`)
 
 export const updateProfile = (body: { displayName?: string; email?: string }) => request<User>('PATCH', '/api/me', { body })
+export const setAvatar = (style: AvatarStyle) => request<User>('PUT', '/api/me/avatar', { body: style })
+/** A square PNG (64 … 512 pixels) the browser has cropped. */
+export const uploadAvatarPhoto = (png: Blob) => request<User>('PUT', '/api/me/avatar/photo', { raw: png })
+export const removeAvatarPhoto = () => request<User>('DELETE', '/api/me/avatar/photo')
 export const changePassword = (current: string, next: string) =>
   request<{ ok: boolean }>('POST', '/api/me/password', { body: { current, new: next } })
 

@@ -8,6 +8,7 @@
   import AdminView from './AdminView.svelte'
   import PromptDialog from './PromptDialog.svelte'
   import ProfileDialog from './ProfileDialog.svelte'
+  import ProfileMenu from './ProfileMenu.svelte'
   import ShareDialog from './ShareDialog.svelte'
   import Peers from './Peers.svelte'
   import EmptyState from './EmptyState.svelte'
@@ -234,6 +235,7 @@
             <Icon name="panel" size={18} />
           </button>
         {/if}
+        <ProfileMenu />
       </div>
     </header>
     <div class="workspace">

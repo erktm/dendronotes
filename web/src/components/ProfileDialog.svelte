@@ -1,5 +1,6 @@
 <script lang="ts">
   import Icon from './Icon.svelte'
+  import AvatarEditor from './AvatarEditor.svelte'
   import { app } from '../lib/state/app.svelte'
   import * as api from '../lib/api/soma'
   import { errorMessage } from '../lib/errors'
@@ -70,13 +71,11 @@
   </header>
 
   {#if app.user}
+    <AvatarEditor user={app.user} />
     <form class="section" onsubmit={saveProfile}>
       <p class="who">
-        <span class="avatar" aria-hidden="true"><Icon name="user" size={18} /></span>
-        <span>
-          <strong>{app.user.username}</strong>
-          <span class="muted">{strings.profile.signsInVia(strings.profile.sources[app.user.source] ?? app.user.source)}</span>
-        </span>
+        <strong>{app.user.username}</strong>
+        <span class="muted">{strings.profile.signsInVia(strings.profile.sources[app.user.source] ?? app.user.source)}</span>
       </p>
       <label for="profile-name">{strings.profile.displayName}</label>
       <input id="profile-name" bind:value={displayName} maxlength="100" autocomplete="name" readonly={managed} />
@@ -165,22 +164,8 @@
   }
   .who {
     display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 8px;
-  }
-  .who > span:last-child {
-    display: flex;
     flex-direction: column;
-  }
-  .avatar {
-    display: grid;
-    place-items: center;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    background: var(--accent-soft);
-    color: var(--accent-strong);
+    margin: 0 0 4px;
   }
   .muted,
   .hint {

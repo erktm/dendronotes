@@ -2,6 +2,7 @@
 // its event stream and then pushes CodeMirror change sets for the version it
 // has seen; everyone's updates come back on the event stream.
 
+import type { Avatar } from './soma'
 import { request } from './client'
 import { somaBase } from './base'
 
@@ -13,7 +14,10 @@ export interface WireUpdate {
 
 export interface Peer {
   id: string
+  /** Id of the account. */
+  user: number
   name: string
+  avatar: Avatar
   /** Index into the fixed cursor palette (peer-c0 … peer-c7). */
   color: number
   sel?: { anchor: number; head: number }
