@@ -395,6 +395,10 @@
 </script>
 
 <section class="graph" aria-label={selection ? strings.graph.label(selection.nodes.length, selection.edges.length) : strings.graph.title}>
+  {#if selection && selection.edges.length === 0 && !local}
+    <!-- Behind the canvas and out of the way of notes without synapses. -->
+    <p class="state backdrop" class:low={selection.nodes.length > 0}>{strings.graph.empty}</p>
+  {/if}
   <!-- Drawn for the eye; the list below carries the same notes for assistive technology. -->
   <canvas
     bind:this={canvas}
@@ -454,8 +458,6 @@
 
   {#if !data && !loaded}
     <p class="state">{strings.graph.loading}</p>
-  {:else if selection && selection.edges.length === 0 && !local}
-    <p class="state">{strings.graph.empty}</p>
   {/if}
 
   <!-- The same notes for screen readers and keyboards. -->
@@ -481,6 +483,7 @@
     background: var(--bg);
   }
   canvas {
+    position: relative; /* above the backdrop hint */
     display: block;
     width: 100%;
     height: 100%;
@@ -594,6 +597,16 @@
     color: var(--text-muted);
     text-align: center;
     transform: translate(-50%, -50%);
+  }
+  .state.backdrop {
+    color: var(--text-faint);
+    font-size: var(--text-sm);
+    pointer-events: none;
+  }
+  .state.backdrop.low {
+    top: auto;
+    bottom: 44px;
+    transform: translateX(-50%);
   }
   /* Hidden for the eye, there for screen readers; shown when tabbed into. */
   .note-list {
