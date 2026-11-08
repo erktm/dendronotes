@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { closeOnBackdrop } from '../lib/actions'
   import { app } from '../lib/state/app.svelte'
   import { strings } from '../lib/strings'
 
@@ -13,6 +14,7 @@
 
 <dialog
   bind:this={dialog}
+  use:closeOnBackdrop
   aria-labelledby="confirm-title"
   aria-describedby="confirm-text"
   onclose={() => {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { closeOnBackdrop } from '../lib/actions'
   import Icon from './Icon.svelte'
   import Avatar from './Avatar.svelte'
   import { app } from '../lib/state/app.svelte'
@@ -118,7 +119,7 @@
   }
 </script>
 
-<dialog bind:this={dialog} aria-labelledby="share-title" onclose={() => (app.shareOpen = false)}>
+<dialog bind:this={dialog} use:closeOnBackdrop aria-labelledby="share-title" onclose={() => (app.shareOpen = false)}>
   <header>
     <h2 id="share-title">{soma ? (owner ? t.title(soma.name) : t.membersTitle(soma.name)) : ''}</h2>
     <button type="button" class="icon-btn" aria-label={t.close} onclick={() => (app.shareOpen = false)}>

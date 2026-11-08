@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { closeOnBackdrop } from '../lib/actions'
   import { app } from '../lib/state/app.svelte'
   import * as admin from '../lib/api/admin'
   import type { AdminSoma } from '../lib/api/admin'
@@ -114,7 +115,7 @@
   {/if}
 </div>
 
-<dialog class="admin-dialog" bind:this={dialog} aria-labelledby="transfer-title">
+<dialog class="admin-dialog" bind:this={dialog} use:closeOnBackdrop aria-labelledby="transfer-title">
   <form onsubmit={transfer}>
     <h2 id="transfer-title">{t.transferTitle(target?.name ?? '')}</h2>
     <label for="transfer-owner">{t.owner}</label>

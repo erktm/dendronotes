@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { closeOnBackdrop } from '../lib/actions'
   import Icon from './Icon.svelte'
   import { app } from '../lib/state/app.svelte'
   import { settings, type NoteFont, type ThemeChoice } from '../lib/state/settings.svelte'
@@ -24,7 +25,7 @@
   ]
 </script>
 
-<dialog bind:this={dialog} aria-labelledby="settings-title" onclose={() => (app.settingsOpen = false)}>
+<dialog bind:this={dialog} use:closeOnBackdrop aria-labelledby="settings-title" onclose={() => (app.settingsOpen = false)}>
   <header>
     <h2 id="settings-title">{strings.settings.title}</h2>
     <button type="button" class="icon-btn" aria-label={strings.settings.close} onclick={() => (app.settingsOpen = false)}>

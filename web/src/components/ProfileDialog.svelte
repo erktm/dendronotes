@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { closeOnBackdrop } from '../lib/actions'
   import Icon from './Icon.svelte'
   import AvatarEditor from './AvatarEditor.svelte'
   import { app } from '../lib/state/app.svelte'
@@ -62,7 +63,7 @@
   }
 </script>
 
-<dialog bind:this={dialog} aria-labelledby="profile-title" onclose={() => (app.profileOpen = false)}>
+<dialog bind:this={dialog} use:closeOnBackdrop aria-labelledby="profile-title" onclose={() => (app.profileOpen = false)}>
   <header>
     <h2 id="profile-title">{strings.profile.title}</h2>
     <button type="button" class="icon-btn" aria-label={strings.profile.close} onclick={() => (app.profileOpen = false)}>

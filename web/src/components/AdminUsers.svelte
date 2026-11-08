@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { closeOnBackdrop } from '../lib/actions'
   import Icon from './Icon.svelte'
   import Avatar from './Avatar.svelte'
   import { app } from '../lib/state/app.svelte'
@@ -176,7 +177,7 @@
   {/if}
 </div>
 
-<dialog class="admin-dialog" bind:this={dialog} aria-labelledby="user-dialog-title">
+<dialog class="admin-dialog" bind:this={dialog} use:closeOnBackdrop aria-labelledby="user-dialog-title">
   <form onsubmit={submit}>
     <h2 id="user-dialog-title">{title}</h2>
     {#if mode === 'create' || mode === 'edit'}

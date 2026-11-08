@@ -17,3 +17,32 @@ export function focusOnMount(node: HTMLElement, select = false) {
     if (select && node instanceof HTMLInputElement) node.select()
   })
 }
+
+/**
+ * Closes a modal <dialog> on a click outside its box (on the backdrop), like
+ * Escape does. The click must also start outside, so selecting text inside
+ * and letting go outside keeps the dialog open.
+ */
+export function closeOnBackdrop(node: HTMLDialogElement) {
+  const outside = (e: MouseEvent) => {
+    if (e.target !== node) return false
+    const r = node.getBoundingClientRect()
+    return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom
+  }
+  let startedOutside = false
+  const onpointerdown = (e: PointerEvent) => {
+    startedOutside = outside(e)
+  }
+  const onclick = (e: MouseEvent) => {
+    if (startedOutside && outside(e)) node.close()
+    startedOutside = false
+  }
+  node.addEventListener('pointerdown', onpointerdown)
+  node.addEventListener('click', onclick)
+  return {
+    destroy() {
+      node.removeEventListener('pointerdown', onpointerdown)
+      node.removeEventListener('click', onclick)
+    },
+  }
+}
