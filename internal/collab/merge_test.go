@@ -10,7 +10,7 @@ func TestMerge3(t *testing.T) {
 	base := "a\nb\nc\nd\n"
 	for _, c := range []struct {
 		name, ours, theirs, want string
-		conflict             bool
+		conflict                 bool
 	}{
 		{"only ours", "A\nb\nc\nd\n", base, "A\nb\nc\nd\n", false},
 		{"only theirs", base, "a\nb\nc\nD\n", "a\nb\nc\nD\n", false},
