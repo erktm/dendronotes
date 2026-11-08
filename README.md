@@ -81,8 +81,8 @@ admin's first soma.
   that was changed by someone else in that moment is left alone and reported.
 - **Editing together.** Everyone who has a note open – other people the soma is shared with,
   or your own second tab – edits the same text at once: changes appear right away, the others'
-  cursors and selections show with their names, and their pictures appear at the top. Readers
-  follow along without being able to change anything.
+  cursors and selections show with their names, and the bar at the bottom of the note shows who
+  else is in it. Readers follow along without being able to change anything.
 - **Saving.** The server writes a note about a second after typing stops, at the latest every
   five seconds while typing goes on ("Saving …", then "Saved"); ⌘S / Ctrl+S saves at once.
   Files keep their line breaks (also Windows-style) and a byte order mark. Without a
@@ -138,8 +138,8 @@ up to `DENDRONOTES_MAX_UPLOAD_MB`. The content must match the extension.
 - **Profile pictures**: design one from a color, a pattern (dendrite, myelin rings, vesicles)
   and your initials, or upload a photo and place it in a circle. The browser crops the photo to
   a small square; the server stores it in `state.db`, encoded anew without metadata, and shows
-  it only to people you share a soma with (and to admins). Pictures appear in the header, next
-  to the others editing a note, in the sharing dialog and in the administration.
+  it only to people you share a soma with (and to admins). Pictures appear in the header (yours),
+  at the bottom of a note (the others in it), in the sharing dialog and in the administration.
 - **Administration** (the shield in the left rail, admins only):
   - *Users*: create accounts, change role, disable, set a new password, sign out everywhere,
     delete. A deleted account's somas go to an account you choose or to the trash. The last

@@ -44,9 +44,8 @@
         <Editor {session} visible={settings.view !== 'read'} />
       {/key}
     </div>
-    {#if settings.view !== 'read'}
-      <StatusBar {session} />
-    {/if}
+    <!-- Also while reading: who else is in the note, and its length. -->
+    <StatusBar {session} />
   </div>
 {/if}
 

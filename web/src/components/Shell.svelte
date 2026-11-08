@@ -10,7 +10,6 @@
   import ProfileDialog from './ProfileDialog.svelte'
   import ProfileMenu from './ProfileMenu.svelte'
   import ShareDialog from './ShareDialog.svelte'
-  import Peers from './Peers.svelte'
   import EmptyState from './EmptyState.svelte'
   import ConfirmDialog from './ConfirmDialog.svelte'
   import QuickSwitcher from './QuickSwitcher.svelte'
@@ -208,9 +207,6 @@
         {/if}
       </nav>
       <div class="tools">
-        {#if app.note && noteReady}
-          <Peers peers={app.note.peers} />
-        {/if}
         {#if save}
           <span class="save {save.kind}" role="status">{save.label}</span>
         {/if}

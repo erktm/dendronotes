@@ -136,6 +136,12 @@ export const strings = {
     conflict: 'This note was changed elsewhere at the same place as here; both versions were kept, one after the other.',
     peers: (n: number) => (n === 1 ? '1 other person is here' : `${n} other people are here`),
     peer: (name: string) => `${name} is editing this note`,
+    here: (names: readonly string[]) =>
+      names.length === 1
+        ? `${names[0]} is here too`
+        : names.length === 2
+          ? `${names[0]} and ${names[1]} are here too`
+          : `${names[0]} and ${names.length - 1} others are here too`,
     leaveWarning: 'Some changes have not reached the server yet.',
   },
 
