@@ -14,7 +14,7 @@
     admin,
     onadmin,
   }: {
-    /** What the open sidebar shows, or null when it is closed. */
+    /** What the open sidebar shows; null when it is closed or the graph or admin area is open. */
     view: 'files' | 'search' | null
     onfiles: () => void
     onsearch: () => void

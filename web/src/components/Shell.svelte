@@ -23,6 +23,8 @@
 
   const narrow = window.matchMedia('(max-width: 760px)')
   let sidebarOpen = $state(!narrow.matches)
+  /** The next route change comes from the rail and keeps the sidebar open. */
+  let keepSidebar = false
 
   // Follow the URL: first the soma, then the note in it.
   $effect(() => {
@@ -49,7 +51,8 @@
       }
       app.openPath(app.somaId && soma === app.somaId && view === 'soma' ? path : null)
     })
-    if (narrow.matches) sidebarOpen = false
+    if (keepSidebar) keepSidebar = false
+    else if (narrow.matches) sidebarOpen = false
   })
 
   // Remember which folders are open.
@@ -87,6 +90,28 @@
   function toggleGraph() {
     if (router.graph) void app.navigate(app.lastNotePath)
     else router.goGraph()
+  }
+
+  /** The graph or the admin area fills the main area instead of a note. */
+  const mainView = $derived(router.view === 'admin' || router.graph)
+
+  /**
+   * The rail works like tabs: only one entry is marked. From the graph or the
+   * admin area, files and search lead back to the notes with that panel open;
+   * otherwise they show or hide the panel.
+   */
+  function showPanel(panel: 'files' | 'search') {
+    if (mainView) {
+      keepSidebar = true // on phones the route change would close it again
+      if (router.view === 'admin') toggleAdmin()
+      else toggleGraph()
+    } else if (sidebarOpen && app.sidebarView === panel) {
+      sidebarOpen = false
+      return
+    }
+    sidebarOpen = true
+    if (panel === 'search') app.openSearch()
+    else app.sidebarView = 'files'
   }
 
   const crumbs = $derived(app.note ? app.note.path.split('/') : [])
@@ -147,15 +172,9 @@
 
 <div class="shell" class:collapsed={!sidebarOpen}>
   <Rail
-    view={sidebarOpen ? app.sidebarView : null}
-    onfiles={() => {
-      if (sidebarOpen && app.sidebarView === 'files') sidebarOpen = false
-      else ((sidebarOpen = true), (app.sidebarView = 'files'))
-    }}
-    onsearch={() => {
-      if (sidebarOpen && app.sidebarView === 'search') sidebarOpen = false
-      else ((sidebarOpen = true), app.openSearch())
-    }}
+    view={sidebarOpen && !mainView ? app.sidebarView : null}
+    onfiles={() => showPanel('files')}
+    onsearch={() => showPanel('search')}
     onopensettings={() => (app.settingsOpen = true)}
     graph={router.graph}
     ongraph={toggleGraph}
