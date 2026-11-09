@@ -7,19 +7,21 @@
   import { SHARE_ROLES } from '../lib/roles'
   import Icon from './Icon.svelte'
   import { formatSize } from '../lib/files'
+  import { ago } from '../lib/time'
   import { errorMessage } from '../lib/errors'
   import { strings } from '../lib/strings'
 
   const t = strings.admin
 
   let somas = $state.raw<AdminSoma[] | null>(null)
+  let deleted = $state.raw<admin.DeletedSoma[]>([])
   let users = $state.raw<User[]>([])
   let groups = $state.raw<Group[]>([])
   let filter = $state('')
 
   async function load() {
     try {
-      ;[somas, users, groups] = await Promise.all([admin.somas(), admin.users(), admin.groups()])
+      ;[somas, users, groups, deleted] = await Promise.all([admin.somas(), admin.users(), admin.groups(), admin.deletedSomas()])
     } catch (err) {
       app.toast(errorMessage(err))
     }
@@ -103,6 +105,50 @@
     }
   }
 
+  // --- Deleted somas ---------------------------------------------------------
+
+  let restoreDialog: HTMLDialogElement | undefined = $state()
+  let restoreTarget = $state.raw<admin.DeletedSoma | null>(null)
+  let restoreOwner = $state(0)
+  const personName = (p: { displayName: string; username: string }) => p.displayName || p.username
+  const activeUsers = $derived(users.filter((u) => !u.disabled))
+
+  function openRestore(d: admin.DeletedSoma) {
+    restoreTarget = d
+    restoreOwner = d.owner?.id ?? app.user?.id ?? 0
+    restoreDialog?.showModal()
+  }
+
+  async function restore(e: SubmitEvent) {
+    e.preventDefault()
+    const d = restoreTarget
+    if (!d) return
+    busy = true
+    try {
+      await admin.restoreSoma(d.id, restoreOwner)
+      app.toast(t.somaRestored(d.name), 'info')
+      restoreDialog?.close()
+      await load()
+      await app.refreshSomas()
+    } catch (err) {
+      app.toast(errorMessage(err))
+    } finally {
+      busy = false
+    }
+  }
+
+  async function purge(d: admin.DeletedSoma) {
+    const ok = await app.ask({ title: t.purgeSomaTitle(d.name), message: t.purgeSomaText, confirmLabel: t.purgeSoma, danger: true })
+    if (!ok) return
+    try {
+      await admin.purgeSoma(d.id)
+      app.toast(t.somaPurged(d.name), 'info')
+      await load()
+    } catch (err) {
+      app.toast(errorMessage(err))
+    }
+  }
+
   async function remove(s: AdminSoma) {
     const ok = await app.ask({ title: t.deleteSomaTitle(s.name), message: t.deleteSomaText, confirmLabel: t.deleteSoma, danger: true })
     if (!ok) return
@@ -155,8 +201,68 @@
         </tbody>
       </table>
     </div>
+
+    <div>
+      <h2 class="section-title">{t.deletedSomas}</h2>
+      <p class="admin-faint">{t.deletedSomasText}</p>
+    </div>
+    {#if deleted.length === 0}
+      <p class="admin-faint">{t.noDeletedSomas}</p>
+    {:else}
+      <div class="admin-scroll">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>{t.somaName}</th>
+              <th>{t.owner}</th>
+              <th>{t.members}</th>
+              <th>{t.folder}</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each deleted as d (d.id)}
+              <tr>
+                <td>
+                  <strong>{d.name}</strong>
+                  <div class="admin-faint">{d.deletedBy ? t.deletedByOn(personName(d.deletedBy), ago(d.deletedAt)) : t.deletedOn(ago(d.deletedAt))}</div>
+                </td>
+                <td>
+                  {#if d.owner}{personName(d.owner)}{:else}<span class="admin-faint">{t.ownerGone}</span>{/if}
+                </td>
+                <td class="admin-muted">{t.shares(d.members, d.groups)}</td>
+                <td class="admin-mono admin-muted">{d.folder}</td>
+                <td>
+                  <div class="admin-actions">
+                    <button type="button" class="admin-btn" onclick={() => openRestore(d)}>{t.restoreSoma}</button>
+                    <button type="button" class="admin-btn danger" onclick={() => purge(d)}>{t.purgeSoma}</button>
+                  </div>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    {/if}
   {/if}
 </div>
+
+<dialog class="admin-dialog" bind:this={restoreDialog} use:closeOnBackdrop aria-labelledby="restore-title">
+  <form onsubmit={restore}>
+    <h2 id="restore-title">{t.restoreSomaTitle(restoreTarget?.name ?? '')}</h2>
+    <p class="admin-faint">{t.restoreSomaText}</p>
+    <label for="restore-owner">{t.restoreSomaOwner}</label>
+    <select id="restore-owner" class="admin-field" bind:value={restoreOwner}>
+      {#each activeUsers as u (u.id)}
+        <option value={u.id}>{userName(u)}</option>
+      {/each}
+    </select>
+    <div class="admin-actions">
+      <button type="button" class="admin-btn" onclick={() => restoreDialog?.close()}>{strings.somas.cancel}</button>
+      <button type="submit" class="admin-btn primary" disabled={busy || !restoreOwner}>{t.restoreSoma}</button>
+    </div>
+  </form>
+</dialog>
 
 <dialog class="admin-dialog" bind:this={dialog} use:closeOnBackdrop aria-labelledby="transfer-title">
   <form onsubmit={transfer}>
@@ -210,6 +316,11 @@
 </dialog>
 
 <style>
+  .section-title {
+    margin: var(--space-4) 0 2px;
+    font-size: var(--text-md);
+    font-weight: 600;
+  }
   .hint {
     margin-top: 6px;
     font-size: var(--text-xs);

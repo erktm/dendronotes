@@ -88,6 +88,11 @@
 
   <footer class="foot">
     <StatusChip state={shownState} />
+    {#if app.sidebarView !== 'search' && app.can.organize}
+      <button type="button" class="trash" aria-label={strings.trash.open} title={strings.trash.open} onclick={() => (app.trashOpen = true)}>
+        <Icon name="trash" size={16} />
+      </button>
+    {/if}
   </footer>
 </aside>
 
@@ -130,6 +135,9 @@
   button:hover {
     background: var(--bg-hover);
     color: var(--text);
+  }
+  .trash {
+    margin-left: auto;
   }
   .foot {
     display: flex;

@@ -3,7 +3,7 @@
   import { app } from '../lib/state/app.svelte'
   import { router } from '../lib/router.svelte'
   import { strings } from '../lib/strings'
-  import type { Membership } from '../lib/api/soma'
+  import { exportURL, type Membership } from '../lib/api/soma'
 
   let open = $state(false)
   let root: HTMLDivElement | undefined = $state()
@@ -73,6 +73,12 @@
   function onpointerdown(e: PointerEvent) {
     if (open && root && !root.contains(e.target as Node)) close(false)
   }
+
+  // The server sends the ZIP as an attachment: the page stays where it is.
+  function download() {
+    close(false)
+    window.location.assign(exportURL(app.somaId))
+  }
 </script>
 
 <svelte:window {onpointerdown} />
@@ -123,6 +129,10 @@
         <button type="button" role="menuitem" onclick={() => (close(false), (app.shareOpen = true))}>
           <span class="check" aria-hidden="true"><Icon name="user" size={14} /></span>
           <span class="label">{app.soma.role === 'owner' ? strings.share.menuOwner : strings.share.menuMember}</span>
+        </button>
+        <button type="button" role="menuitem" title={strings.somas.exportHint} onclick={download}>
+          <span class="check" aria-hidden="true"><Icon name="download" size={14} /></span>
+          <span class="label">{strings.somas.export}</span>
         </button>
       {/if}
       {#if app.soma?.role === 'owner'}

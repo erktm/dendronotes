@@ -30,6 +30,8 @@ class Live {
   state = $state<LiveState>('offline')
   /** Increases with every change in the soma; views refetch derived data. */
   version = $state(0)
+  /** Increases when the trash changed (restored, deleted for good). */
+  trashVersion = $state(0)
   /** The id the server gave this stream ("hello"); notes are joined with it. */
   stream = $state('')
 
@@ -103,6 +105,7 @@ class Live {
       this.handlers?.change(c)
     })
     es.addEventListener('access', () => this.handlers?.access())
+    es.addEventListener('trash', () => this.trashVersion++)
     es.onerror = () => {
       if (this.source !== es) return
       if (es.readyState === EventSource.CLOSED) {

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { app } from '../lib/state/app.svelte'
+  import Icon from './Icon.svelte'
   import * as admin from '../lib/api/admin'
   import type { ServerInfo } from '../lib/api/admin'
   import { formatSize } from '../lib/files'
@@ -94,6 +95,13 @@
           <dt>{t.maxUpload}</dt>
           <dd>{formatSize(info.limits.maxUploadBytes)}</dd>
         </dl>
+      </div>
+      <div class="admin-card wide">
+        <h3>{t.backup}</h3>
+        <p class="admin-faint">{t.backupText}</p>
+        <div class="admin-actions">
+          <a class="admin-btn" href={admin.backupURL} download><Icon name="download" size={15} /> {t.downloadBackup}</a>
+        </div>
       </div>
       <div class="admin-card wide">
         <h3>{t.sso}</h3>

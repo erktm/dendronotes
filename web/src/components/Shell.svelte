@@ -10,6 +10,8 @@
   import ProfileDialog from './ProfileDialog.svelte'
   import ProfileMenu from './ProfileMenu.svelte'
   import ShareDialog from './ShareDialog.svelte'
+  import TrashDialog from './TrashDialog.svelte'
+  import HistoryDialog from './HistoryDialog.svelte'
   import EmptyState from './EmptyState.svelte'
   import ConfirmDialog from './ConfirmDialog.svelte'
   import QuickSwitcher from './QuickSwitcher.svelte'
@@ -225,6 +227,15 @@
           <button
             type="button"
             class="icon-btn"
+            aria-label={strings.history.open}
+            title={strings.history.open}
+            onclick={() => (app.historyOpen = true)}
+          >
+            <Icon name="history" size={18} />
+          </button>
+          <button
+            type="button"
+            class="icon-btn"
             class:on={settings.showDetails}
             aria-pressed={settings.showDetails}
             aria-label={settings.showDetails ? strings.view.hideDetails : strings.view.showDetails}
@@ -268,6 +279,8 @@
 <PromptDialog />
 <ProfileDialog />
 <ShareDialog />
+<TrashDialog />
+<HistoryDialog />
 <QuickSwitcher />
 <SettingsDialog />
 

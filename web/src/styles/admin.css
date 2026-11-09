@@ -120,6 +120,7 @@
   font-size: var(--text-sm);
   font-weight: 550;
   white-space: nowrap;
+  text-decoration: none;
   cursor: pointer;
 }
 .admin-btn:hover:not(:disabled) {

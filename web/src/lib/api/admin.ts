@@ -120,6 +120,29 @@ export const transferSoma = (id: string, ownerId: number) =>
   request<{ id: string }>('PATCH', `/api/admin/somas/${encodeURIComponent(id)}`, { body: { ownerId } })
 export const deleteSoma = (id: string) => request<{ id: string }>('DELETE', `/api/admin/somas/${encodeURIComponent(id)}`)
 
+/** A deleted soma an admin can bring back. */
+export interface DeletedSoma {
+  id: string
+  name: string
+  folder: string
+  originalFolder: string
+  /** null when the owner's account is gone (choose another to restore). */
+  owner: Person | null
+  members: number
+  groups: number
+  createdAt: string
+  deletedBy: Person | null
+  deletedAt: string
+}
+
+export const deletedSomas = () => request<{ somas: DeletedSoma[] }>('GET', '/api/admin/somas/deleted').then((r) => r.somas)
+export const restoreSoma = (id: string, ownerId?: number) =>
+  request<{ id: string }>('POST', `/api/admin/somas/deleted/${encodeURIComponent(id)}/restore`, { body: ownerId ? { ownerId } : {} })
+export const purgeSoma = (id: string) => request<{ id: string }>('DELETE', `/api/admin/somas/deleted/${encodeURIComponent(id)}`)
+
+/** Where the backup of state.db and the histories downloads. */
+export const backupURL = '/api/admin/backup'
+
 export const sessions = () => request<{ sessions: Session[]; current: number }>('GET', '/api/admin/sessions')
 export const endSession = (id: number) => request<{ ok: boolean }>('DELETE', `/api/admin/sessions/${id}`)
 

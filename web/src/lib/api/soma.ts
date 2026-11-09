@@ -127,6 +127,51 @@ export const uploadFile = (path: string, file: Blob, unique = true) =>
 export const trash = (path: string) =>
   request<{ trashedTo: string }>('DELETE', `${somaBase()}/entries/${encodePath(path)}`)
 
+/** A deleted file or folder waiting in the soma's trash. */
+export interface TrashItem {
+  /** Relative to the trash. */
+  path: string
+  /** Where it was deleted from (restored there). */
+  original: string
+  type: 'file' | 'dir'
+  size: number
+  /** Folders: the files inside. */
+  files?: number
+  deletedAt: string
+  /** Unknown for entries put into the trash elsewhere (Obsidian). */
+  deletedBy: Person | null
+}
+
+const trashURL = (p: string) => `${somaBase()}/trash/${encodePath(p)}`
+
+export const trashItems = () => request<{ items: TrashItem[] }>('GET', `${somaBase()}/trash`).then((r) => r.items)
+export const readTrashNote = (path: string) => request<Note>('GET', trashURL(path))
+export const restoreTrash = (path: string) => request<{ path: string }>('POST', trashURL(path))
+export const purgeTrash = (path: string) => request<{ path: string }>('DELETE', trashURL(path))
+export const emptyTrash = () => request<{ ok: boolean }>('DELETE', `${somaBase()}/trash`)
+
+/** Why a version of a note was recorded. */
+export type VersionReason = 'edit' | 'create' | 'outside' | 'relink' | 'restore'
+
+export interface Version {
+  id: number
+  path: string
+  at: string
+  /** Accounts that changed the note in this version (see people). */
+  authors: number[]
+  reason: VersionReason
+  size: number
+  restoredFrom?: number
+}
+
+export const history = (path: string) =>
+  request<{ versions: Version[]; people: Record<string, Person> }>('GET', `${somaBase()}/history/${encodePath(path)}`)
+export const version = (id: number) => request<{ version: Version; content: string }>('GET', `${somaBase()}/versions/${id}`)
+export const restoreVersion = (id: number) => request<NoteMeta>('POST', `${somaBase()}/versions/${id}/restore`)
+
+/** Where the soma downloads as a ZIP. */
+export const exportURL = (somaId: string) => `/api/somas/${encodeURIComponent(somaId)}/export`
+
 export const me = () => request<Me>('GET', '/api/auth/me', { expect401: true })
 
 export interface AuthMethods {
