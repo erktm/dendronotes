@@ -122,7 +122,7 @@ func TestRouteAccess(t *testing.T) {
 	ben := newClient(t, s)
 	ben.loginAs("ben", "ben password long")
 
-	concrete := strings.NewReplacer("{soma}", testSoma, "{path...}", "a.md", "{id}", "1")
+	concrete := strings.NewReplacer("{soma}", testSoma, "{path...}", "a.md", "{id}", "1", "{user}", "1")
 	for _, rt := range s.routes() {
 		p := rt.pattern
 		url := concrete.Replace(p)
@@ -131,7 +131,7 @@ func TestRouteAccess(t *testing.T) {
 			if p != "/healthz" && p != "/readyz" && !strings.HasPrefix(p, "/api/auth/") {
 				t.Errorf("public route %s %s", rt.method, p)
 			}
-		case somaViewer, somaEditor, somaOwner:
+		case somaViewer, somaWriter, somaContributor, somaEditor, somaOwner:
 			if !strings.HasPrefix(p, "/api/somas/{soma}") {
 				t.Errorf("soma route %s %s outside /api/somas/{soma}", rt.method, p)
 			}
@@ -152,23 +152,39 @@ func TestRouteAccess(t *testing.T) {
 			}
 		}
 	}
-	// Members with too low a role get 403: viewers on changing routes, editors
-	// on owner routes.
-	benUser, err := s.store.UserByUsername(context.Background(), "ben")
+	// Members with too low a role get 403 – whether the soma is shared with
+	// them personally or through a group.
+	ctx := context.Background()
+	benUser, err := s.store.UserByUsername(ctx, "ben")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, role := range []string{store.MemberViewer, store.MemberEditor} {
-		if err := s.store.SetMember(context.Background(), testSoma, benUser.ID, role); err != nil {
-			t.Fatal(err)
-		}
-		for _, rt := range s.routes() {
-			if store.RoleRank(rt.access.somaRole()) <= store.RoleRank(role) {
-				continue
+	team, err := s.store.CreateGroup(ctx, "Team")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.store.AddGroupMember(ctx, team.ID, benUser.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, via := range []string{"personally", "group"} {
+		for _, role := range []string{store.MemberViewer, store.MemberWriter, store.MemberContributor, store.MemberEditor} {
+			if via == "personally" {
+				err = s.store.SetMember(ctx, testSoma, benUser.ID, role)
+			} else {
+				_ = s.store.RemoveMember(ctx, testSoma, benUser.ID)
+				err = s.store.SetSomaGroup(ctx, testSoma, team.ID, role)
 			}
-			url := concrete.Replace(rt.pattern)
-			if rec := ben.do(rt.method, url, "{}"); rec.Code != 403 {
-				t.Errorf("%s %s %s: %d, want 403", role, rt.method, url, rec.Code)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, rt := range s.routes() {
+				if rt.access < somaViewer || store.RoleRank(rt.access.somaRole()) <= store.RoleRank(role) {
+					continue
+				}
+				url := concrete.Replace(rt.pattern)
+				if rec := ben.do(rt.method, url, "{}"); rec.Code != 403 {
+					t.Errorf("%s (%s) %s %s: %d, want 403", role, via, rt.method, url, rec.Code)
+				}
 			}
 		}
 	}

@@ -247,8 +247,10 @@ paths:
         "404": { $ref: "#/components/responses/Error" }
   /api/users/search:
     get:
-      summary: Find people to share a soma with (user and display name start with q)
-      description: Needs at least two characters; returns at most 10 enabled accounts with id, user and display name only.
+      summary: Find people and groups to share a soma with (names start with q)
+      description: >
+        Needs at least two characters; returns at most 10 enabled accounts with id, user and
+        display name only, and at most 10 groups.
       parameters:
         - { name: q, in: query, required: true, schema: { type: string, maxLength: 100 } }
       responses:
@@ -260,6 +262,7 @@ paths:
                 type: object
                 properties:
                   users: { type: array, items: { $ref: "#/components/schemas/Person" } }
+                  groups: { type: array, items: { $ref: "#/components/schemas/Group" } }
         "401": { $ref: "#/components/responses/Unauthorized" }
   /api/somas:
     get:
@@ -318,10 +321,10 @@ paths:
     parameters:
       - $ref: "#/components/parameters/soma"
     get:
-      summary: Who has access to a soma (members)
+      summary: Who has access to a soma (people and groups)
       responses:
         "200":
-          description: Members, owner first, and your own role.
+          description: People (owner first), groups, and your own effective role.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Members" }
@@ -336,7 +339,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { type: object, required: [role], properties: { role: { type: string, enum: [editor, viewer] } } }
+            schema: { $ref: "#/components/schemas/ShareRole" }
       responses:
         "200": { description: The members now., content: { application/json: { schema: { $ref: "#/components/schemas/Members" } } } }
         "400": { $ref: "#/components/responses/Error" }
@@ -349,11 +352,36 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/groups/{id}:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+      - $ref: "#/components/parameters/id"
+    put:
+      summary: Share the soma with a group or change the group's role (owner)
+      description: Members of the group get the role; with Everyone, every enabled account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ShareRole" }
+      responses:
+        "200": { description: The members now., content: { application/json: { schema: { $ref: "#/components/schemas/Members" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Stop sharing the soma with a group (owner)
+      description: Open event streams of people who lost access end at once.
+      responses:
+        "200": { description: The members now., content: { application/json: { schema: { $ref: "#/components/schemas/Members" } } } }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /api/somas/{soma}/membership:
     parameters:
       - $ref: "#/components/parameters/soma"
     delete:
-      summary: Leave a soma shared with you (not as its owner)
+      summary: Leave a soma shared with you personally (not as its owner)
+      description: Access through a group stays (error not_shared_personally if that is the only one).
       responses:
         "200": { description: Left. }
         "400": { $ref: "#/components/responses/Error" }
@@ -896,9 +924,76 @@ paths:
       responses:
         "200": { description: Ended. }
         "404": { $ref: "#/components/responses/Error" }
+  /api/admin/groups:
+    get:
+      summary: All groups, Everyone first (admin)
+      responses:
+        "200":
+          description: Groups with their number of members.
+          content:
+            application/json:
+              schema: { type: object, properties: { groups: { type: array, items: { $ref: "#/components/schemas/Group" } } } }
+        "403": { $ref: "#/components/responses/Error" }
+    post:
+      summary: Create a group (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [name], properties: { name: { type: string, maxLength: 100 } } }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/Group" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/admin/groups/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    patch:
+      summary: Rename a group (admin; not Everyone)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [name], properties: { name: { type: string, maxLength: 100 } } }
+      responses:
+        "200": { description: Renamed., content: { application/json: { schema: { $ref: "#/components/schemas/Group" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Delete a group and its shares (admin; not Everyone)
+      responses:
+        "200": { description: Deleted. }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/admin/groups/{id}/members:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      summary: The accounts in a group (admin; Everyone has no list)
+      responses:
+        "200": { description: The group and its members. }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/admin/groups/{id}/members/{user}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+      - { name: user, in: path, required: true, schema: { type: integer } }
+    put:
+      summary: Add an account to a group (admin)
+      responses:
+        "200": { description: The group and its members. }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Take an account out of a group (admin); its open streams of somas it lost end
+      responses:
+        "200": { description: The group and its members. }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /api/admin/somas:
     get:
-      summary: All somas with owner, members and size (admin)
+      summary: All somas with owner, members, groups and size (admin)
       responses:
         "200": { description: Somas. }
         "403": { $ref: "#/components/responses/Error" }
@@ -1101,10 +1196,30 @@ components:
         username: { type: string }
         displayName: { type: string }
         avatar: { $ref: "#/components/schemas/Avatar", description: Only in member lists. }
+    Role:
+      type: string
+      enum: [owner, editor, contributor, writer, viewer]
+      description: >
+        From most to least, each including the ones below: owner (sharing, renaming and
+        deleting the soma), editor (rename, move, delete), contributor (create notes, folders,
+        files), writer (change existing notes), viewer (read).
+    ShareRole:
+      type: object
+      required: [role]
+      properties:
+        role: { type: string, enum: [editor, contributor, writer, viewer] }
+    Group:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        everyone: { type: boolean, description: The built-in group of every enabled account. }
+        members: { type: integer }
+        createdAt: { type: string, format: date-time }
     Members:
       type: object
       properties:
-        role: { type: string, enum: [owner, editor, viewer], description: Your role. }
+        role: { $ref: "#/components/schemas/Role", description: Your effective role. }
         members:
           type: array
           items:
@@ -1112,13 +1227,22 @@ components:
               - $ref: "#/components/schemas/Person"
               - type: object
                 properties:
-                  role: { type: string, enum: [owner, editor, viewer] }
+                  role: { $ref: "#/components/schemas/Role" }
+        groups:
+          type: array
+          items:
+            allOf:
+              - $ref: "#/components/schemas/Group"
+              - type: object
+                properties:
+                  role: { type: string, enum: [editor, contributor, writer, viewer] }
     Membership:
       type: object
       properties:
         id: { type: string }
         name: { type: string }
-        role: { type: string, enum: [owner, editor, viewer] }
+        role: { $ref: "#/components/schemas/Role", description: Effective – the highest of your personal share and your groups'. }
+        direct: { type: boolean, description: Shared with you personally (only then can you leave it). }
         owner:
           type: object
           properties:

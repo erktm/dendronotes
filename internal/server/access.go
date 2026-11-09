@@ -15,12 +15,14 @@ import (
 type access int
 
 const (
-	public     access = iota // anyone
-	signedIn                 // any signed-in account
-	adminOnly                // accounts with the admin role
-	somaViewer               // members of the soma in {soma}, any role
-	somaEditor               // members who may change notes
-	somaOwner                // the owner of the soma
+	public          access = iota // anyone
+	signedIn                      // any signed-in account
+	adminOnly                     // accounts with the admin role
+	somaViewer                    // anyone with access to the soma in {soma}
+	somaWriter                    // who may change existing notes
+	somaContributor               // who may also create notes, folders and files
+	somaEditor                    // who may also rename, move and delete
+	somaOwner                     // the owner of the soma
 )
 
 // somaRole is the minimal member role for the soma access levels.
@@ -28,6 +30,10 @@ func (a access) somaRole() string {
 	switch a {
 	case somaViewer:
 		return store.MemberViewer
+	case somaWriter:
+		return store.MemberWriter
+	case somaContributor:
+		return store.MemberContributor
 	case somaEditor:
 		return store.MemberEditor
 	case somaOwner:
@@ -45,15 +51,16 @@ type somaCtx struct {
 	rt   *somas.Runtime
 }
 
-// withSoma resolves {soma} for a signed-in account: non-members get 404 (a
-// soma's existence is not revealed), members with a lower role 403. The soma
-// is opened for the duration of the request.
+// withSoma resolves {soma} for a signed-in account: without access (neither
+// personally nor through a group) 404 – a soma's existence is not revealed –,
+// with a lower role 403. The role is the effective one. The soma is opened for
+// the duration of the request.
 func (s *Server) withSoma(min string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		u, _ := auth.UserFrom(ctx)
 		id := r.PathValue("soma")
-		role, err := s.store.MemberRole(ctx, id, u.ID)
+		role, err := s.store.EffectiveRole(ctx, id, u.ID)
 		if err != nil {
 			s.internalError(w, r, "membership lookup", err)
 			return

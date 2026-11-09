@@ -69,6 +69,11 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 			if !ok || !send(e) {
 				return // shutdown, too slow, or the client left
 			}
+			// Sharing changed (also through a group): end the stream at once
+			// when this account has lost access.
+			if e.Name == "access" && !s.stillMember(r, sm.ID) {
+				return
+			}
 		case <-ticker.C:
 			if !s.stillMember(r, sm.ID) {
 				return // signed out, session expired, or no longer a member
@@ -87,6 +92,6 @@ func (s *Server) stillMember(r *http.Request, somaID string) bool {
 		return false
 	}
 	u, _ := auth.UserFrom(r.Context())
-	role, err := s.store.MemberRole(r.Context(), somaID, u.ID)
+	role, err := s.store.EffectiveRole(r.Context(), somaID, u.ID)
 	return err == nil && role != ""
 }
