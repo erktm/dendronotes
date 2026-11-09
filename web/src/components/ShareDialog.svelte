@@ -4,30 +4,38 @@
   import Avatar from './Avatar.svelte'
   import { app } from '../lib/state/app.svelte'
   import * as api from '../lib/api/soma'
-  import type { Member, Person } from '../lib/api/soma'
+  import type { Group, GroupGrant, Member, Person, ShareRole } from '../lib/api/soma'
+  import { SHARE_ROLES } from '../lib/roles'
   import { errorMessage } from '../lib/errors'
   import { strings } from '../lib/strings'
 
   const t = strings.share
+  /** Most to least, as offered in the menus. */
+  const roles = [...SHARE_ROLES].reverse()
 
   let dialog: HTMLDialogElement | undefined = $state()
   let members = $state.raw<Member[]>([])
+  let groups = $state.raw<GroupGrant[]>([])
   let query = $state('')
   let found = $state.raw<Person[]>([])
+  let foundGroups = $state.raw<Group[]>([])
   let searched = $state(false)
-  let newRole = $state<'editor' | 'viewer'>('editor')
+  let newRole = $state<ShareRole>('editor')
   let busy = $state(false)
 
   const soma = $derived(app.soma)
   const owner = $derived(soma?.role === 'owner')
   const name = (p: Person) => p.displayName || p.username
+  const groupName = (g: Group) => (g.everyone ? t.everyone : g.name)
 
   $effect(() => {
     if (!dialog) return
     if (app.shareOpen && !dialog.open) {
       query = ''
       found = []
+      foundGroups = []
       members = []
+      groups = []
       dialog.showModal()
       void load()
     } else if (!app.shareOpen && dialog.open) dialog.close()
@@ -41,13 +49,15 @@
   async function load() {
     if (!soma) return
     try {
-      members = (await api.members(soma.id)).members
+      const m = await api.members(soma.id)
+      members = m.members
+      groups = m.groups
     } catch (err) {
       app.toast(errorMessage(err))
     }
   }
 
-  // Search as you type (from two characters), skipping people with access.
+  // Search as you type (from two characters), skipping who has access already.
   let controller: AbortController | null = null
   let timer: ReturnType<typeof setTimeout> | undefined
   $effect(() => {
@@ -56,14 +66,16 @@
     controller?.abort()
     if ([...q].length < 2) {
       found = []
+      foundGroups = []
       searched = false
       return
     }
     timer = setTimeout(async () => {
       controller = new AbortController()
       try {
-        const people = await api.searchUsers(q, controller.signal)
-        found = people.filter((p) => !members.some((m) => m.id === p.id))
+        const res = await api.searchPeople(q, controller.signal)
+        found = res.users.filter((p) => !members.some((m) => m.id === p.id))
+        foundGroups = res.groups.filter((g) => !groups.some((x) => x.id === g.id))
         searched = true
       } catch (err) {
         if (!(err instanceof DOMException && err.name === 'AbortError')) app.toast(errorMessage(err))
@@ -74,7 +86,9 @@
   async function run(action: () => Promise<api.Members>, done: string) {
     busy = true
     try {
-      members = (await action()).members
+      const m = await action()
+      members = m.members
+      groups = m.groups
       app.toast(done, 'info')
     } catch (err) {
       app.toast(errorMessage(err))
@@ -89,8 +103,22 @@
     query = ''
   }
 
-  function changeRole(m: Member, role: 'editor' | 'viewer') {
-    if (soma && role !== m.role) void run(() => api.setMember(soma.id, m.id, role), t.roleOf(name(m)) + ': ' + t[role])
+  async function addGroup(g: Group) {
+    if (!soma) return
+    await run(() => api.setSomaGroup(soma.id, g.id, newRole), t.added(groupName(g)))
+    query = ''
+  }
+
+  function changeRole(m: Member, role: ShareRole) {
+    if (soma && role !== m.role) void run(() => api.setMember(soma.id, m.id, role), t.roleOf(name(m)) + ': ' + t.roles[role])
+  }
+
+  function changeGroupRole(g: GroupGrant, role: ShareRole) {
+    if (soma && role !== g.role) void run(() => api.setSomaGroup(soma.id, g.id, role), t.roleOf(groupName(g)) + ': ' + t.roles[role])
+  }
+
+  function removeGroup(g: GroupGrant) {
+    if (soma) void run(() => api.removeSomaGroup(soma.id, g.id), t.removed(groupName(g)))
   }
 
   function remove(m: Member) {
@@ -142,13 +170,27 @@
             bind:value={query}
             aria-describedby="share-hint"
           />
-          <select aria-label={t.newRole} bind:value={newRole}>
-            <option value="editor">{t.editor}</option>
-            <option value="viewer">{t.viewer}</option>
+          <select aria-label={t.newRole} bind:value={newRole} aria-describedby="share-role-hint">
+            {#each roles as r (r)}
+              <option value={r}>{t.roles[r]}</option>
+            {/each}
           </select>
         </div>
-        {#if found.length}
+        <p class="hint" id="share-role-hint">{t.roles[newRole]}: {t.roleHints[newRole]}</p>
+        {#if found.length || foundGroups.length}
           <ul class="found">
+            {#each foundGroups as g (g.id)}
+              <li>
+                <button type="button" disabled={busy} onclick={() => void addGroup(g)} aria-label={t.add(groupName(g))}>
+                  <span class="avatar" aria-hidden="true"><Icon name="group" size={15} /></span>
+                  <span class="who">
+                    <strong>{groupName(g)}</strong>
+                    <span class="faint">{g.everyone ? t.everyoneHint : t.groupSize(g.members)}</span>
+                  </span>
+                  <Icon name="plus" size={15} />
+                </button>
+              </li>
+            {/each}
             {#each found as p (p.id)}
               <li>
                 <button type="button" disabled={busy} onclick={() => void add(p)} aria-label={t.add(name(p))}>
@@ -183,10 +225,11 @@
                 aria-label={t.roleOf(name(m))}
                 value={m.role}
                 disabled={busy}
-                onchange={(e) => changeRole(m, e.currentTarget.value as 'editor' | 'viewer')}
+                onchange={(e) => changeRole(m, e.currentTarget.value as ShareRole)}
               >
-                <option value="editor">{t.editor}</option>
-                <option value="viewer">{t.viewer}</option>
+                {#each roles as r (r)}
+                  <option value={r}>{t.roles[r]}</option>
+                {/each}
               </select>
               <button type="button" class="text-btn" disabled={busy} title={t.makeOwnerOf(name(m))} aria-label={t.makeOwnerOf(name(m))} onclick={() => void makeOwner(m)}>
                 {t.makeOwner}
@@ -195,12 +238,43 @@
                 <Icon name="close" size={15} />
               </button>
             {:else}
-              <span class="role">{m.role === 'editor' ? t.editor : t.viewer}</span>
+              <span class="role">{t.roles[m.role]}</span>
             {/if}
           </li>
         {/each}
       </ul>
-      {#if !owner}
+      {#if groups.length}
+        <h3 class="groups-title">{t.groups}</h3>
+        <ul class="members">
+          {#each groups as g (g.id)}
+            <li>
+              <span class="avatar" aria-hidden="true"><Icon name="group" size={15} /></span>
+              <span class="who">
+                <strong>{groupName(g)}</strong>
+                <span class="faint">{g.everyone ? t.everyoneHint : t.groupSize(g.members)}</span>
+              </span>
+              {#if owner}
+                <select
+                  aria-label={t.roleOf(groupName(g))}
+                  value={g.role}
+                  disabled={busy}
+                  onchange={(e) => changeGroupRole(g, e.currentTarget.value as ShareRole)}
+                >
+                  {#each roles as r (r)}
+                    <option value={r}>{t.roles[r]}</option>
+                  {/each}
+                </select>
+                <button type="button" class="icon-btn" disabled={busy} aria-label={t.remove(groupName(g))} title={t.remove(groupName(g))} onclick={() => removeGroup(g)}>
+                  <Icon name="close" size={15} />
+                </button>
+              {:else}
+                <span class="role">{t.roles[g.role]}</span>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      {/if}
+      {#if !owner && soma.direct}
         <div class="actions">
           <button type="button" class="danger" onclick={() => void app.leaveSoma(soma.id)}>{t.leave}</button>
         </div>
@@ -367,6 +441,9 @@
   .role {
     color: var(--text-muted);
     font-size: var(--text-sm);
+  }
+  .groups-title {
+    margin-top: 18px;
   }
   .members select {
     height: 30px;

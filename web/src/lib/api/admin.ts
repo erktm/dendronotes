@@ -1,5 +1,5 @@
 import { request } from './client'
-import type { Person, User } from './soma'
+import type { Group, Person, User } from './soma'
 
 export interface AdminSoma {
   id: string
@@ -9,6 +9,8 @@ export interface AdminSoma {
   createdAt: string
   owner: Person
   members: number
+  /** Groups the soma is shared with. */
+  groups: number
   path: string
   bytes: number
   files: number
@@ -81,6 +83,20 @@ export const deleteUser = (id: number, transferTo?: number) =>
 export const endUserSessions = (id: number) => request<{ ok: boolean }>('DELETE', `/api/admin/users/${id}/sessions`)
 
 export const somas = () => request<{ somas: AdminSoma[] }>('GET', '/api/admin/somas').then((r) => r.somas)
+
+export const groups = () => request<{ groups: Group[] }>('GET', '/api/admin/groups').then((r) => r.groups)
+export const createGroup = (name: string) => request<Group>('POST', '/api/admin/groups', { body: { name } })
+export const renameGroup = (id: number, name: string) => request<Group>('PATCH', `/api/admin/groups/${id}`, { body: { name } })
+export const deleteGroup = (id: number) => request<{ id: number }>('DELETE', `/api/admin/groups/${id}`)
+export interface GroupMembers {
+  group: Group
+  members: Person[]
+}
+export const groupMembers = (id: number) => request<GroupMembers>('GET', `/api/admin/groups/${id}/members`)
+export const addGroupMember = (id: number, userId: number) =>
+  request<GroupMembers>('PUT', `/api/admin/groups/${id}/members/${userId}`)
+export const removeGroupMember = (id: number, userId: number) =>
+  request<GroupMembers>('DELETE', `/api/admin/groups/${id}/members/${userId}`)
 export const transferSoma = (id: string, ownerId: number) =>
   request<{ id: string }>('PATCH', `/api/admin/somas/${encodeURIComponent(id)}`, { body: { ownerId } })
 export const deleteSoma = (id: string) => request<{ id: string }>('DELETE', `/api/admin/somas/${encodeURIComponent(id)}`)

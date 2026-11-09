@@ -24,6 +24,7 @@ import { NoteSession } from './note.svelte'
 import { live, type CollabEventName } from './live.svelte'
 import type { CollabEvent, NoticeEvent, PresenceEvent, SavedEvent } from '../api/collab'
 import { settings } from './settings.svelte'
+import { capabilities, type Capability } from '../roles'
 
 type AuthState = 'checking' | 'anonymous' | 'authenticated'
 
@@ -88,8 +89,10 @@ class App {
   somasLoaded = $state(false)
   somaId = $state('')
   soma = $derived(this.somas.find((s) => s.id === this.somaId) ?? null)
-  /** The account may change notes in the open soma (owner or editor, not viewer). */
-  canEdit = $derived(this.soma !== null && this.soma.role !== 'viewer')
+  /** What the account may do in the open soma (lib/roles.ts). */
+  can = $derived(capabilities(this.soma?.role))
+  /** The account may change notes in the open soma (NoteHost). */
+  canEdit = $derived(this.can.write)
 
   entries = $state.raw<Entry[]>([])
   tree = $derived(buildTree(this.entries))
@@ -309,10 +312,10 @@ class App {
     if (id === this.somaId) router.goSoma(this.preferredSoma(), true)
   }
 
-  /** For write actions: false (and a hint) when the soma is only shared for reading. */
-  private mayEdit(): boolean {
-    if (this.canEdit) return true
-    if (this.soma) this.toast(strings.share.viewerHint, 'info')
+  /** For changing actions: false (and a hint) when the role does not allow it. */
+  private may(what: Capability): boolean {
+    if (this.can[what]) return true
+    if (this.soma) this.toast(strings.share.notAllowed[what], 'info')
     return false
   }
 
@@ -386,13 +389,13 @@ class App {
 
   /** Shows the inline name input for a new note or folder in parent. */
   startCreate(kind: 'new-note' | 'new-folder', parent: string): void {
-    if (!this.mayEdit()) return
+    if (!this.may('create')) return
     if (parent) this.expanded.add(parent)
     this.edit = { kind, parent }
   }
 
   async createEntry(kind: 'note' | 'folder', parent: string, rawName: string): Promise<boolean> {
-    if (!this.mayEdit()) return false
+    if (!this.may('create')) return false
     const problem = nameProblem(rawName)
     if (problem) {
       this.toast(problem)
@@ -447,7 +450,7 @@ class App {
   }
 
   private async moveTo(from: string, to: string): Promise<boolean> {
-    if (!this.mayEdit()) return false
+    if (!this.may('organize')) return false
     // Save first: the open note may be moved, or contain synapses to rewrite.
     await this.note?.flush()
     let res: api.MoveResult
@@ -495,7 +498,7 @@ class App {
   }
 
   async remove(path: string): Promise<void> {
-    if (!this.mayEdit()) return
+    if (!this.may('organize')) return
     const isDir = this.entries.find((e) => e.path === path)?.type === 'dir'
     const ok = await this.ask({
       title: isDir ? strings.dialogs.deleteFolderTitle : strings.dialogs.deleteNoteTitle,
@@ -571,7 +574,7 @@ class App {
    * returns the stored paths; failures are reported and skipped.
    */
   async upload(files: readonly File[], folder: string, rename?: (f: File) => string): Promise<string[]> {
-    if (!this.mayEdit()) return []
+    if (!this.may('create')) return []
     const stored: string[] = []
     for (const f of files) {
       const name = (rename?.(f) ?? f.name).normalize('NFC')
@@ -615,7 +618,7 @@ class App {
       await this.navigate(resolved)
       return
     }
-    if (!this.mayEdit()) return
+    if (!this.may('create')) return
     const path = markdown ? normalizePath(join(dirname(fromPath), target)) : newNotePath(target, fromPath)
     if (!path) {
       this.toast(strings.errors.byCode.invalid_path!)

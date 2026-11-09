@@ -6,9 +6,9 @@ search indexes are caches that can be rebuilt at any time.
 
 One container, one process, no external services, no external requests (air-gap friendly).
 
-> **Status: milestone 8** – editing together in real time, accounts with their own somas,
-> sharing with roles, sign-in through Keycloak (OpenID Connect) and an administration area, on
-> top of the notes app: file tree, an editor with live preview and optional Vim key bindings, a
+> **Status: milestone 9** – editing together in real time, accounts with their own somas,
+> sharing with people and groups in five roles, sign-in through Keycloak (OpenID Connect) and
+> an administration area, on top of the notes app: file tree, an editor with live preview and optional Vim key bindings, a
 > reading view, synapses with backlinks, full-text search with tags, live updates when files
 > change on disk, synapses that follow renamed notes, attachments (images, audio, video and
 > other files) and embedded notes, and a graph of all notes and synapses.
@@ -125,13 +125,23 @@ up to `DENDRONOTES_MAX_UPLOAD_MB`. The content must match the extension.
   soma when it is created (renaming the soma keeps the folder). Deleting a soma moves its
   folder to `DENDRONOTES_SOMAS_DIR/.trash/`, so the notes stay recoverable as files; a soma
   registered from `DENDRONOTES_SOMA_DIR` keeps its folder where it is.
-- **Sharing** ("Share soma …" in the soma switcher). The owner adds people by name with a
-  role: *can edit* (notes and files) or *can read*. Only the owner shares, renames, deletes or
-  hands the soma over to another member ("Make owner"; the previous owner stays as editor).
+- **Sharing** ("Share soma …" in the soma switcher). The owner adds people and groups by name,
+  each with a role; every role includes the ones above it:
+
+  | Role | May |
+  |------|-----|
+  | *Can read* (viewer) | read notes and files |
+  | *Can write* (writer) | change existing notes and tick tasks |
+  | *Can add* (contributor) | create notes, folders and files (uploads, new notes from synapses) |
+  | *Full access* (editor) | rename, move and delete |
+  | *Owner* | share, rename or delete the soma, hand it over ("Make owner"; the previous owner keeps full access) |
+
+  Someone who gets a soma both personally and through groups has the highest of those roles.
   Somas shared with you are listed under "Shared with you"; "People with access …" shows who
-  else is in and lets you leave. For readers the soma is read-only: no editing, uploads,
-  renaming or deleting – the server refuses such requests as well. Changes to sharing take
-  effect at once, also in browsers that have the soma open.
+  else is in and lets you leave a soma shared with you personally (access through a group
+  stays). What a role does not allow is hidden in the interface and refused by the server.
+  Changes to sharing take effect at once, also in browsers that have the soma open – someone
+  who loses access is disconnected right away.
 - **Profile** (your picture at the top right, which also signs you out): profile picture,
   display name, e-mail and, for accounts with a password, a new password. Changing it signs
   out your other sessions.
@@ -144,7 +154,11 @@ up to `DENDRONOTES_MAX_UPLOAD_MB`. The content must match the extension.
   - *Users*: create accounts, change role, disable, set a new password, sign out everywhere,
     delete. A deleted account's somas go to an account you choose or to the trash. The last
     admin can be neither demoted, disabled nor deleted.
-  - *Somas*: every soma with owner, size and folder; hand it to another owner or delete it.
+  - *Groups*: create, rename and delete groups and choose their members. The group
+    *Everyone* is built in and contains every account, also future ones; share a soma with it
+    to open it to the whole server.
+  - *Somas*: every soma with owner, members, groups, size and folder; hand it to another owner
+    or delete it.
   - *Sessions*: who is signed in from where; end single sessions.
   - *Server*: version, uptime, storage, open somas and the effective configuration (secrets
     show only whether they are set).
@@ -311,15 +325,15 @@ The administration area shows whether the provider is reachable.
 
 ## Security notes
 
-- Somas are separated per account: requests for a soma the account is not a member of are
-  answered with 404, as if it did not exist; members with too low a role get 403 (readers on
-  every changing request). The administration needs the admin role. A test runs every route
-  as non-member, reader and editor.
+- Somas are separated per account: requests for a soma the account has no access to (neither
+  personally nor through a group) are answered with 404, as if it did not exist; members with
+  too low a role get 403. The administration needs the admin role. A test runs every route as
+  non-member and with every role, given personally and through a group.
 - OpenID Connect uses the authorization code flow with PKCE (S256), a random state bound to
   the browser by a short-lived cookie (no login CSRF, each state works once) and a nonce; the
   ID token's signature, issuer, audience, expiry and nonce are checked. After sign-in the
   browser only returns to paths within dendronotes. The search for people to share with needs
-  two characters and shows only user and display names.
+  two characters and shows only user and display names (and group names).
 - Every file access goes through Go's `os.Root`: paths with `..`, absolute paths and symlinks
   pointing out of the soma are refused by the kernel-level lookup. API paths are validated
   beforehand and can never address hidden entries (`.git`, `.trash`, …). Symlinks inside the
@@ -375,12 +389,13 @@ which a test keeps in sync with the server.
 | `GET /api/somas/{soma}/graph`           | All notes and the synapses between them              |
 | `GET /api/somas/{soma}/events`          | Live updates (Server-Sent Events)                    |
 | `POST /api/somas/{soma}/collab/join`, `/leave`, `/push`, `/presence`; `GET …/collab/pull` | Editing together: open a note with the stream's id, send changes (CodeMirror change sets), cursors, catch up |
-| `GET /api/somas/{soma}/members`         | Who has access, with roles                           |
+| `GET /api/somas/{soma}/members`         | Who has access – people and groups – with roles     |
 | `PUT`, `DELETE /api/somas/{soma}/members/{id}` | Share with an account or change its role; take access away (owner) |
-| `DELETE /api/somas/{soma}/membership`   | Leave a soma shared with you                         |
+| `PUT`, `DELETE /api/somas/{soma}/groups/{id}` | Share with a group or change its role; take access away (owner) |
+| `DELETE /api/somas/{soma}/membership`   | Leave a soma shared with you personally              |
 | `GET /api/users/search?q=`              | Find people to share with (two characters or more)   |
 | `GET /api/auth/methods`, `/api/auth/oidc/login`, `/api/auth/oidc/callback` | Sign-in options and the OpenID Connect flow |
-| `/api/admin/users`, `/somas`, `/sessions`, `/server`, `/sso/check`, `/audit` | Administration (admins only) |
+| `/api/admin/users`, `/groups`, `/somas`, `/sessions`, `/server`, `/sso/check`, `/audit` | Administration (admins only) |
 
 ## Air gap and reproducible builds
 

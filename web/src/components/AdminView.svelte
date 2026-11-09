@@ -1,5 +1,6 @@
 <script lang="ts">
   import AdminUsers from './AdminUsers.svelte'
+  import AdminGroups from './AdminGroups.svelte'
   import AdminSomas from './AdminSomas.svelte'
   import AdminSessions from './AdminSessions.svelte'
   import AdminServer from './AdminServer.svelte'
@@ -9,7 +10,7 @@
   import { router } from '../lib/router.svelte'
   import { strings } from '../lib/strings'
 
-  const tabs = ['users', 'somas', 'sessions', 'server', 'audit'] as const
+  const tabs = ['users', 'groups', 'somas', 'sessions', 'server', 'audit'] as const
   const tab = $derived((tabs as readonly string[]).includes(router.adminTab) ? router.adminTab : 'users')
 </script>
 
@@ -30,6 +31,8 @@
     <div class="body">
       {#if tab === 'users'}
         <AdminUsers />
+      {:else if tab === 'groups'}
+        <AdminGroups />
       {:else if tab === 'somas'}
         <AdminSomas />
       {:else if tab === 'sessions'}

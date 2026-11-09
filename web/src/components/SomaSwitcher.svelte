@@ -11,7 +11,7 @@
 
   const mine = $derived(app.somas.filter((s) => s.role === 'owner'))
   const shared = $derived(app.somas.filter((s) => s.role !== 'owner'))
-  const roleLabel = (m: Membership) => (m.role === 'editor' ? strings.somas.editor : strings.somas.viewer)
+  const roleLabel = (m: Membership) => strings.somas.roles[m.role] ?? m.role
 
   function toggle() {
     open = !open

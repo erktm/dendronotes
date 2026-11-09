@@ -15,7 +15,6 @@
   function openMenu(e: MouseEvent, node: TreeNode | null) {
     e.preventDefault()
     e.stopPropagation()
-    if (!app.canEdit) return // every entry in the menu changes the soma
     // Keyboard-opened context menus report (0, 0): anchor at the element.
     let { clientX: x, clientY: y } = e
     if (x === 0 && y === 0 && e.currentTarget instanceof HTMLElement) {
@@ -25,13 +24,13 @@
     }
     const items: MenuItem[] = []
     const folder = node ? (node.type === 'dir' ? node.path : null) : ''
-    if (folder !== null) {
+    if (folder !== null && app.can.create) {
       items.push(
         { label: strings.tree.newNote, icon: 'note', action: () => startCreate('new-note', folder) },
         { label: strings.tree.newFolder, icon: 'folder-plus', action: () => startCreate('new-folder', folder) },
       )
     }
-    if (node) {
+    if (node && app.can.organize) {
       items.push(
         { label: strings.tree.rename, icon: 'pencil', action: () => (app.edit = { kind: 'rename', path: node.path }) },
         {
@@ -42,14 +41,14 @@
         },
       )
     }
-    menu = { x, y, items }
+    if (items.length) menu = { x, y, items } // every entry changes the soma
   }
 
   function ondragover(e: DragEvent) {
-    if (!app.canEdit) return
     const types = e.dataTransfer?.types ?? []
     const files = types.includes('Files')
-    if (!e.dataTransfer || (!types.includes(DRAG_TYPE) && !files)) return
+    // Files from the computer are added (create), tree entries moved (organize).
+    if (!e.dataTransfer || !(files ? app.can.create : types.includes(DRAG_TYPE) && app.can.organize)) return
     e.preventDefault()
     e.dataTransfer.dropEffect = files ? 'copy' : 'move'
     rootDrop = true
@@ -99,7 +98,7 @@
   {#if empty}
     <div class="empty">
       <p>{strings.soma.empty}</p>
-      {#if app.canEdit}
+      {#if app.can.create}
         <button type="button" onclick={() => startCreate('new-note', '')}>{strings.soma.createFirstNote}</button>
       {/if}
     </div>

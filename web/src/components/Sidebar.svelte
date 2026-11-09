@@ -49,7 +49,7 @@
   <header class="head">
     <Wordmark />
     <div class="actions">
-      {#if app.canEdit}
+      {#if app.can.create}
       <button type="button" aria-label={strings.tree.newNote} title={strings.tree.newNote} onclick={() => app.startCreate('new-note', targetFolder())}>
         <Icon name="plus" size={18} />
       </button>

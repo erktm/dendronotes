@@ -39,7 +39,7 @@
   function onkeydown(e: KeyboardEvent) {
     if (e.key === 'F2') {
       e.preventDefault()
-      app.edit = { kind: 'rename', path: node.path }
+      if (app.can.organize) app.edit = { kind: 'rename', path: node.path }
     } else if (e.key === 'Delete' || (e.key === 'Backspace' && e.metaKey)) {
       e.preventDefault()
       void app.remove(node.path)
@@ -61,7 +61,7 @@
   function ondragover(e: DragEvent) {
     const types = e.dataTransfer?.types ?? []
     const files = types.includes('Files')
-    if (!isDir || !app.canEdit || !e.dataTransfer || (!types.includes(DRAG_TYPE) && !files)) return
+    if (!isDir || !e.dataTransfer || !(files ? app.can.create : types.includes(DRAG_TYPE) && app.can.organize)) return
     e.preventDefault()
     e.stopPropagation()
     e.dataTransfer.dropEffect = files ? 'copy' : 'move'
@@ -111,7 +111,7 @@
       class:active
       class:muted={!isDir && !isNote(node.path)}
       use:cssVars={{ '--depth': depth }}
-      draggable={app.canEdit ? 'true' : 'false'}
+      draggable={app.can.organize ? 'true' : 'false'}
       title={node.path}
       onclick={activate}
       oncontextmenu={(e) => onmenu(e, node)}

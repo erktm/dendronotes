@@ -1,4 +1,5 @@
 import { request } from './client'
+import type { ShareRole, SomaRole } from '../roles'
 import { encodePath } from '../paths'
 import { somaBase } from './base'
 
@@ -62,7 +63,7 @@ export interface Me {
   logoutUrl?: string
 }
 
-export type SomaRole = 'owner' | 'editor' | 'viewer'
+export type { ShareRole, SomaRole } from '../roles'
 
 export interface Person {
   id: number
@@ -77,8 +78,20 @@ export interface Membership {
   id: string
   name: string
   folder: string
+  /** Effective: the highest of the personal share and the groups'. */
   role: SomaRole
+  /** Shared personally (only then can it be left). */
+  direct: boolean
   owner: Person
+}
+
+/** A set of accounts somas can be shared with; Everyone is every account. */
+export interface Group {
+  id: number
+  name: string
+  everyone: boolean
+  members: number
+  createdAt: string
 }
 
 const file = (p: string) => `${somaBase()}/notes/${encodePath(p)}`
@@ -142,21 +155,30 @@ export interface Member extends Person {
   role: SomaRole
 }
 
+export interface GroupGrant extends Group {
+  role: ShareRole
+}
+
 export interface Members {
   members: Member[]
-  /** The caller's own role. */
+  groups: GroupGrant[]
+  /** The caller's own (effective) role. */
   role: SomaRole
 }
 
 const membersURL = (id: string) => `/api/somas/${encodeURIComponent(id)}/members`
 export const members = (id: string) => request<Members>('GET', membersURL(id))
-export const setMember = (id: string, userId: number, role: 'editor' | 'viewer') =>
+export const setMember = (id: string, userId: number, role: ShareRole) =>
   request<Members>('PUT', `${membersURL(id)}/${userId}`, { body: { role } })
+const groupsURL = (id: string) => `/api/somas/${encodeURIComponent(id)}/groups`
+export const setSomaGroup = (id: string, groupId: number, role: ShareRole) =>
+  request<Members>('PUT', `${groupsURL(id)}/${groupId}`, { body: { role } })
+export const removeSomaGroup = (id: string, groupId: number) => request<Members>('DELETE', `${groupsURL(id)}/${groupId}`)
 export const removeMember = (id: string, userId: number) => request<Members>('DELETE', `${membersURL(id)}/${userId}`)
 export const leaveSoma = (id: string) => request<{ id: string }>('DELETE', `/api/somas/${encodeURIComponent(id)}/membership`)
-/** People to share with: at least two characters of user or display name. */
-export const searchUsers = (q: string, signal?: AbortSignal) =>
-  request<{ users: Person[] }>('GET', `/api/users/search?q=${encodeURIComponent(q)}`, { signal }).then((r) => r.users)
+/** People and groups to share with: at least two characters of a name. */
+export const searchPeople = (q: string, signal?: AbortSignal) =>
+  request<{ users: Person[]; groups: Group[] }>('GET', `/api/users/search?q=${encodeURIComponent(q)}`, { signal })
 export const deleteSoma = (id: string) => request<{ id: string }>('DELETE', `/api/somas/${encodeURIComponent(id)}`)
 
 export const updateProfile = (body: { displayName?: string; email?: string }) => request<User>('PATCH', '/api/me', { body })

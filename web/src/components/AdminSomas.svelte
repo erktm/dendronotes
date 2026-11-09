@@ -98,7 +98,7 @@
             <tr>
               <td><strong>{s.name}</strong><div class="admin-faint admin-mono">{s.id}</div></td>
               <td>{s.owner.displayName || s.owner.username}</td>
-              <td class="num">{s.members}</td>
+              <td class="num">{s.members}{#if s.groups}<div class="admin-faint">{t.groupsShared(s.groups)}</div>{/if}</td>
               <td class="num">{formatSize(s.bytes)}<div class="admin-faint">{t.files(s.files)}</div></td>
               <td class="admin-mono admin-muted">{s.path}</td>
               <td>
