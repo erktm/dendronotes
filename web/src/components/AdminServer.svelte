@@ -31,6 +31,19 @@
       checking = false
     }
   }
+
+  let checkingLDAP = $state(false)
+  async function checkLDAP() {
+    if (!info) return
+    checkingLDAP = true
+    try {
+      info = { ...info, ldap: await admin.checkLDAP() }
+    } catch (err) {
+      app.toast(errorMessage(err))
+    } finally {
+      checkingLDAP = false
+    }
+  }
 </script>
 
 <div class="admin-page">
@@ -109,6 +122,38 @@
           </div>
         {:else}
           <p class="admin-faint">{t.ssoOff}</p>
+        {/if}
+      </div>
+      <div class="admin-card wide">
+        <h3>{t.ldap}</h3>
+        {#if info.ldap}
+          {@const checked = admin.formatDate(info.ldap.checkedAt)}
+          <dl>
+            <dt>{t.ldapState}</dt>
+            <dd>
+              {#if checked}
+                <span class="admin-pill" class:accent={info.ldap.ready} class:warn={!info.ldap.ready}>{info.ldap.ready ? t.ldapReady : t.ldapDown}</span>
+              {:else}
+                <span class="admin-pill">{t.ldapUnchecked}</span>
+              {/if}
+              {#if info.ldap.error}<div class="admin-faint">{info.ldap.error}</div>{/if}
+            </dd>
+            <dt>{t.ldapServer}</dt>
+            <dd class="admin-mono">{info.ldap.url}</dd>
+            <dt>{t.ldapBind}</dt>
+            <dd class="admin-mono" class:admin-faint={!info.ldap.bindDN}>{info.ldap.bindDN || t.ldapAnonymous}</dd>
+            <dt>{t.ldapBase}</dt>
+            <dd class="admin-mono">{info.ldap.baseDN}</dd>
+            <dt>{t.ldapGroups}</dt>
+            <dd class="admin-mono" class:admin-faint={!info.ldap.groupBaseDN}>{info.ldap.groupBaseDN || t.ldapNoGroups}</dd>
+            <dt>{t.ssoChecked}</dt>
+            <dd>{checked || t.never}</dd>
+          </dl>
+          <div class="admin-actions">
+            <button type="button" class="admin-btn" disabled={checkingLDAP} onclick={() => void checkLDAP()}>{t.ldapCheck}</button>
+          </div>
+        {:else}
+          <p class="admin-faint">{t.ldapOff}</p>
         {/if}
       </div>
     </div>

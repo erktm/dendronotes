@@ -27,8 +27,8 @@
   })
 
   const local = $derived(app.user?.source === 'local')
-  // Name and e-mail of single sign-on accounts come from the provider.
-  const managed = $derived(app.user?.source === 'oidc')
+  // Name and e-mail of single sign-on and directory accounts come from there.
+  const managed = $derived(app.user?.source === 'oidc' || app.user?.source === 'ldap')
 
   async function saveProfile(e: SubmitEvent) {
     e.preventDefault()
@@ -83,7 +83,7 @@
       <label for="profile-email">{strings.profile.email}</label>
       <input id="profile-email" type="email" bind:value={email} maxlength="254" autocomplete="email" readonly={managed} />
       {#if managed}
-        <p class="hint">{strings.profile.managedByProvider}</p>
+        <p class="hint">{app.user.source === 'ldap' ? strings.profile.managedByDirectory : strings.profile.managedByProvider}</p>
       {:else}
         <div class="actions">
           <button type="submit" class="primary" disabled={busy}>{strings.profile.save}</button>

@@ -144,7 +144,9 @@
                   <span class="icon" aria-hidden="true"><Icon name="group" size={16} /></span>
                   <div>
                     <strong>{label(g)}</strong>
+                    {#if g.source === 'ldap'}<span class="admin-pill">{t.directoryBadge}</span>{/if}
                     {#if g.everyone}<div class="admin-faint">{t.everyoneDesc}</div>{/if}
+                    {#if g.source === 'ldap'}<div class="admin-faint">{t.directoryDesc}</div>{/if}
                   </div>
                 </div>
               </td>
@@ -153,7 +155,9 @@
                 {#if !g.everyone}
                   <div class="admin-actions" role="group" aria-label={t.actions(g.name)}>
                     <button type="button" class="admin-btn" onclick={() => openMembers(g)}>{t.manageMembers}</button>
-                    <button type="button" class="admin-btn" onclick={() => rename(g)}>{t.renameGroup}</button>
+                    {#if g.source !== 'ldap'}
+                      <button type="button" class="admin-btn" onclick={() => rename(g)}>{t.renameGroup}</button>
+                    {/if}
                     <button type="button" class="admin-btn danger" onclick={() => remove(g)}>{t.deleteGroup}</button>
                   </div>
                 {/if}
@@ -178,6 +182,7 @@
 >
   {#if current}
     {@const g = current.group}
+    {@const directory = g.source === 'ldap'}
     <form onsubmit={add}>
       <h2 id="group-members-title">{t.groupMembersTitle(g.name)}</h2>
       {#if current.members.length}
@@ -186,32 +191,38 @@
             <li>
               <Avatar id={m.id} name={name(m)} avatar={m.avatar} size={26} />
               <span class="who"><strong>{name(m)}</strong><span class="admin-faint">{m.username}</span></span>
-              <button
-                type="button"
-                class="remove"
-                disabled={busy}
-                aria-label={t.removeFromGroup(name(m))}
-                title={t.removeFromGroup(name(m))}
-                onclick={() => change(() => admin.removeGroupMember(g.id, m.id))}
-              >
-                <Icon name="close" size={15} />
-              </button>
+              {#if !directory}
+                <button
+                  type="button"
+                  class="remove"
+                  disabled={busy}
+                  aria-label={t.removeFromGroup(name(m))}
+                  title={t.removeFromGroup(name(m))}
+                  onclick={() => change(() => admin.removeGroupMember(g.id, m.id))}
+                >
+                  <Icon name="close" size={15} />
+                </button>
+              {/if}
             </li>
           {/each}
         </ul>
       {:else}
         <p class="admin-faint">{t.noGroupMembers}</p>
       {/if}
-      <label for="group-add">{t.addToGroupLabel}</label>
-      <div class="add">
-        <select id="group-add" class="admin-field" bind:value={adding} disabled={busy || !candidates.length}>
-          <option value={0}>–</option>
-          {#each candidates as u (u.id)}
-            <option value={u.id}>{u.displayName ? `${u.displayName} (${u.username})` : u.username}</option>
-          {/each}
-        </select>
-        <button type="submit" class="admin-btn" disabled={busy || !adding}>{t.addToGroup}</button>
-      </div>
+      {#if directory}
+        <p class="admin-faint">{t.directoryMembers}</p>
+      {:else}
+        <label for="group-add">{t.addToGroupLabel}</label>
+        <div class="add">
+          <select id="group-add" class="admin-field" bind:value={adding} disabled={busy || !candidates.length}>
+            <option value={0}>–</option>
+            {#each candidates as u (u.id)}
+              <option value={u.id}>{u.displayName ? `${u.displayName} (${u.username})` : u.username}</option>
+            {/each}
+          </select>
+          <button type="submit" class="admin-btn" disabled={busy || !adding}>{t.addToGroup}</button>
+        </div>
+      {/if}
       <div class="admin-actions">
         <button type="button" class="admin-btn primary" onclick={() => dialog?.close()}>{t.done}</button>
       </div>
@@ -220,6 +231,9 @@
 </dialog>
 
 <style>
+  strong + :global(.admin-pill) {
+    margin-left: 6px;
+  }
   .named {
     display: flex;
     align-items: center;

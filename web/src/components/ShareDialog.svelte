@@ -27,6 +27,8 @@
   const owner = $derived(soma?.role === 'owner')
   const name = (p: Person) => p.displayName || p.username
   const groupName = (g: Group) => (g.everyone ? t.everyone : g.name)
+  const groupHint = (g: Group) =>
+    g.everyone ? t.everyoneHint : g.source === 'ldap' ? t.directoryGroupSize(g.members) : t.groupSize(g.members)
 
   $effect(() => {
     if (!dialog) return
@@ -185,7 +187,7 @@
                   <span class="avatar" aria-hidden="true"><Icon name="group" size={15} /></span>
                   <span class="who">
                     <strong>{groupName(g)}</strong>
-                    <span class="faint">{g.everyone ? t.everyoneHint : t.groupSize(g.members)}</span>
+                    <span class="faint">{groupHint(g)}</span>
                   </span>
                   <Icon name="plus" size={15} />
                 </button>
@@ -251,7 +253,7 @@
               <span class="avatar" aria-hidden="true"><Icon name="group" size={15} /></span>
               <span class="who">
                 <strong>{groupName(g)}</strong>
-                <span class="faint">{g.everyone ? t.everyoneHint : t.groupSize(g.members)}</span>
+                <span class="faint">{groupHint(g)}</span>
               </span>
               {#if owner}
                 <select

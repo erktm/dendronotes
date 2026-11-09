@@ -33,7 +33,7 @@ export interface User {
   displayName: string
   email: string
   role: 'admin' | 'user'
-  source: 'local' | 'oidc' | 'proxy'
+  source: 'local' | 'oidc' | 'proxy' | 'ldap'
   disabled: boolean
   createdAt: string
   lastLoginAt: string
@@ -90,6 +90,8 @@ export interface Group {
   id: number
   name: string
   everyone: boolean
+  /** ldap: mirrors an Active Directory group (name and members come from there). */
+  source: 'local' | 'ldap'
   members: number
   createdAt: string
 }

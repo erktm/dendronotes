@@ -52,6 +52,7 @@ export interface ServerInfo {
   settings: Record<string, string>
   localLogin: boolean
   sso: SSOStatus | null
+  ldap: LDAPStatus | null
 }
 
 export interface SSOStatus {
@@ -62,6 +63,17 @@ export interface SSOStatus {
   checkedAt: string
   error?: string
   logout: boolean
+}
+
+export interface LDAPStatus {
+  url: string
+  baseDN: string
+  bindDN: string
+  groupBaseDN: string
+  ready: boolean
+  /** Zero time until the first check has finished. */
+  checkedAt: string
+  error?: string
 }
 
 export interface NewUser {
@@ -113,6 +125,7 @@ export const endSession = (id: number) => request<{ ok: boolean }>('DELETE', `/a
 
 export const server = () => request<ServerInfo>('GET', '/api/admin/server')
 export const checkSSO = () => request<SSOStatus>('POST', '/api/admin/sso/check')
+export const checkLDAP = () => request<LDAPStatus>('POST', '/api/admin/ldap/check')
 
 export const audit = (before = 0, limit = 100) =>
   request<{ entries: AuditEntry[] }>('GET', `/api/admin/audit?limit=${limit}${before ? `&before=${before}` : ''}`).then((r) => r.entries)
