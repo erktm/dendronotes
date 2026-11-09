@@ -75,6 +75,8 @@ var Vars = []string{
 	EnvOIDCAdminGroups, EnvOIDCAllowed, EnvOIDCLabel, EnvOIDCCAFile,
 }
 
+func init() { Vars = append(Vars, ldapVars...) }
+
 // Config holds all runtime settings.
 type Config struct {
 	SomasDir        string         // one folder per soma (source of truth)
@@ -106,6 +108,7 @@ type Auth struct {
 	PublicURL      string        // external base URL, e.g. https://notes.example.org (no trailing slash)
 	LocalLogin     bool          // sign-in with user name and password for everyone (else only the admin)
 	OIDC           OIDC          // sign-in through an OpenID Connect provider (Keycloak)
+	LDAP           LDAP          // sign-in against Active Directory / LDAP (ldap.go)
 }
 
 // OIDC configures sign-in through an OpenID Connect provider. It is enabled
@@ -363,8 +366,9 @@ func (c *Config) loadAuth(getenv func(string) string) error {
 	if a.OIDC.Enabled() && a.Mode != "local" {
 		errs = append(errs, fmt.Errorf("%s works only with %s=local (in proxy mode the proxy signs people in)", EnvOIDCIssuer, EnvAuthMode))
 	}
-	if !a.LocalLogin && !a.OIDC.Enabled() {
-		errs = append(errs, fmt.Errorf("%s=false needs %s, otherwise only the admin could sign in", EnvLocalLogin, EnvOIDCIssuer))
+	errs = append(errs, a.loadLDAP(getenv)) // after the mode: LDAP needs local
+	if !a.LocalLogin && !a.OIDC.Enabled() && !a.LDAP.Enabled() {
+		errs = append(errs, fmt.Errorf("%s=false needs %s or %s, otherwise only the admin could sign in", EnvLocalLogin, EnvOIDCIssuer, EnvLDAPURL))
 	}
 	return errors.Join(errs...)
 }
@@ -620,6 +624,9 @@ func (c Config) Describe(name string) string {
 		return c.Auth.OIDC.LoginLabel
 	case EnvOIDCCAFile:
 		return c.Auth.OIDC.CAFile
+	}
+	if v, ok := c.ldapSetting(name); ok {
+		return v
 	}
 	return ""
 }

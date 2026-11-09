@@ -156,13 +156,15 @@ up to `DENDRONOTES_MAX_UPLOAD_MB`. The content must match the extension.
     admin can be neither demoted, disabled nor deleted.
   - *Groups*: create, rename and delete groups and choose their members. The group
     *Everyone* is built in and contains every account, also future ones; share a soma with it
-    to open it to the whole server.
+    to open it to the whole server. Groups taken over from Active Directory are marked as such;
+    their name and members come from the directory (see [Authentication](#authentication)).
   - *Somas*: every soma with owner, members, groups, size and folder; create a soma for any
     account – optionally shared with a group right away, for example *Everyone* –, hand a soma
     to another owner or delete it.
   - *Sessions*: who is signed in from where; end single sessions.
-  - *Server*: version, uptime, storage, open somas and the effective configuration (secrets
-    show only whether they are set).
+  - *Server*: version, uptime, storage, open somas, whether the OpenID Connect provider and
+    the directory are reachable, and the effective configuration (secrets show only whether
+    they are set).
   - *Audit log*: sign-ins (failed ones too), account and soma changes.
 
 Disabling an account, setting its password or ending its sessions takes effect at once; open
@@ -238,7 +240,7 @@ All variables carry the `DENDRONOTES_` prefix. Variables without it are ignored.
 | `DENDRONOTES_AUTH_PROXY_ALLOWED_USERS` |                    | Optional comma-separated allow list for proxy mode         |
 | `DENDRONOTES_AUTH_PROXY_LOGOUT_URL`    |                    | Where "Sign out" leads in proxy mode, e.g. `/oauth2/sign_out` |
 | `DENDRONOTES_PUBLIC_URL`               |                    | External address, e.g. `https://notes.example.org` (needed for OIDC) |
-| `DENDRONOTES_LOCAL_LOGIN`              | `true`             | `false`: only the admin account may sign in with a password (needs OIDC) |
+| `DENDRONOTES_LOCAL_LOGIN`              | `true`             | `false`: only the admin account may sign in with a local password (needs OIDC or LDAP) |
 | `DENDRONOTES_OIDC_ISSUER`              |                    | Issuer URL of the provider, e.g. `https://sso.example.org/realms/main`; turns OIDC on |
 | `DENDRONOTES_OIDC_CLIENT_ID`           |                    | Client ID registered for dendronotes                       |
 | `DENDRONOTES_OIDC_CLIENT_SECRET_FILE`  |                    | File containing the client secret (none for a public client) |
@@ -249,6 +251,22 @@ All variables carry the `DENDRONOTES_` prefix. Variables without it are ignored.
 | `DENDRONOTES_OIDC_ALLOWED_GROUPS`      |                    | Comma-separated groups allowed to sign in (empty: everyone the provider lets through) |
 | `DENDRONOTES_OIDC_LOGIN_LABEL`         | `SSO`              | Provider name on the sign-in button ("Continue with …")   |
 | `DENDRONOTES_OIDC_CA_FILE`             |                    | PEM file with extra CA certificates for the provider (own CA, air gap) |
+| `DENDRONOTES_LDAP_URL`                 |                    | Active Directory / LDAP server, `ldaps://dc1.example.org` (enables directory sign-in) |
+| `DENDRONOTES_LDAP_START_TLS`           | `false`            | Encrypt an `ldap://` connection with StartTLS (plain `ldap://` works only for localhost) |
+| `DENDRONOTES_LDAP_CA_FILE`             |                    | PEM file with extra CA certificates for the directory (own CA) |
+| `DENDRONOTES_LDAP_BIND_DN`             |                    | Read-only service account that searches accounts and groups (empty: anonymous) |
+| `DENDRONOTES_LDAP_BIND_PASSWORD_FILE`  |                    | File with that account's password                         |
+| `DENDRONOTES_LDAP_BASE_DN`             |                    | Where accounts and groups are searched, e.g. `DC=example,DC=org` (required) |
+| `DENDRONOTES_LDAP_USER_FILTER`         | AD: `sAMAccountName`, `userPrincipalName` or `mail` = `{login}` | Filter that finds the account; `{login}` is what was typed |
+| `DENDRONOTES_LDAP_USERNAME_ATTR`       | `sAMAccountName`   | Attribute that becomes the user name                       |
+| `DENDRONOTES_LDAP_NAME_ATTR`           | `displayName`      | Attribute with the display name                            |
+| `DENDRONOTES_LDAP_EMAIL_ATTR`          | `mail`             | Attribute with the e-mail address                          |
+| `DENDRONOTES_LDAP_ID_ATTR`             | `objectGUID`       | Stable id of accounts and groups (`entryUUID` for OpenLDAP) |
+| `DENDRONOTES_LDAP_GROUP_BASE_DN`       |                    | Groups below this DN become dendronotes groups (empty: none) |
+| `DENDRONOTES_LDAP_GROUP_FILTER`        | AD: groups with the account as (nested) `member` | Filter for an account's groups; `{dn}` is the account's DN |
+| `DENDRONOTES_LDAP_GROUP_NAME_ATTR`     | `cn`               | Attribute with a group's name                              |
+| `DENDRONOTES_LDAP_ADMIN_GROUPS`        |                    | Semicolon-separated groups (names or DNs) whose members are admins, synced on every sign-in |
+| `DENDRONOTES_LDAP_ALLOWED_GROUPS`      |                    | Semicolon-separated groups (names or DNs) allowed to sign in (empty: every account found) |
 
 In local mode, one of the three admin password variables is required while no enabled admin
 account exists; without it, the server does not start. Once an admin exists, they are ignored
@@ -323,6 +341,50 @@ sign-in – to end it at once, disable the account or end its sessions in the ad
 With `DENDRONOTES_LOCAL_LOGIN=false` the sign-in page shows only the Keycloak button; the admin
 account can still sign in with its password at `/?local=1` should the provider be unreachable.
 The administration area shows whether the provider is reachable.
+
+**With Active Directory** (or another LDAP directory; in local mode, next to or instead of
+passwords). People sign in on the normal form with their directory account – user name
+(`sAMAccountName`), `user@domain` (UPN) or e-mail – and its password. dendronotes looks the
+account up with a read-only service account, then checks the password by binding as that
+account; it never stores the password. Local accounts come first: when what was typed matches a
+local account with a password, only that password counts.
+
+```bash
+-e DENDRONOTES_LDAP_URL=ldaps://dc1.example.org -e DENDRONOTES_LDAP_BIND_DN='CN=svc-dendronotes,OU=Service,DC=example,DC=org' -e DENDRONOTES_LDAP_BIND_PASSWORD_FILE=/run/secrets/ldap-bind-password -e DENDRONOTES_LDAP_BASE_DN='DC=example,DC=org' -e DENDRONOTES_LDAP_GROUP_BASE_DN='OU=dendronotes,OU=Groups,DC=example,DC=org' -e DENDRONOTES_LDAP_ADMIN_GROUPS='dendronotes-admins' -e DENDRONOTES_LDAP_ALLOWED_GROUPS='dendronotes-users;dendronotes-admins'
+```
+
+- **Connection**: `ldaps://` (port 636), or `ldap://` with `DENDRONOTES_LDAP_START_TLS=true`.
+  Certificates are verified; add your own CA with `DENDRONOTES_LDAP_CA_FILE`. Unencrypted
+  `ldap://` is refused except for `localhost`.
+- **Accounts** are created at the first sign-in (with an empty soma "Notes") and bound to the
+  directory's `objectGUID`, never to the name; a directory account called like an existing local
+  account gets a suffix (`erik-2`). Display name and e-mail follow the directory on every
+  sign-in and cannot be changed in dendronotes; there is no dendronotes password.
+- **Admins and access**: with `DENDRONOTES_LDAP_ADMIN_GROUPS`, membership decides the admin role
+  at every sign-in (without it, roles are managed in the administration area);
+  `DENDRONOTES_LDAP_ALLOWED_GROUPS` keeps everyone else out. Groups are given by name (`cn`) or
+  DN; nested groups count.
+- **Groups**: every group below `DENDRONOTES_LDAP_GROUP_BASE_DN` that someone is a member of –
+  directly or through nested groups – becomes a dendronotes group at their sign-in, so somas can
+  be shared with it like with any group. Name and members follow the directory: someone joins
+  or leaves a group at their next sign-in. In the administration area these groups are marked
+  *Active Directory*; they can be deleted (the next member's sign-in brings them back) but not
+  renamed or given other members. Keep the group base narrow – a dedicated OU – rather than the
+  whole domain. A local group with the same name stays separate; the directory group is shown
+  as "Name (AD)".
+- As with Keycloak, dendronotes keeps its own session (`DENDRONOTES_SESSION_TTL`): disabling an
+  account in Active Directory takes effect at its next sign-in. To end access at once, disable
+  the account or end its sessions in the administration area. With
+  `DENDRONOTES_LOCAL_LOGIN=false` only directory accounts and the admin account sign in with a
+  password.
+- The service account needs read access only. The administration area (*Server*) shows whether
+  the directory is reachable and checks the connection on request.
+
+Other LDAP directories work with their own filters and attributes, for example OpenLDAP:
+
+```bash
+-e DENDRONOTES_LDAP_USER_FILTER='(&(objectClass=inetOrgPerson)(|(uid={login})(mail={login})))' -e DENDRONOTES_LDAP_USERNAME_ATTR=uid -e DENDRONOTES_LDAP_NAME_ATTR=cn -e DENDRONOTES_LDAP_ID_ATTR=entryUUID -e DENDRONOTES_LDAP_GROUP_FILTER='(&(objectClass=groupOfNames)(member={dn}))'
+```
 
 ## Security notes
 

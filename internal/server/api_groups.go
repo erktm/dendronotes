@@ -34,6 +34,8 @@ func (s *Server) groupError(w http.ResponseWriter, r *http.Request, what string,
 	switch {
 	case errors.Is(err, store.ErrBuiltinGroup):
 		httpx.Error(w, http.StatusBadRequest, "builtin_group")
+	case errors.Is(err, store.ErrDirectoryGroup):
+		httpx.Error(w, http.StatusBadRequest, "directory_group")
 	case errors.Is(err, store.ErrTaken):
 		httpx.Error(w, http.StatusConflict, "name_taken")
 	case errors.Is(err, store.ErrNotFound):

@@ -521,6 +521,7 @@ func (s *Server) handleAdminServer(w http.ResponseWriter, r *http.Request) {
 		"settings":   settings,
 		"localLogin": s.cfg.Auth.LocalLogin,
 		"sso":        s.ssoStatus(),
+		"ldap":       s.ldapState(),
 	})
 }
 

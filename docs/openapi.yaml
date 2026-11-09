@@ -43,6 +43,10 @@ paths:
   /api/auth/login:
     post:
       summary: Sign in with the password (password mode only)
+      description: >
+        A local account with a password is checked here. Otherwise, with
+        DENDRONOTES_LDAP_URL set, the directory checks the password and the
+        account is created or updated from it (source `ldap`).
       security: []
       requestBody:
         required: true
@@ -67,10 +71,14 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Me" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403":
+          description: Account disabled (`account_disabled`) or not in an allowed directory group (`account_not_allowed`).
         "404":
           description: Not available in proxy mode (`not_available`).
         "429":
           description: Too many attempts (`rate_limited`); see the Retry-After header.
+        "503":
+          description: The directory cannot be reached (`directory_unavailable`).
   /api/auth/logout:
     post:
       summary: Sign out
@@ -949,7 +957,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/id"
     patch:
-      summary: Rename a group (admin; not Everyone)
+      summary: Rename a group (admin; not Everyone or directory groups)
       requestBody:
         required: true
         content:
@@ -980,7 +988,7 @@ paths:
       - $ref: "#/components/parameters/id"
       - { name: user, in: path, required: true, schema: { type: integer } }
     put:
-      summary: Add an account to a group (admin)
+      summary: Add an account to a group (admin; not to directory groups, their members come from the directory)
       responses:
         "200": { description: The group and its members. }
         "400": { $ref: "#/components/responses/Error" }
@@ -1067,6 +1075,25 @@ paths:
       responses:
         "200": { description: Provider state (as `sso` in /api/admin/server). }
         "404": { description: OpenID Connect is not configured. }
+  /api/admin/ldap/check:
+    post:
+      summary: Connect to the directory with the service account and read the base DN (admin)
+      responses:
+        "200":
+          description: Directory state (as `ldap` in /api/admin/server; null there without LDAP).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url: { type: string }
+                  baseDN: { type: string }
+                  bindDN: { type: string }
+                  groupBaseDN: { type: string }
+                  ready: { type: boolean }
+                  checkedAt: { type: string, format: date-time }
+                  error: { type: string }
+        "404": { description: LDAP is not configured. }
   /api/admin/audit:
     get:
       summary: Audit log, newest first (admin)
@@ -1135,6 +1162,8 @@ components:
             invalid_role, invalid_display_name, invalid_email, last_admin, self,
             invalid_transfer, too_many_somas, unknown_user, owner_cannot_leave,
             managed_by_provider, not_available, unknown_stream, resync,
+            builtin_group, directory_group, name_taken, directory_unavailable,
+            account_not_allowed,
             version_mismatch, invalid_update, shutting_down, internal_error.
     Readiness:
       type: object
@@ -1161,7 +1190,7 @@ components:
         displayName: { type: string }
         email: { type: string }
         role: { type: string, enum: [admin, user] }
-        source: { type: string, enum: [local, oidc, proxy] }
+        source: { type: string, enum: [local, oidc, proxy, ldap] }
         disabled: { type: boolean }
         createdAt: { type: string, format: date-time }
         lastLoginAt: { type: string, format: date-time }
@@ -1241,6 +1270,10 @@ components:
         id: { type: integer }
         name: { type: string }
         everyone: { type: boolean, description: The built-in group of every enabled account. }
+        source:
+          type: string
+          enum: [local, ldap]
+          description: ldap groups mirror a directory group; name and members come from the directory at sign-in.
         members: { type: integer }
         createdAt: { type: string, format: date-time }
     Members:

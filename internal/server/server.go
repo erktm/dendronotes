@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"dendronotes/internal/clientip"
 	"dendronotes/internal/config"
 	"dendronotes/internal/httpx"
+	"dendronotes/internal/ldap"
 	"dendronotes/internal/soma"
 	"dendronotes/internal/somas"
 	"dendronotes/internal/sso"
@@ -28,16 +30,20 @@ var hashParams auth.Params
 
 // Server bundles the HTTP server, its dependencies and the readiness state.
 type Server struct {
-	cfg     config.Config
-	log     *slog.Logger
-	store   *store.Store
-	somas   *somas.Manager
-	auth    *auth.Authenticator
-	sso     *sso.Provider // nil without OIDC
-	ips     *clientip.Resolver
-	assets  *assets
-	version string
-	started time.Time
+	cfg   config.Config
+	log   *slog.Logger
+	store *store.Store
+	somas *somas.Manager
+	auth  *auth.Authenticator
+	sso   *sso.Provider // nil without OIDC
+	ldap  *ldap.Client  // nil without Active Directory / LDAP
+	// ldapLast is the last directory check (api_ldap.go).
+	ldapMu   sync.Mutex
+	ldapLast ldapStatus
+	ips      *clientip.Resolver
+	assets   *assets
+	version  string
+	started  time.Time
 
 	httpSrv  *http.Server
 	ready    atomic.Bool // true only after a complete startup
@@ -85,21 +91,34 @@ func New(cfg config.Config, log *slog.Logger, webFS fs.FS, version string) (*Ser
 		s.sso.Start(ctx)
 		s.addCloser("oidc", func() error { stop(); return nil })
 	}
+	var directory auth.Directory // stays nil (not a typed nil) without LDAP
+	if l := cfg.Auth.LDAP; l.Enabled() {
+		if s.ldap, err = ldap.New(l); err != nil {
+			return fail(fmt.Errorf("ldap: %w", err))
+		}
+		directory = s.ldap
+		go s.checkLDAP(context.Background()) // a first status for the administration area
+	}
 	s.auth, err = auth.New(auth.Config{
-		Mode:               auth.Mode(cfg.Auth.Mode),
-		SessionTTL:         cfg.Auth.SessionTTL,
-		CookieSecure:       cfg.Auth.CookieSecure,
-		HashParams:         hashParams,
-		AdminUsername:      cfg.Auth.AdminUsername,
-		PasswordsAdminOnly: !cfg.Auth.LocalLogin,
-		SSO:                s.sso,
-		SSOLabel:           cfg.Auth.OIDC.LoginLabel,
-		AdminGroups:        cfg.Auth.OIDC.AdminGroups,
-		AllowedGroups:      cfg.Auth.OIDC.AllowedGroups,
-		ProxyHeader:        cfg.Auth.ProxyHeader,
-		ProxyAllowed:       cfg.Auth.ProxyAllowed,
-		ProxyLogoutURL:     cfg.Auth.ProxyLogoutURL,
-		OnProvision:        s.welcome,
+		Mode:                   auth.Mode(cfg.Auth.Mode),
+		SessionTTL:             cfg.Auth.SessionTTL,
+		CookieSecure:           cfg.Auth.CookieSecure,
+		HashParams:             hashParams,
+		AdminUsername:          cfg.Auth.AdminUsername,
+		PasswordsAdminOnly:     !cfg.Auth.LocalLogin,
+		SSO:                    s.sso,
+		SSOLabel:               cfg.Auth.OIDC.LoginLabel,
+		AdminGroups:            cfg.Auth.OIDC.AdminGroups,
+		AllowedGroups:          cfg.Auth.OIDC.AllowedGroups,
+		Directory:              directory,
+		DirectoryAdminGroups:   cfg.Auth.LDAP.AdminGroups,
+		DirectoryAllowedGroups: cfg.Auth.LDAP.AllowedGroups,
+		DirectoryGroups:        cfg.Auth.LDAP.GroupBaseDN != "",
+		OnDirectoryGroups:      s.publishGroupsAccess,
+		ProxyHeader:            cfg.Auth.ProxyHeader,
+		ProxyAllowed:           cfg.Auth.ProxyAllowed,
+		ProxyLogoutURL:         cfg.Auth.ProxyLogoutURL,
+		OnProvision:            s.welcome,
 	}, st, s.ips, log)
 	if err != nil {
 		return fail(fmt.Errorf("auth: %w", err))

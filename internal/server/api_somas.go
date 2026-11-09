@@ -161,7 +161,7 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u, _ := auth.UserFrom(r.Context())
-	if u.Source == store.SourceOIDC && s.sso != nil {
+	if (u.Source == store.SourceOIDC && s.sso != nil) || u.Source == store.SourceLDAP {
 		// The provider is the source of name and e-mail; they are updated
 		// on every sign-in.
 		httpx.Error(w, http.StatusBadRequest, "managed_by_provider")

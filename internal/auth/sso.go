@@ -6,7 +6,6 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -138,73 +137,13 @@ func (a *Authenticator) HandleSSOCallback(w http.ResponseWriter, r *http.Request
 // subject only, never by name: a local account "erik" is not taken over by
 // a provider user "erik", who gets "erik-2" instead.
 func (a *Authenticator) ssoAccount(ctx context.Context, c sso.Claims, ip string) (store.User, error) {
-	role := store.RoleUser
 	syncRole := len(a.cfg.AdminGroups) > 0
-	if syncRole && sso.InGroup(c.Groups, a.cfg.AdminGroups) {
-		role = store.RoleAdmin
-	}
-	name := truncate(strings.TrimSpace(c.Name), 100)
-	email := truncate(strings.TrimSpace(c.Email), 254)
-
-	u, err := a.store.UserByOIDC(ctx, c.Issuer, c.Subject)
-	if err == nil {
-		var up store.UserUpdate
-		changed := false
-		if name != "" && name != u.DisplayName {
-			up.DisplayName, changed = &name, true
-		}
-		if email != "" && email != u.Email {
-			up.Email, changed = &email, true
-		}
-		if syncRole && role != u.Role {
-			up.Role, changed = &role, true
-			a.store.Audit(ctx, store.AuditEntry{Actor: "system", Action: "user.update", Target: u.Username,
-				Detail: "role " + string(role) + " from provider groups", IP: ip})
-		}
-		if !changed {
-			return u, nil
-		}
-		return a.store.UpdateUser(ctx, u.ID, up)
-	}
-	if !errors.Is(err, store.ErrNotFound) {
-		return store.User{}, err
-	}
-
-	base := usernameFrom(c.Username)
-	if base == "" {
-		base = usernameFrom(strings.Split(c.Email, "@")[0])
-	}
-	if base == "" {
-		base = "user"
-	}
-	for i := 1; i <= 50; i++ {
-		candidate := base
-		if i > 1 {
-			candidate = base + "-" + strconv.Itoa(i)
-		}
-		u, err = a.store.CreateUser(ctx, store.User{
-			Username: candidate, DisplayName: name, Email: email, Role: role,
-			Source: store.SourceOIDC, OIDCIssuer: c.Issuer, OIDCSubject: c.Subject,
-		})
-		if !errors.Is(err, store.ErrTaken) {
-			break
-		}
-		// Taken may also mean the identity was just created by a parallel sign-in.
-		if existing, lerr := a.store.UserByOIDC(ctx, c.Issuer, c.Subject); lerr == nil {
-			return existing, nil
-		}
-	}
-	if err != nil {
-		return store.User{}, err
-	}
-	a.log.Info("account created on first SSO sign-in", "user", u.Username)
-	a.store.Audit(ctx, store.AuditEntry{ActorID: u.ID, Actor: u.Username, Action: "user.provision", Detail: "sso", IP: ip})
-	if a.cfg.OnProvision != nil {
-		if err := a.cfg.OnProvision(ctx, u); err != nil {
-			a.log.Error("preparing new account failed", "user", u.Username, "err", err)
-		}
-	}
-	return u, nil
+	return a.externalAccount(ctx, external{
+		via: "sso", source: store.SourceOIDC, issuer: c.Issuer, subject: c.Subject,
+		username: c.Username, name: c.Name, email: c.Email,
+		syncRole: syncRole, admin: syncRole && sso.InGroup(c.Groups, a.cfg.AdminGroups),
+		lookup: func(ctx context.Context) (store.User, error) { return a.store.UserByOIDC(ctx, c.Issuer, c.Subject) },
+	}, ip)
 }
 
 // usernameFrom turns a provider user name into a valid one: characters that

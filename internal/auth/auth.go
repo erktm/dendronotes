@@ -66,6 +66,16 @@ type Config struct {
 	AdminGroups   []string // provider groups whose members are admins (empty: not synced)
 	AllowedGroups []string // only members of these groups may sign in (empty: everyone)
 
+	// Directory checks the passwords of accounts that are not local (Active
+	// Directory / LDAP, see directory.go); nil: off.
+	Directory              Directory
+	DirectoryAdminGroups   []string // groups (names or DNs) whose members are admins (empty: not synced)
+	DirectoryAllowedGroups []string // only members may sign in (empty: every account found)
+	// DirectoryGroups syncs the account's groups below the group base into
+	// dendronotes groups; OnDirectoryGroups hears which ones changed members.
+	DirectoryGroups   bool
+	OnDirectoryGroups func(ctx context.Context, changed []int64)
+
 	// Proxy mode.
 	ProxyHeader    string
 	ProxyAllowed   []string // empty: every user the proxy lets through
@@ -351,7 +361,8 @@ type MethodsResponse struct {
 
 // HandleMethods lists the ways to sign in (public).
 func (a *Authenticator) HandleMethods(w http.ResponseWriter, r *http.Request) {
-	m := MethodsResponse{Mode: a.cfg.Mode, Local: a.cfg.Mode == ModeLocal && !a.cfg.PasswordsAdminOnly}
+	// The password form is for local accounts and for the directory.
+	m := MethodsResponse{Mode: a.cfg.Mode, Local: a.cfg.Mode == ModeLocal && (!a.cfg.PasswordsAdminOnly || a.cfg.Directory != nil)}
 	if a.cfg.Mode == ModeLocal && a.cfg.SSO != nil {
 		m.SSO = &struct {
 			Label string `json:"label"`
@@ -412,6 +423,11 @@ func (a *Authenticator) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		fail("malformed")
 		return
 	}
+	// Not a local password account: the directory decides (if there is one).
+	if a.cfg.Directory != nil && (errors.Is(err, store.ErrNotFound) || (err == nil && u.Source == store.SourceLDAP)) {
+		a.directoryLogin(w, r, name, body.Password, ip, fail)
+		return
+	}
 	if a.cfg.PasswordsAdminOnly && (err != nil || !strings.EqualFold(u.Username, a.cfg.AdminUsername)) {
 		fail("password sign-in is off")
 		return
@@ -434,13 +450,18 @@ func (a *Authenticator) HandleLogin(w http.ResponseWriter, r *http.Request) {
 		fail("credentials")
 		return
 	}
+	a.startSession(w, r, u, ip, "")
+}
+
+// startSession signs an account in after its password was checked: refused
+// for disabled accounts, else a session cookie and the account as answer.
+func (a *Authenticator) startSession(w http.ResponseWriter, r *http.Request, u store.User, ip, via string) {
 	if u.Disabled {
 		a.log.Warn("login of disabled account", "ip", ip, "user", u.Username)
 		a.store.Audit(r.Context(), store.AuditEntry{ActorID: u.ID, Actor: u.Username, Action: "login.failed", Detail: "disabled", IP: ip})
 		httpx.Error(w, http.StatusForbidden, "account_disabled")
 		return
 	}
-
 	token, err := a.store.CreateSession(r.Context(), u.ID, a.cfg.SessionTTL, ip, r.UserAgent())
 	if err != nil {
 		a.log.Error("creating session failed", "err", err)
@@ -449,8 +470,8 @@ func (a *Authenticator) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = a.store.TouchLogin(r.Context(), u.ID)
 	a.setCookie(w, r, token)
-	a.log.Info("login", "ip", ip, "user", u.Username)
-	a.store.Audit(r.Context(), store.AuditEntry{ActorID: u.ID, Actor: u.Username, Action: "login", IP: ip})
+	a.log.Info("login", "ip", ip, "user", u.Username, "via", via)
+	a.store.Audit(r.Context(), store.AuditEntry{ActorID: u.ID, Actor: u.Username, Action: "login", Detail: via, IP: ip})
 	httpx.WriteJSON(w, http.StatusOK, MeResponse{User: u, Mode: a.cfg.Mode})
 }
 

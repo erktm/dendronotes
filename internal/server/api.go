@@ -95,6 +95,7 @@ func (s *Server) routes() []route {
 		{"DELETE", "/api/admin/sessions/{id}", s.handleAdminEndSession, adminOnly},
 		{"GET", "/api/admin/server", s.handleAdminServer, adminOnly},
 		{"POST", "/api/admin/sso/check", s.handleAdminSSOCheck, adminOnly},
+		{"POST", "/api/admin/ldap/check", s.handleAdminLDAPCheck, adminOnly},
 		{"GET", "/api/admin/audit", s.handleAdminAudit, adminOnly},
 	}
 }
