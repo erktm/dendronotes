@@ -140,6 +140,11 @@ func New(cfg config.Config, log *slog.Logger, webFS fs.FS, version string) (*Ser
 		Log:            log,
 	})
 	s.addCloser("somas", s.somas.Close)
+	if cfg.TrashDays > 0 {
+		trashCtx, stopTrash := context.WithCancel(context.Background())
+		go s.expireTrashEvery(trashCtx)
+		s.addCloser("trash", func() error { stopTrash(); return nil })
+	}
 	if s.ldap != nil && cfg.Auth.LDAP.SyncInterval > 0 {
 		s.ldapSync.Interval = cfg.Auth.LDAP.SyncInterval.String()
 		syncCtx, stopSync := context.WithCancel(context.Background())

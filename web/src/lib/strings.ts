@@ -256,6 +256,10 @@ export const strings = {
     open: 'Trash',
     close: 'Close trash',
     intro: 'Deleted files and folders wait here until they are restored or deleted for good.',
+    introDays: (days: number) =>
+      `Deleted files and folders wait here for ${days === 1 ? 'a day' : `${days} days`} and can be restored until then; after that they are deleted for good.`,
+    expires: (days: number) =>
+      days <= 0 ? 'deleted for good today' : days === 1 ? 'deleted for good tomorrow' : `deleted for good in ${days} days`,
     empty: 'The trash is empty.',
     loading: 'Loading …',
     from: (folder: string) => (folder ? `from ${folder}` : 'from the top level'),

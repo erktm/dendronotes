@@ -145,7 +145,8 @@ export interface TrashItem {
 
 const trashURL = (p: string) => `${somaBase()}/trash/${encodePath(p)}`
 
-export const trashItems = () => request<{ items: TrashItem[] }>('GET', `${somaBase()}/trash`).then((r) => r.items)
+/** The trash, and after how many days entries are deleted for good (0: never). */
+export const trashItems = () => request<{ items: TrashItem[]; keepDays: number }>('GET', `${somaBase()}/trash`)
 export const readTrashNote = (path: string) => request<Note>('GET', trashURL(path))
 export const restoreTrash = (path: string) => request<{ path: string }>('POST', trashURL(path))
 export const purgeTrash = (path: string) => request<{ path: string }>('DELETE', trashURL(path))

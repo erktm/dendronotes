@@ -42,6 +42,7 @@ const (
 	EnvIgnore          = Prefix + "IGNORE"
 	EnvRescanInterval  = Prefix + "RESCAN_INTERVAL"
 	EnvHistoryDays     = Prefix + "HISTORY_DAYS"
+	EnvTrashDays       = Prefix + "TRASH_DAYS"
 	EnvAuthMode        = Prefix + "AUTH_MODE"
 	EnvAdminUsername   = Prefix + "ADMIN_USERNAME"
 	EnvAdminHash       = Prefix + "ADMIN_PASSWORD_HASH"
@@ -70,7 +71,7 @@ const (
 // (enforced by a test).
 var Vars = []string{
 	EnvSomasDir, EnvSomaDir, EnvDataDir, EnvHTTPPort, EnvMetricsPort, EnvLogLevel, EnvLogFormat, EnvShutdownTimeout,
-	EnvTrustedProxies, EnvMaxNoteMB, EnvMaxUploadMB, EnvIgnore, EnvRescanInterval, EnvHistoryDays, EnvAuthMode, EnvAdminUsername,
+	EnvTrustedProxies, EnvMaxNoteMB, EnvMaxUploadMB, EnvIgnore, EnvRescanInterval, EnvHistoryDays, EnvTrashDays, EnvAuthMode, EnvAdminUsername,
 	EnvAdminHash, EnvAdminHashFile, EnvAdminPassword, EnvSessionTTL, EnvCookieSecure,
 	EnvProxyHeader, EnvProxyAllowed, EnvProxyLogoutURL, EnvPublicURL, EnvLocalLogin,
 	EnvOIDCIssuer, EnvOIDCClientID, EnvOIDCSecretFile, EnvOIDCScopes, EnvOIDCUserClaim, EnvOIDCGroupsClaim,
@@ -95,6 +96,7 @@ type Config struct {
 	Ignore          []string       // extra name patterns hidden from the tree
 	RescanInterval  time.Duration  // periodic full comparison of soma and index; 0 = off
 	HistoryDays     int            // how long earlier versions of notes are kept; 0 = forever
+	TrashDays       int            // entries in a soma's trash are deleted for good after this; 0 = never
 	Auth            Auth
 }
 
@@ -155,6 +157,7 @@ const (
 	DefaultMaxNoteMB       = 5
 	DefaultMaxUploadMB     = 25
 	DefaultHistoryDays     = 90
+	DefaultTrashDays       = 7
 	DefaultProxyHeader     = "X-Forwarded-User"
 	DefaultOIDCScopes      = "openid profile email"
 	DefaultOIDCUserClaim   = "preferred_username"
@@ -178,6 +181,7 @@ func Load(getenv func(string) string) (Config, error) {
 		MaxNoteBytes:    DefaultMaxNoteMB << 20,
 		MaxUploadBytes:  DefaultMaxUploadMB << 20,
 		HistoryDays:     DefaultHistoryDays,
+		TrashDays:       DefaultTrashDays,
 		Auth: Auth{
 			Mode:          "local",
 			AdminUsername: DefaultAdminUsername,
@@ -264,6 +268,15 @@ func Load(getenv func(string) string) (Config, error) {
 			add(fmt.Errorf("%s: %q must be a whole number of days (0 keeps everything)", EnvHistoryDays, v))
 		} else {
 			c.HistoryDays = days
+		}
+	}
+
+	if v := getenv(EnvTrashDays); v != "" {
+		days, err := strconv.Atoi(v)
+		if err != nil || days < 0 || days > 36500 {
+			add(fmt.Errorf("%s: %q must be a whole number of days (0 keeps everything)", EnvTrashDays, v))
+		} else {
+			c.TrashDays = days
 		}
 	}
 
@@ -616,6 +629,8 @@ func (c Config) Describe(name string) string {
 		return c.RescanInterval.String()
 	case EnvHistoryDays:
 		return strconv.Itoa(c.HistoryDays)
+	case EnvTrashDays:
+		return strconv.Itoa(c.TrashDays)
 	case EnvAuthMode:
 		return c.Auth.Mode
 	case EnvAdminUsername:

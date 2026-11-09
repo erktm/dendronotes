@@ -110,7 +110,10 @@ admin's first soma.
   and folders wait in the soma's `.trash` folder – the same place Obsidian uses – with who
   deleted them, when and from where. Restore puts them back where they were (missing folders
   are created again, an occupied name gets a " (n)" suffix); the owner can also delete single
-  entries or everything for good, which takes their history along.
+  entries or everything for good, which takes their history along. After
+  `DENDRONOTES_TRASH_DAYS` (7 days) entries are deleted for good on their own – for files put
+  into the trash elsewhere, counted from when dendronotes first sees them. Deleted somas are not
+  affected; admins restore or delete them.
 - **Download as ZIP** (soma switcher). All visible notes, files and folders of the soma as they
   are now; hidden folders such as `.trash` and `.obsidian` stay out.
 - **Live updates.** Changes made outside dendronotes – another editor, git, a sync tool –
@@ -279,6 +282,7 @@ All variables carry the `DENDRONOTES_` prefix. Variables without it are ignored.
 | `DENDRONOTES_MAX_UPLOAD_MB`            | `25`               | Largest file that can be uploaded (images, PDFs, media …)  |
 | `DENDRONOTES_IGNORE`                   |                    | Extra name patterns hidden from the tree, e.g. `node_modules,*.tmp` (dot entries are always hidden) |
 | `DENDRONOTES_RESCAN_INTERVAL`          | `5m`               | How often the whole soma is compared with the index, in addition to file system events; `0` turns it off |
+| `DENDRONOTES_TRASH_DAYS`               | `7`                | Entries in a soma's trash are deleted for good after this many days (with their history and comments); `0` keeps them |
 | `DENDRONOTES_HISTORY_DAYS`             | `90`               | How long earlier versions of notes are kept (the newest version of every note always stays); `0` keeps everything |
 | `DENDRONOTES_TRUSTED_PROXIES`          |                    | IPs/CIDRs of reverse proxies whose `X-Forwarded-*` headers are believed |
 | `DENDRONOTES_AUTH_MODE`                | `local`            | `local` (accounts with passwords) or `proxy`               |

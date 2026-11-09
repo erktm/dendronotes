@@ -848,12 +848,15 @@ paths:
         (Obsidian) are listed one by one with their file time.
       responses:
         "200":
-          description: Newest first; `path` is relative to the trash.
+          description: >
+            Newest first; `path` is relative to the trash. `keepDays`: entries are
+            deleted for good this many days after `deletedAt` (0: never).
           content:
             application/json:
               schema:
                 type: object
                 properties:
+                  keepDays: { type: integer }
                   items:
                     type: array
                     items:

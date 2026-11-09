@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
+	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -78,13 +81,14 @@ func (s *Server) trashedFolders(r *http.Request, somaID string) (map[string]bool
 
 // trashItems combines the files in the trash with what is known about them.
 // Entries without a record (deleted by Obsidian, or before dendronotes kept
-// records) are listed file by file with their own path and time.
-func (s *Server) trashItems(r *http.Request, rt *somas.Runtime) ([]trashItem, error) {
+// records) are listed file by file and get a record now: their time in the
+// trash counts from when dendronotes first saw them.
+func (s *Server) trashItems(ctx context.Context, rt *somas.Runtime) ([]trashItem, error) {
 	entries, err := rt.Soma.TrashTree()
 	if err != nil {
 		return nil, err
 	}
-	records, err := s.store.TrashRecords(r.Context(), rt.ID)
+	records, err := s.store.TrashRecords(ctx, rt.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +104,7 @@ func (s *Server) trashItems(r *http.Request, rt *somas.Runtime) ([]trashItem, er
 	for _, rec := range records {
 		e, ok := byPath[rec.Path]
 		if !ok {
-			_ = s.store.RemoveTrash(r.Context(), rt.ID, rec.Path) // gone (purged elsewhere)
+			_ = s.store.RemoveTrash(ctx, rt.ID, rec.Path) // gone (purged elsewhere)
 			continue
 		}
 		it := trashItem{Path: rec.Path, Original: rec.Original, Type: e.Type, Size: e.Size, DeletedAt: rec.DeletedAt, DeletedBy: rec.DeletedBy}
@@ -120,7 +124,10 @@ func (s *Server) trashItems(r *http.Request, rt *somas.Runtime) ([]trashItem, er
 		if e.Type != "file" || recorded[e.Path] || slices.ContainsFunc(recordedDirs, func(d string) bool { return under(e.Path, d) }) {
 			continue
 		}
-		items = append(items, trashItem{Path: e.Path, Original: e.Path, Type: "file", Size: e.Size, DeletedAt: time.UnixMilli(e.MTime).UTC()})
+		if err := s.store.AddTrash(ctx, store.TrashRecord{SomaID: rt.ID, Path: e.Path, Original: e.Path}); err != nil {
+			return nil, err
+		}
+		items = append(items, trashItem{Path: e.Path, Original: e.Path, Type: "file", Size: e.Size, DeletedAt: time.Now().UTC().Truncate(time.Second)})
 	}
 	slices.SortStableFunc(items, func(a, b trashItem) int {
 		if c := b.DeletedAt.Compare(a.DeletedAt); c != 0 {
@@ -132,12 +139,88 @@ func (s *Server) trashItems(r *http.Request, rt *somas.Runtime) ([]trashItem, er
 }
 
 func (s *Server) handleListTrash(w http.ResponseWriter, r *http.Request) {
-	items, err := s.trashItems(r, runtimeOf(r))
+	rt := runtimeOf(r)
+	if _, err := s.expireTrash(r.Context(), rt, time.Now()); err != nil {
+		s.log.Error("emptying old trash entries failed", "soma", rt.ID, "err", err)
+	}
+	items, err := s.trashItems(r.Context(), rt)
 	if err != nil {
 		s.somaError(w, r, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": items})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"items": items, "keepDays": s.cfg.TrashDays})
+}
+
+// expireTrash deletes the entries that are longer than TRASH_DAYS in the
+// trash for good (with their history and comments).
+func (s *Server) expireTrash(ctx context.Context, rt *somas.Runtime, now time.Time) (int, error) {
+	if s.cfg.TrashDays <= 0 {
+		return 0, nil
+	}
+	items, err := s.trashItems(ctx, rt)
+	if err != nil {
+		return 0, err
+	}
+	limit := now.AddDate(0, 0, -s.cfg.TrashDays)
+	n := 0
+	for _, it := range items {
+		if !it.DeletedAt.Before(limit) {
+			continue
+		}
+		if err := rt.Soma.PurgeTrash(it.Path); err != nil && !errors.Is(err, soma.ErrNotFound) {
+			return n, err
+		}
+		if err := s.store.RemoveTrash(ctx, rt.ID, it.Path); err != nil {
+			return n, err
+		}
+		s.forget(rt, soma.TrashDir+"/"+it.Path)
+		n++
+	}
+	if n > 0 {
+		s.log.Info("old trash entries deleted", "soma", rt.ID, "entries", n, "days", s.cfg.TrashDays)
+		s.store.Audit(ctx, store.AuditEntry{Actor: "system", Action: "trash.expire", Target: rt.ID, Detail: strconv.Itoa(n)})
+		trashChanged(rt)
+	}
+	return n, nil
+}
+
+// expireTrashEvery empties old trash entries of all somas once an hour
+// (somas with an empty trash are not even opened).
+func (s *Server) expireTrashEvery(ctx context.Context) {
+	tick := time.NewTicker(time.Hour)
+	defer tick.Stop()
+	for {
+		s.expireAllTrash(ctx)
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+		}
+	}
+}
+
+func (s *Server) expireAllTrash(ctx context.Context) {
+	list, err := s.store.AllSomas(ctx)
+	if err != nil {
+		s.log.Error("listing somas for the trash failed", "err", err)
+		return
+	}
+	for _, info := range list {
+		if ctx.Err() != nil {
+			return
+		}
+		if entries, err := os.ReadDir(filepath.Join(s.somas.Path(info.Soma), soma.TrashDir)); err != nil || len(entries) == 0 {
+			continue
+		}
+		rt, err := s.somas.Acquire(info.Soma)
+		if err != nil {
+			continue
+		}
+		if _, err := s.expireTrash(ctx, rt, time.Now()); err != nil {
+			s.log.Error("emptying old trash entries failed", "soma", info.ID, "err", err)
+		}
+		rt.Release()
+	}
 }
 
 // handleReadTrash returns a note in the trash (preview).

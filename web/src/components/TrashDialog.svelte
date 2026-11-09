@@ -15,6 +15,7 @@
 
   let dialog: HTMLDialogElement | undefined = $state()
   let items = $state.raw<TrashItem[] | null>(null)
+  let keepDays = $state(0)
   let preview = $state.raw<{ item: TrashItem; note: Note } | null>(null)
   let busy = $state(false)
 
@@ -36,7 +37,9 @@
 
   async function load() {
     try {
-      items = await api.trashItems()
+      const r = await api.trashItems()
+      items = r.items
+      keepDays = r.keepDays
     } catch (err) {
       app.toast(errorMessage(err))
     }
@@ -49,6 +52,10 @@
     const when = ago(it.deletedAt)
     const parts = [t.from(dirname(it.original)), who(it) ? t.deletedBy(who(it), when) : t.deleted(when)]
     parts.push(it.type === 'dir' ? t.files(it.files ?? 0) : formatSize(it.size))
+    if (keepDays > 0) {
+      const left = new Date(it.deletedAt).getTime() + keepDays * 86_400_000 - Date.now()
+      parts.push(t.expires(Math.max(0, Math.floor(left / 86_400_000))))
+    }
     return parts.join(' · ')
   }
 
@@ -126,7 +133,7 @@
     </div>
   {:else}
     <div class="intro">
-      <p>{t.intro}</p>
+      <p>{keepDays > 0 ? t.introDays(keepDays) : t.intro}</p>
       {#if app.can.manage && items?.length}
         <button type="button" class="btn danger" disabled={busy} onclick={() => void emptyAll()}>{t.emptyAll}</button>
       {/if}

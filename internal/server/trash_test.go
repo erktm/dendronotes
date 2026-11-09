@@ -1,11 +1,13 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"dendronotes/internal/store"
 )
@@ -176,5 +178,57 @@ func TestDeletedSomas(t *testing.T) {
 	}
 	if list := deleted(); len(list) != 0 {
 		t.Errorf("after purging: %+v", list)
+	}
+}
+
+// Entries are deleted for good after TRASH_DAYS – counted for files put into
+// the trash elsewhere from when dendronotes first sees them.
+func TestTrashExpires(t *testing.T) {
+	s := newTestServer(t, testFS())
+	s.cfg.TrashDays = 7
+	admin := newClient(t, s)
+	admin.login()
+	base := "/api/somas/" + testSoma
+	expect(t, admin.do("POST", base+"/notes/Old.md", `{"content":"old"}`), 201, "")
+	expect(t, admin.do("DELETE", base+"/entries/Old.md", ``), 200, "")
+	// Obsidian moved this one long ago (its file time is old).
+	obsidian := filepath.Join(somaDir(s), ".trash", "From Obsidian.md")
+	if err := os.WriteFile(obsidian, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().AddDate(0, -2, 0)
+	if err := os.Chtimes(obsidian, old, old); err != nil {
+		t.Fatal(err)
+	}
+	rec := admin.do("GET", base+"/trash", "")
+	expect(t, rec, 200, "")
+	if got := decode[struct {
+		Items    []map[string]any
+		KeepDays int
+	}](t, rec); len(got.Items) != 2 || got.KeepDays != 7 {
+		t.Fatalf("trash: %+v", got)
+	}
+
+	rt := rtOf(t, s)
+	ctx := context.Background()
+	if n, err := s.expireTrash(ctx, rt, time.Now().AddDate(0, 0, 6)); err != nil || n != 0 {
+		t.Errorf("after 6 days: %d %v", n, err)
+	}
+	if n, err := s.expireTrash(ctx, rt, time.Now().AddDate(0, 0, 8)); err != nil || n != 2 {
+		t.Errorf("after 8 days: %d %v", n, err)
+	}
+	if _, err := os.Stat(obsidian); !os.IsNotExist(err) {
+		t.Errorf("expired file still there: %v", err)
+	}
+	if got := decode[trashList](t, admin.do("GET", base+"/trash", "")); len(got.Items) != 0 {
+		t.Errorf("trash after expiry: %+v", got)
+	}
+
+	// 0 keeps everything.
+	s.cfg.TrashDays = 0
+	expect(t, admin.do("POST", base+"/notes/Keep.md", `{"content":"k"}`), 201, "")
+	expect(t, admin.do("DELETE", base+"/entries/Keep.md", ``), 200, "")
+	if n, _ := s.expireTrash(ctx, rt, time.Now().AddDate(1, 0, 0)); n != 0 {
+		t.Errorf("expired with TRASH_DAYS=0: %d", n)
 	}
 }
