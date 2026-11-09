@@ -626,6 +626,115 @@ paths:
         "409": { $ref: "#/components/responses/Error" }
         "413": { $ref: "#/components/responses/Error" }
         "415": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/drawings/{path}:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+      - $ref: "#/components/parameters/path"
+    get:
+      summary: Read a drawing for the editor
+      description: >
+        Drawings are files named `*.drawing.svg`: plain SVG with the editable
+        scene as JSON in `<metadata id="dendronotes-drawing">`. Other paths get
+        400 `not_a_drawing`. The ETag is also in the body.
+      responses:
+        "200":
+          description: The drawing.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Drawing" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    post:
+      summary: Create an empty drawing (contributor)
+      parameters:
+        - name: unique
+          in: query
+          description: With 1, a taken name gets a " (n)" suffix instead of failing with 409.
+          schema: { type: string, enum: ["1"] }
+      responses:
+        "201":
+          description: Created; `path` may differ from the requested one with unique=1. No `svg`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Drawing" }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+    put:
+      summary: Save a drawing (writer)
+      description: >
+        Replaces the whole file, guarded by `If-Match` with the drawing's ETag
+        (412 when it changed meanwhile). The SVG must pass the server's check:
+        well-formed, a short list of SVG elements and attributes, pictures only
+        as `data:image/…` URLs, no scripts, event handlers, external
+        references or CSS `url()`; otherwise 400 `invalid_drawing`. At most 8 MiB.
+      parameters:
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [svg], properties: { svg: { type: string } } }
+      responses:
+        "200":
+          description: Saved; the new ETag (no `svg`).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Drawing" }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "412": { $ref: "#/components/responses/Error" }
+        "428": { description: No If-Match header (`if_match_required`). }
+  /api/somas/{soma}/icons:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+    get:
+      summary: The soma's icon library, by name
+      responses:
+        "200":
+          description: The icons (without their pictures).
+          content:
+            application/json:
+              schema: { type: object, properties: { icons: { type: array, items: { $ref: "#/components/schemas/Icon" } } } }
+    post:
+      summary: Add an icon to the library (contributor)
+      description: >
+        The request body is the picture: PNG of at most 512×512 pixels (encoded
+        anew, without metadata) or SVG that passes the same check as drawings.
+        At most 256 KiB and 300 icons per soma. The web app converts other
+        pictures to PNG first.
+      parameters:
+        - { name: name, in: query, schema: { type: string, maxLength: 80 } }
+      requestBody:
+        required: true
+        content:
+          image/png: { schema: { type: string, format: binary } }
+          image/svg+xml: { schema: { type: string } }
+      responses:
+        "201": { description: The icon., content: { application/json: { schema: { $ref: "#/components/schemas/Icon" } } } }
+        "400": { description: Not a usable PNG or SVG (`invalid_icon`) or a bad name (`invalid_name`). }
+        "409": { description: The library is full (`too_many_icons`). }
+        "413": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/icons/{id}:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+      - $ref: "#/components/parameters/id"
+    get:
+      summary: An icon's picture
+      description: Served with the sandboxing CSP of files.
+      responses:
+        "200":
+          description: The picture.
+          content:
+            image/png: { schema: { type: string, format: binary } }
+            image/svg+xml: { schema: { type: string } }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Remove an icon from the library (its uploader; editors any)
+      description: Drawings keep their own copy of the icons they use.
+      responses:
+        "200": { description: Removed. }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /api/somas/{soma}/move:
     parameters:
       - $ref: "#/components/parameters/soma"
@@ -1687,6 +1796,22 @@ components:
         reason: { type: string, enum: [edit, create, outside, relink, restore] }
         size: { type: integer }
         restoredFrom: { type: integer, description: The version a restore brought back. }
+    Drawing:
+      type: object
+      required: [path, etag]
+      properties:
+        path: { type: string }
+        svg: { type: string, description: Only when reading. }
+        etag: { type: string }
+    Icon:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        mime: { type: string, enum: [image/png, image/svg+xml] }
+        size: { type: integer }
+        createdBy: { type: integer }
+        createdAt: { type: string, format: date-time }
     Person:
       type: object
       properties:

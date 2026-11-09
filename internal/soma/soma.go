@@ -456,11 +456,26 @@ func (s *Soma) TrashAvoiding(p string, avoid func(string) bool) (string, error) 
 	return dst, nil
 }
 
+// compoundExts are extensions of two parts that stay together when a name
+// gets a suffix ("Plan (1).drawing.svg", not "Plan.drawing (1).svg").
+var compoundExts = []string{".drawing.svg"}
+
+// splitExt splits p into stem and extension, keeping compound extensions.
+func splitExt(p string) (stem, ext string) {
+	low := strings.ToLower(p)
+	for _, c := range compoundExts {
+		if strings.HasSuffix(low, c) && len(path.Base(p)) > len(c) {
+			return p[:len(p)-len(c)], p[len(p)-len(c):]
+		}
+	}
+	ext = path.Ext(p)
+	return strings.TrimSuffix(p, ext), ext
+}
+
 // freeName returns p, or p with a " (n)" suffix before the extension if p
 // already exists.
 func (s *Soma) freeName(p string) (string, error) {
-	ext := path.Ext(p)
-	stem := strings.TrimSuffix(p, ext)
+	stem, ext := splitExt(p)
 	candidate := p
 	for i := 1; i <= 1000; i++ {
 		if _, err := s.root.Lstat(candidate); err != nil {

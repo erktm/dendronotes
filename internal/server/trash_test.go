@@ -169,7 +169,8 @@ func TestDeletedSomas(t *testing.T) {
 		t.Errorf("cara does not own the restored soma: %+v", somasOfCara)
 	}
 
-	// For good: the files go.
+	// For good: the files go, and so does the icon library.
+	expect(t, cara.do("POST", base+"/icons?name=Star", `<svg xmlns="http://www.w3.org/2000/svg"/>`), 201, "")
 	expect(t, cara.do("DELETE", base, ``), 200, "")
 	folder := deleted()[0].Folder
 	expect(t, admin.do("DELETE", "/api/admin/somas/deleted/"+seeds.ID, ``), 200, "")
@@ -178,6 +179,9 @@ func TestDeletedSomas(t *testing.T) {
 	}
 	if list := deleted(); len(list) != 0 {
 		t.Errorf("after purging: %+v", list)
+	}
+	if icons, err := s.store.Icons(context.Background(), seeds.ID); err != nil || len(icons) != 0 {
+		t.Errorf("icons of the purged soma: %v %v", icons, err)
 	}
 }
 

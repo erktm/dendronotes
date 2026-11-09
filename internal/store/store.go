@@ -238,6 +238,18 @@ var migrations = []string{
 		last_used_ip TEXT NOT NULL DEFAULT ''
 	);
 	CREATE INDEX api_tokens_user ON api_tokens(user_id);`,
+	// 8: the icon library of a soma (pictures for drawings). Like comments,
+	// it outlives the soma row until the soma is purged.
+	`CREATE TABLE soma_icons (
+		id         INTEGER PRIMARY KEY,
+		soma_id    TEXT NOT NULL,
+		name       TEXT NOT NULL,
+		mime       TEXT NOT NULL CHECK (mime IN ('image/png', 'image/svg+xml')),
+		data       BLOB NOT NULL,
+		created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+		created_at INTEGER NOT NULL
+	);
+	CREATE INDEX soma_icons_soma ON soma_icons(soma_id);`,
 }
 
 // rebuilds are the migrations (by index) that recreate a table others refer

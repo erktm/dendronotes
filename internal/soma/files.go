@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path"
 	"strings"
@@ -115,4 +116,58 @@ func (s *Soma) OpenFile(p string) (*os.File, Entry, error) {
 		return nil, Entry{}, ErrNotFound
 	}
 	return f, e, nil
+}
+
+// ReadFileContent returns a whole file (up to max bytes) with its entry and
+// content version (ETag), for files edited in the app such as drawings.
+func (s *Soma) ReadFileContent(p string, max int64) ([]byte, Entry, string, error) {
+	f, e, err := s.OpenFile(p)
+	if err != nil {
+		return nil, Entry{}, "", err
+	}
+	defer f.Close()
+	if e.Size > max {
+		return nil, Entry{}, "", ErrTooLarge
+	}
+	data, err := io.ReadAll(io.LimitReader(f, max+1))
+	if err != nil {
+		return nil, Entry{}, "", err
+	}
+	if int64(len(data)) > max {
+		return nil, Entry{}, "", ErrTooLarge
+	}
+	return data, e, ETag(data), nil
+}
+
+// WriteFile replaces the content of an existing file, like WriteNote: only
+// if it is still the version ifMatch names (else a *ConflictError), atomically.
+func (s *Soma) WriteFile(p string, content []byte, ifMatch string) (Entry, string, error) {
+	p, err := CleanPath(p)
+	if err != nil {
+		return Entry{}, "", err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	lst, err := s.root.Lstat(p)
+	if err != nil {
+		return Entry{}, "", mapErr(err)
+	}
+	switch {
+	case lst.Mode()&fs.ModeSymlink != 0:
+		return Entry{}, "", ErrReadOnly
+	case lst.IsDir():
+		return Entry{}, "", ErrIsDir
+	}
+	current, err := s.root.ReadFile(p)
+	if err != nil {
+		return Entry{}, "", mapErr(err)
+	}
+	if cur := ETag(current); ifMatch != cur {
+		return Entry{}, "", &ConflictError{ETag: cur}
+	}
+	if err := s.atomicWrite(p, content, lst.Mode().Perm()); err != nil {
+		return Entry{}, "", err
+	}
+	e, err := s.Stat(p) // Stat takes no lock
+	return e, ETag(content), err
 }

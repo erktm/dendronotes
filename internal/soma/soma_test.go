@@ -470,6 +470,12 @@ func TestCreateFile(t *testing.T) {
 	if e, err := s.CreateFile("Projects/photo.png", strings.NewReader(png), 1<<20, true, allowAll); err != nil || e.Path != "Projects/photo (1).png" {
 		t.Errorf("unique name: %+v, %v", e, err)
 	}
+	// A drawing keeps its two-part extension.
+	for _, want := range []string{"Projects/Plan.drawing.svg", "Projects/Plan (1).drawing.svg"} {
+		if e, err := s.CreateFile("Projects/Plan.drawing.svg", strings.NewReader("<svg/>"), 1000, true, allowAll); err != nil || e.Path != want {
+			t.Errorf("unique drawing name: %+v, %v (want %s)", e, err, want)
+		}
+	}
 
 	// Too large: nothing remains, not even the temporary file.
 	if _, err := s.CreateFile("big.bin", strings.NewReader(strings.Repeat("x", 2000)), 1000, false, allowAll); !errors.Is(err, ErrTooLarge) {
@@ -524,6 +530,42 @@ func TestOpenFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, _, err := s.OpenFile("folder"); !errors.Is(err, ErrIsDir) {
+		t.Errorf("folder: %v", err)
+	}
+}
+
+func TestWriteFile(t *testing.T) {
+	s, _, _ := setup(t)
+	allowAll := func([]byte) error { return nil }
+	if _, err := s.CreateFile("Plan.drawing.svg", strings.NewReader("one"), 1000, false, allowAll); err != nil {
+		t.Fatal(err)
+	}
+	data, _, etag, err := s.ReadFileContent("Plan.drawing.svg", 1000)
+	if err != nil || string(data) != "one" || etag != ETag([]byte("one")) {
+		t.Fatalf("ReadFileContent: %q %s %v", data, etag, err)
+	}
+	if _, _, _, err := s.ReadFileContent("Plan.drawing.svg", 2); !errors.Is(err, ErrTooLarge) {
+		t.Errorf("larger than max: %v", err)
+	}
+	e, newTag, err := s.WriteFile("Plan.drawing.svg", []byte("two"), etag)
+	if err != nil || e.Size != 3 || newTag != ETag([]byte("two")) {
+		t.Fatalf("WriteFile: %+v %s %v", e, newTag, err)
+	}
+	// The old ETag no longer fits: nothing is overwritten.
+	var conflict *ConflictError
+	if _, _, err := s.WriteFile("Plan.drawing.svg", []byte("three"), etag); !errors.As(err, &conflict) {
+		t.Errorf("stale ETag: %v", err)
+	}
+	if data, _, _, _ := s.ReadFileContent("Plan.drawing.svg", 1000); string(data) != "two" {
+		t.Errorf("content after conflict: %q", data)
+	}
+	if _, _, err := s.WriteFile("Missing.drawing.svg", []byte("x"), etag); !errors.Is(err, ErrNotFound) {
+		t.Errorf("missing file: %v", err)
+	}
+	if _, err := s.CreateFile("Garden/Beds.drawing.svg", strings.NewReader("x"), 1000, false, allowAll); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.WriteFile("Garden", []byte("x"), etag); !errors.Is(err, ErrIsDir) {
 		t.Errorf("folder: %v", err)
 	}
 }
