@@ -435,8 +435,10 @@ class App {
     }
     let name = rawName.normalize('NFC')
     const entry = this.entries.find((e) => e.path === path)
-    // Keep a note a note: "Plan" for "Idea.md" becomes "Plan.md".
+    // Keep a note a note: "Plan" for "Idea.md" becomes "Plan.md"; an
+    // attachment keeps its type: "north bed" for "north.png" becomes "north bed.png".
     if (entry?.type === 'file' && isNote(path) && !isNote(name)) name += extname(path)
+    else if (entry?.type === 'file' && !isNote(path) && !extname(name)) name += extname(path)
     const to = join(dirname(path), name)
     if (to === path) return true
     return this.moveTo(path, to)
