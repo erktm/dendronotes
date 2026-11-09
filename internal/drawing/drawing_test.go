@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/png"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -28,13 +29,20 @@ func TestCheckAcceptsDrawings(t *testing.T) {
 	if err := Check(Empty()); err != nil {
 		t.Errorf("empty drawing: %v", err)
 	}
-	// A drawing written by the editor in the browser (shared test file).
-	if data, err := os.ReadFile("../../web/src/lib/testdata/drawing.svg"); err == nil {
-		if err := Check(data); err != nil {
-			t.Errorf("drawing from the editor: %v", err)
+	// Drawings written by the editor in the browser (shared test files,
+	// written by web/src/lib/drawing/svg.test.ts).
+	files, err := filepath.Glob("../../web/src/lib/testdata/drawing*.svg")
+	if err != nil || len(files) < 2 {
+		t.Fatalf("shared drawings: %v %v", files, err)
+	}
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
 		}
-	} else if !os.IsNotExist(err) {
-		t.Fatal(err)
+		if err := Check(data); err != nil {
+			t.Errorf("%s: %v", filepath.Base(f), err)
+		}
 	}
 }
 

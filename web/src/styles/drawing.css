@@ -1,0 +1,112 @@
+/*
+ * Drawings in the app (lib/drawing/dom.ts): the color slots of their
+ * elements as tokens. Ink and the knock-out behind labels follow the
+ * palette; the other colors are --draw-* (tokens.css). Saved files carry
+ * the same colors in their own style sheet (lib/drawing/colors.ts).
+ */
+.dn-drawing text {
+  white-space: pre;
+}
+
+.dn-drawing .s-ink {
+  stroke: var(--text);
+}
+.dn-drawing .t-ink {
+  fill: var(--text);
+}
+.dn-drawing .f-ink {
+  fill: var(--bg-sunken);
+}
+.dn-drawing .paper {
+  fill: var(--bg);
+}
+
+.dn-drawing .s-gray {
+  stroke: var(--draw-gray);
+}
+.dn-drawing .t-gray {
+  fill: var(--draw-gray);
+}
+.dn-drawing .f-gray {
+  fill: var(--draw-gray-fill);
+}
+
+.dn-drawing .s-red {
+  stroke: var(--draw-red);
+}
+.dn-drawing .t-red {
+  fill: var(--draw-red);
+}
+.dn-drawing .f-red {
+  fill: var(--draw-red-fill);
+}
+
+.dn-drawing .s-orange {
+  stroke: var(--draw-orange);
+}
+.dn-drawing .t-orange {
+  fill: var(--draw-orange);
+}
+.dn-drawing .f-orange {
+  fill: var(--draw-orange-fill);
+}
+
+.dn-drawing .s-yellow {
+  stroke: var(--draw-yellow);
+}
+.dn-drawing .t-yellow {
+  fill: var(--draw-yellow);
+}
+.dn-drawing .f-yellow {
+  fill: var(--draw-yellow-fill);
+}
+
+.dn-drawing .s-green {
+  stroke: var(--draw-green);
+}
+.dn-drawing .t-green {
+  fill: var(--draw-green);
+}
+.dn-drawing .f-green {
+  fill: var(--draw-green-fill);
+}
+
+.dn-drawing .s-teal {
+  stroke: var(--draw-teal);
+}
+.dn-drawing .t-teal {
+  fill: var(--draw-teal);
+}
+.dn-drawing .f-teal {
+  fill: var(--draw-teal-fill);
+}
+
+.dn-drawing .s-blue {
+  stroke: var(--draw-blue);
+}
+.dn-drawing .t-blue {
+  fill: var(--draw-blue);
+}
+.dn-drawing .f-blue {
+  fill: var(--draw-blue-fill);
+}
+
+.dn-drawing .s-violet {
+  stroke: var(--draw-violet);
+}
+.dn-drawing .t-violet {
+  fill: var(--draw-violet);
+}
+.dn-drawing .f-violet {
+  fill: var(--draw-violet-fill);
+}
+
+.dn-drawing .s-pink {
+  stroke: var(--draw-pink);
+}
+.dn-drawing .t-pink {
+  fill: var(--draw-pink);
+}
+.dn-drawing .f-pink {
+  fill: var(--draw-pink-fill);
+}
