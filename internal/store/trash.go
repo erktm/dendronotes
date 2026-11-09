@@ -263,7 +263,8 @@ func (s *Store) RestoreSoma(ctx context.Context, id, folder string, ownerID int6
 	return s.SomaByID(ctx, d.ID)
 }
 
-// ForgetDeletedSoma removes a deleted soma for good (with its trash records).
+// ForgetDeletedSoma removes a deleted soma for good (with its trash records
+// and comments).
 func (s *Store) ForgetDeletedSoma(ctx context.Context, id string) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -277,8 +278,10 @@ func (s *Store) ForgetDeletedSoma(ctx context.Context, id string) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM trash WHERE soma_id = ?`, id); err != nil {
-		return err
+	for _, table := range []string{"trash", "notifications", "comments"} {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE soma_id = ?`, id); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
 }

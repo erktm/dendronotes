@@ -187,6 +187,45 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Error" }
+  /api/me/notifications:
+    get:
+      summary: Your newest notifications (mentions and replies) and how many are unread
+      description: Only about comments that still exist, in somas you can still open.
+      responses:
+        "200":
+          description: Newest first, at most 50.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  unread: { type: integer }
+                  notifications:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        kind: { type: string, enum: [mention, reply] }
+                        somaId: { type: string }
+                        somaName: { type: string }
+                        path: { type: string }
+                        commentId: { type: integer }
+                        threadId: { type: integer }
+                        excerpt: { type: string }
+                        actor: { $ref: "#/components/schemas/Person" }
+                        createdAt: { type: string, format: date-time }
+                        read: { type: boolean }
+  /api/me/notifications/read:
+    post:
+      summary: Mark notifications as read (`ids`, or all without them)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { ids: { type: array, items: { type: integer }, maxItems: 200 } } }
+      responses:
+        "200": { description: How many are still unread., content: { application/json: { schema: { type: object, properties: { unread: { type: integer } } } } } }
   /api/me/avatar:
     put:
       summary: Design your avatar (shown when you have no photo)
@@ -610,6 +649,100 @@ paths:
         saved first.
       responses:
         "200": { description: The ZIP (Content-Disposition attachment)., content: { application/zip: {} } }
+  /api/somas/{soma}/comments:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+    get:
+      summary: The comments on a note, oldest first
+      parameters:
+        - { name: path, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Threads (threadId 0) and their replies, with their authors by id.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  comments: { type: array, items: { $ref: "#/components/schemas/Comment" } }
+                  people: { type: object, additionalProperties: { $ref: "#/components/schemas/Person" } }
+    post:
+      summary: Comment on a note, or answer in a thread (everyone with access)
+      description: >
+        A new thread names its note (`path`) and the text it is about: `quote`
+        with up to 64 characters before (`prefix`) and after it (`suffix`), so
+        the place can be found again after edits; without a quote it is about
+        the whole note. A reply names its thread (`threadId`). `@user name`
+        notifies that account if it has access to the soma; replies also
+        notify the others in the thread. At most 5000 characters.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                path: { type: string }
+                body: { type: string }
+                quote: { type: string }
+                prefix: { type: string }
+                suffix: { type: string }
+                threadId: { type: integer }
+      responses:
+        "201": { description: The comment., content: { application/json: { schema: { $ref: "#/components/schemas/Comment" } } } }
+        "400": { description: Empty, too long or with control characters (`invalid_comment`). }
+        "404": { description: The note or thread does not exist. }
+        "429": { description: Too many comments in a short time (`rate_limited`). }
+  /api/somas/{soma}/comments/{id}:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+      - $ref: "#/components/parameters/id"
+    patch:
+      summary: Change the text of your own comment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [body], properties: { body: { type: string } } }
+      responses:
+        "200": { description: The comment., content: { application/json: { schema: { $ref: "#/components/schemas/Comment" } } } }
+        "403": { description: Not your comment (`not_author`). }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Delete a comment – a thread's first comment takes the replies along (your own; editors any)
+      responses:
+        "200": { description: Deleted. }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/comments/{id}/resolve:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+      - $ref: "#/components/parameters/id"
+    post:
+      summary: Mark a thread as done or open it again (writer)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [resolved], properties: { resolved: { type: boolean } } }
+      responses:
+        "200": { description: The thread's first comment., content: { application/json: { schema: { $ref: "#/components/schemas/Comment" } } } }
+        "400": { description: A reply, not a thread (`not_a_thread`). }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/people:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+    get:
+      summary: People with access to the soma whose name starts with q (for @mentions)
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 64 } }
+      responses:
+        "200":
+          description: Up to 8 people.
+          content:
+            application/json:
+              schema: { type: object, properties: { people: { type: array, items: { $ref: "#/components/schemas/Person" } } } }
   /api/somas/{soma}/history/{path}:
     parameters:
       - $ref: "#/components/parameters/soma"
@@ -1343,7 +1476,8 @@ components:
             invalid_transfer, too_many_somas, unknown_user, owner_cannot_leave,
             managed_by_provider, not_available, unknown_stream, resync,
             builtin_group, directory_group, name_taken, directory_unavailable,
-            account_not_allowed,
+            account_not_allowed, owner_required, folder_missing, invalid_comment,
+            not_author, not_a_thread,
             version_mismatch, invalid_update, shutting_down, internal_error.
     Readiness:
       type: object
@@ -1425,6 +1559,21 @@ components:
               color: { type: integer, minimum: 0, maximum: 7 }
               sel: { type: object, properties: { anchor: { type: integer }, head: { type: integer } } }
         conflict: { type: boolean }
+    Comment:
+      type: object
+      properties:
+        id: { type: integer }
+        path: { type: string }
+        threadId: { type: integer, description: 0 for the first comment of a thread, else that comment's id. }
+        authorId: { type: integer, description: 0 when the account is gone. }
+        body: { type: string }
+        quote: { type: string }
+        prefix: { type: string }
+        suffix: { type: string }
+        createdAt: { type: string, format: date-time }
+        editedAt: { type: string, format: date-time }
+        resolvedAt: { type: string, format: date-time }
+        resolvedBy: { type: integer }
     Version:
       type: object
       properties:

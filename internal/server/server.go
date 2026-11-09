@@ -40,10 +40,12 @@ type Server struct {
 	// ldapLast is the last directory check (api_ldap.go).
 	ldapMu   sync.Mutex
 	ldapLast ldapStatus
-	ips      *clientip.Resolver
-	assets   *assets
-	version  string
-	started  time.Time
+	// commentLimits holds a rate limiter per account (api_comments.go).
+	commentLimits sync.Map
+	ips           *clientip.Resolver
+	assets        *assets
+	version       string
+	started       time.Time
 
 	httpSrv  *http.Server
 	ready    atomic.Bool // true only after a complete startup

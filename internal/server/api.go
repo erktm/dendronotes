@@ -55,6 +55,8 @@ func (s *Server) routes() []route {
 		{"DELETE", "/api/somas/{soma}/groups/{id}", s.handleRemoveSomaGroup, somaOwner},
 		{"DELETE", "/api/somas/{soma}/membership", s.handleLeaveSoma, somaViewer},
 		{"GET", "/api/users/search", s.handleSearchUsers, signedIn},
+		{"GET", "/api/me/notifications", s.handleNotifications, signedIn},
+		{"POST", "/api/me/notifications/read", s.handleReadNotifications, signedIn},
 
 		{"GET", "/api/somas/{soma}/tree", s.handleTree, somaViewer},
 		{"GET", "/api/somas/{soma}/notes/{path...}", s.handleReadNote, somaViewer},
@@ -66,6 +68,12 @@ func (s *Server) routes() []route {
 		{"POST", "/api/somas/{soma}/move", s.handleMove, somaEditor},
 		{"DELETE", "/api/somas/{soma}/entries/{path...}", s.handleTrash, somaEditor},
 		{"GET", "/api/somas/{soma}/export", s.handleExport, somaViewer},
+		{"GET", "/api/somas/{soma}/comments", s.handleComments, somaViewer},
+		{"POST", "/api/somas/{soma}/comments", s.handleAddComment, somaViewer},
+		{"PATCH", "/api/somas/{soma}/comments/{id}", s.handleEditComment, somaViewer},
+		{"DELETE", "/api/somas/{soma}/comments/{id}", s.handleDeleteComment, somaViewer},
+		{"POST", "/api/somas/{soma}/comments/{id}/resolve", s.handleResolveComment, somaWriter},
+		{"GET", "/api/somas/{soma}/people", s.handleSomaPeople, somaViewer},
 		{"GET", "/api/somas/{soma}/history/{path...}", s.handleHistory, somaViewer},
 		{"GET", "/api/somas/{soma}/versions/{id}", s.handleVersion, somaViewer},
 		{"POST", "/api/somas/{soma}/versions/{id}/restore", s.handleRestoreVersion, somaWriter},
@@ -253,7 +261,7 @@ func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 	move := func() (string, error) {
 		to, err := rt.Collab.Move(from, func() (string, error) { return rt.Soma.Move(from, body.To) })
 		if err == nil {
-			rt.MoveHistory(from, to)
+			s.follow(rt, from, to)
 		}
 		return to, err
 	}
@@ -365,7 +373,7 @@ func (s *Server) handleTrash(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.recordTrash(r, rt.ID, p, dst, entry.Type == "dir")
-	rt.MoveHistory(p, dst)
+	s.follow(rt, p, dst)
 	trashChanged(rt)
 	rt.SyncAfterWrite(r.Context())
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"trashedTo": dst})

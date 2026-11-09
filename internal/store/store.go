@@ -193,6 +193,38 @@ var migrations = []string{
 		deleted_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
 		deleted_at      INTEGER NOT NULL
 	);`,
+	// 6: comments on notes (threads anchored to a quote of the text) and
+	// notifications of mentions and replies. Like the trash, they outlive
+	// their soma row (a deleted soma can be restored).
+	`CREATE TABLE comments (
+		id          INTEGER PRIMARY KEY,
+		soma_id     TEXT NOT NULL,
+		path        TEXT NOT NULL,
+		thread_id   INTEGER NOT NULL DEFAULT 0,
+		author_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+		body        TEXT NOT NULL,
+		quote       TEXT NOT NULL DEFAULT '',
+		prefix      TEXT NOT NULL DEFAULT '',
+		suffix      TEXT NOT NULL DEFAULT '',
+		created_at  INTEGER NOT NULL,
+		edited_at   INTEGER NOT NULL DEFAULT 0,
+		resolved_at INTEGER NOT NULL DEFAULT 0,
+		resolved_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+	);
+	CREATE INDEX comments_path ON comments(soma_id, path);
+	CREATE INDEX comments_thread ON comments(thread_id) WHERE thread_id <> 0;
+	CREATE TABLE notifications (
+		id         INTEGER PRIMARY KEY,
+		user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		kind       TEXT NOT NULL CHECK (kind IN ('mention', 'reply')),
+		soma_id    TEXT NOT NULL,
+		path       TEXT NOT NULL,
+		comment_id INTEGER NOT NULL,
+		actor_id   INTEGER REFERENCES users(id) ON DELETE SET NULL,
+		created_at INTEGER NOT NULL,
+		read_at    INTEGER NOT NULL DEFAULT 0
+	);
+	CREATE INDEX notifications_user ON notifications(user_id, created_at);`,
 }
 
 // rebuilds are the migrations (by index) that recreate a table others refer

@@ -96,6 +96,14 @@ admin's first soma.
   trash; versions older than `DENDRONOTES_HISTORY_DAYS` (90 days) are removed, but the newest
   version of every note always stays. The history lives in `DENDRONOTES_DATA_DIR/history/`,
   never in the soma.
+- **Comments** (the speech bubble in the top bar). Select text – in the editor or the reading
+  view – and press "Comment", or comment on the whole note. Everyone with access comments and
+  replies, readers too; writers mark threads as done, authors change or delete their own
+  comments, editors anyone's. The commented text is marked in the note and found again after
+  edits; if it is gone, the thread says so. `@user name` lets someone with access know, and
+  replies notify the others in the thread: the bell in the top bar lists both and jumps to
+  the comment. Comments live in `state.db`, never in the note, and follow renames and the
+  trash.
 - **Trash** (the bin at the bottom of the sidebar, for everyone who may delete). Deleted files
   and folders wait in the soma's `.trash` folder – the same place Obsidian uses – with who
   deleted them, when and from where. Restore puts them back where they were (missing folders
@@ -480,6 +488,8 @@ which a test keeps in sync with the server.
 | `GET /api/somas/{soma}/trash`           | The trash; `POST …/trash/{path}` restores, `DELETE` deletes for good (owner) |
 | `GET /api/somas/{soma}/history/{path}`  | Versions of a note; `GET …/versions/{id}`, `POST …/versions/{id}/restore` |
 | `GET /api/somas/{soma}/export`          | The soma as a ZIP                                    |
+| `GET /api/somas/{soma}/comments?path=`  | Comments on a note; `POST` adds one (or a reply), `PATCH`/`DELETE …/comments/{id}`, `POST …/{id}/resolve` |
+| `GET /api/me/notifications`             | Mentions and replies; `POST …/read` marks them read  |
 | `GET /api/somas/{soma}/files/{path}`    | Download a file (attachments, images, media)         |
 | `POST /api/somas/{soma}/files/{path}`   | Upload a file (raw body; `?unique=1` avoids name clashes) |
 | `GET /api/somas/{soma}/search?q=`       | Full-text search (words, "phrases", #tags)           |

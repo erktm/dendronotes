@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"slices"
@@ -39,6 +40,23 @@ func (s *Server) recordTrash(r *http.Request, somaID, p, dst string, dir bool) {
 	}
 	if err := s.store.AddTrash(r.Context(), rec); err != nil {
 		s.log.Error("recording trash entry", "soma", somaID, "path", p, "err", err)
+	}
+}
+
+// follow lets what dendronotes keeps about a note or folder – history and
+// comments – go along when it moves (rename, trash, restore).
+func (s *Server) follow(rt *somas.Runtime, from, to string) {
+	rt.MoveHistory(from, to)
+	if err := s.store.MoveComments(context.Background(), rt.ID, from, to); err != nil {
+		s.log.Error("moving comments failed", "from", from, "to", to, "err", err)
+	}
+}
+
+// forget deletes what dendronotes keeps about p (deleted for good).
+func (s *Server) forget(rt *somas.Runtime, p string) {
+	rt.RemoveHistory(p)
+	if err := s.store.RemoveComments(context.Background(), rt.ID, p); err != nil {
+		s.log.Error("removing comments failed", "path", p, "err", err)
 	}
 }
 
@@ -164,7 +182,7 @@ func (s *Server) handleRestoreTrash(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.RemoveTrash(r.Context(), rt.ID, p); err != nil {
 		s.log.Error("forgetting trash entry", "soma", rt.ID, "path", p, "err", err)
 	}
-	rt.MoveHistory(soma.TrashDir+"/"+p, to)
+	s.follow(rt, soma.TrashDir+"/"+p, to)
 	rt.SyncAfterWrite(r.Context())
 	trashChanged(rt)
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"path": to})
@@ -185,7 +203,7 @@ func (s *Server) handlePurgeTrash(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.RemoveTrash(r.Context(), rt.ID, p); err != nil {
 		s.log.Error("forgetting trash entry", "soma", rt.ID, "path", p, "err", err)
 	}
-	rt.RemoveHistory(soma.TrashDir + "/" + p)
+	s.forget(rt, soma.TrashDir+"/"+p)
 	s.audit(r, "trash.purge", rt.ID, p)
 	trashChanged(rt)
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"path": p})
@@ -201,7 +219,7 @@ func (s *Server) handleEmptyTrash(w http.ResponseWriter, r *http.Request) {
 	if err := s.store.ClearTrash(r.Context(), rt.ID); err != nil {
 		s.log.Error("forgetting trash entries", "soma", rt.ID, "err", err)
 	}
-	rt.RemoveHistory(soma.TrashDir)
+	s.forget(rt, soma.TrashDir)
 	s.audit(r, "trash.empty", rt.ID, "")
 	trashChanged(rt)
 	httpx.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
