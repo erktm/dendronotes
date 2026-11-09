@@ -70,3 +70,14 @@ pre {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* Phones zoom into form fields with text smaller than 16px (iOS) and stay
+   zoomed in; 16px keeps the page as it is. */
+@media (max-width: 760px) {
+  input,
+  select,
+  textarea {
+    /* Components size their fields; this one rule has to win. */
+    font-size: max(16px, 1em) !important;
+  }
+}

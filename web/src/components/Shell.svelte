@@ -29,6 +29,47 @@
 
   const narrow = window.matchMedia('(max-width: 760px)')
   let sidebarOpen = $state(!narrow.matches)
+  /** Phone layout: the sidebar lies over the page. */
+  let phone = $state(narrow.matches)
+  $effect(() => {
+    const update = () => (phone = narrow.matches)
+    narrow.addEventListener('change', update)
+    return () => narrow.removeEventListener('change', update)
+  })
+
+  // On phones the sidebar closes with a tap beside it, a swipe to the left
+  // or Escape – not only with the rail button that opened it.
+  const closeSidebar = () => (sidebarOpen = false)
+  $effect(() => {
+    if (!phone || !sidebarOpen) return
+    const onkey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !e.defaultPrevented && !document.querySelector('dialog[open]')) closeSidebar()
+    }
+    window.addEventListener('keydown', onkey)
+    return () => window.removeEventListener('keydown', onkey)
+  })
+
+  /** Closes the sidebar when a touch moves clearly to the left. */
+  function swipeToClose(node: HTMLElement) {
+    let start: { x: number; y: number } | null = null
+    const down = (e: TouchEvent) => {
+      const t = e.touches[0]
+      start = t && e.touches.length === 1 ? { x: t.clientX, y: t.clientY } : null
+    }
+    const up = (e: TouchEvent) => {
+      const t = e.changedTouches[0]
+      if (start && t && phone && start.x - t.clientX > 60 && Math.abs(t.clientY - start.y) < 50) closeSidebar()
+      start = null
+    }
+    node.addEventListener('touchstart', down, { passive: true })
+    node.addEventListener('touchend', up, { passive: true })
+    return {
+      destroy() {
+        node.removeEventListener('touchstart', down)
+        node.removeEventListener('touchend', up)
+      },
+    }
+  }
   /** The next route change comes from the rail and keeps the sidebar open. */
   let keepSidebar = false
 
@@ -204,7 +245,12 @@
     onadmin={toggleAdmin}
   />
   {#if sidebarOpen}
-    <Sidebar />
+    {#if phone}
+      <button type="button" class="scrim" tabindex="-1" aria-label={strings.nav.hideFiles} onclick={closeSidebar} use:swipeToClose></button>
+    {/if}
+    <div class="sidebar-slot" use:swipeToClose>
+      <Sidebar />
+    </div>
   {/if}
   <main class="main">
     <header class="topbar">
@@ -442,6 +488,19 @@
     min-width: 0;
     min-height: 0;
     overflow: auto;
+  }
+
+  .sidebar-slot {
+    display: contents;
+  }
+  .scrim {
+    position: fixed;
+    inset: 0 0 0 var(--rail-width);
+    z-index: 39;
+    padding: 0;
+    border: 0;
+    background: var(--scrim);
+    cursor: default;
   }
 
   /* Phones: the file list slides over the note instead of beside it. */

@@ -512,12 +512,16 @@
   }
   .segmented {
     display: inline-flex;
+    min-width: 0;
+    max-width: 100%;
     padding: 2px;
     border: 1px solid var(--line);
     border-radius: 8px;
     background: var(--bg-sunken);
   }
   .segmented button {
+    flex: 0 1 auto;
+    min-width: 0;
     max-width: 220px;
     height: 26px;
     padding: 0 10px;
@@ -580,6 +584,19 @@
   .zoom button:hover {
     background: var(--bg-hover);
     color: var(--text);
+  }
+  /* Phones: the panel leaves room for the zoom buttons and wraps. */
+  @media (max-width: 760px) {
+    .controls {
+      top: 8px;
+      left: 8px;
+      max-width: calc(100% - 68px);
+      font-size: var(--text-xs);
+    }
+    .zoom {
+      top: 8px;
+      right: 8px;
+    }
   }
   .foot {
     position: absolute;
