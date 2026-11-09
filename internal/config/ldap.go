@@ -9,29 +9,32 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Active Directory / LDAP: people sign in with their directory account in the
 // normal password form; groups below LDAP_GROUP_BASE_DN become dendronotes
 // groups.
 const (
-	EnvLDAPURL            = Prefix + "LDAP_URL"
-	EnvLDAPStartTLS       = Prefix + "LDAP_START_TLS"
-	EnvLDAPCAFile         = Prefix + "LDAP_CA_FILE"
-	EnvLDAPBindDN         = Prefix + "LDAP_BIND_DN"
-	EnvLDAPBindPassword   = Prefix + "LDAP_BIND_PASSWORD_FILE"
-	EnvLDAPBaseDN         = Prefix + "LDAP_BASE_DN"
-	EnvLDAPUserFilter     = Prefix + "LDAP_USER_FILTER"
-	EnvLDAPUsernameAttr   = Prefix + "LDAP_USERNAME_ATTR"
-	EnvLDAPNameAttr       = Prefix + "LDAP_NAME_ATTR"
-	EnvLDAPEmailAttr      = Prefix + "LDAP_EMAIL_ATTR"
-	EnvLDAPIDAttr         = Prefix + "LDAP_ID_ATTR"
-	EnvLDAPGroupBaseDN    = Prefix + "LDAP_GROUP_BASE_DN"
-	EnvLDAPGroupFilter    = Prefix + "LDAP_GROUP_FILTER"
-	EnvLDAPGroupNameAttr  = Prefix + "LDAP_GROUP_NAME_ATTR"
-	EnvLDAPAdminGroups    = Prefix + "LDAP_ADMIN_GROUPS"
-	EnvLDAPAllowedGroups  = Prefix + "LDAP_ALLOWED_GROUPS"
-	DefaultLDAPUserFilter = "(&(objectCategory=person)(objectClass=user)" +
+	EnvLDAPURL              = Prefix + "LDAP_URL"
+	EnvLDAPStartTLS         = Prefix + "LDAP_START_TLS"
+	EnvLDAPCAFile           = Prefix + "LDAP_CA_FILE"
+	EnvLDAPBindDN           = Prefix + "LDAP_BIND_DN"
+	EnvLDAPBindPassword     = Prefix + "LDAP_BIND_PASSWORD_FILE"
+	EnvLDAPBaseDN           = Prefix + "LDAP_BASE_DN"
+	EnvLDAPUserFilter       = Prefix + "LDAP_USER_FILTER"
+	EnvLDAPUsernameAttr     = Prefix + "LDAP_USERNAME_ATTR"
+	EnvLDAPNameAttr         = Prefix + "LDAP_NAME_ATTR"
+	EnvLDAPEmailAttr        = Prefix + "LDAP_EMAIL_ATTR"
+	EnvLDAPIDAttr           = Prefix + "LDAP_ID_ATTR"
+	EnvLDAPGroupBaseDN      = Prefix + "LDAP_GROUP_BASE_DN"
+	EnvLDAPGroupFilter      = Prefix + "LDAP_GROUP_FILTER"
+	EnvLDAPGroupNameAttr    = Prefix + "LDAP_GROUP_NAME_ATTR"
+	EnvLDAPAdminGroups      = Prefix + "LDAP_ADMIN_GROUPS"
+	EnvLDAPAllowedGroups    = Prefix + "LDAP_ALLOWED_GROUPS"
+	EnvLDAPSyncInterval     = Prefix + "LDAP_SYNC_INTERVAL"
+	DefaultLDAPSyncInterval = 15 * time.Minute
+	DefaultLDAPUserFilter   = "(&(objectCategory=person)(objectClass=user)" +
 		"(|(sAMAccountName={login})(userPrincipalName={login})(mail={login})))"
 	// The matching rule finds nested groups too (Active Directory).
 	DefaultLDAPGroupFilter   = "(&(objectClass=group)(member:1.2.840.113556.1.4.1941:={dn}))"
@@ -46,6 +49,7 @@ var ldapVars = []string{
 	EnvLDAPURL, EnvLDAPStartTLS, EnvLDAPCAFile, EnvLDAPBindDN, EnvLDAPBindPassword, EnvLDAPBaseDN,
 	EnvLDAPUserFilter, EnvLDAPUsernameAttr, EnvLDAPNameAttr, EnvLDAPEmailAttr, EnvLDAPIDAttr,
 	EnvLDAPGroupBaseDN, EnvLDAPGroupFilter, EnvLDAPGroupNameAttr, EnvLDAPAdminGroups, EnvLDAPAllowedGroups,
+	EnvLDAPSyncInterval,
 }
 
 // LDAP configures sign-in against Active Directory (or another LDAP
@@ -68,6 +72,8 @@ type LDAP struct {
 	GroupNameAttr string
 	AdminGroups   []string // members become admins (names or DNs; empty: roles stay in dendronotes)
 	AllowedGroups []string // only members may sign in (empty: every account found)
+	// SyncInterval checks all directory accounts in the background (0: off).
+	SyncInterval time.Duration
 }
 
 // Enabled reports whether directory sign-in is configured.
@@ -153,6 +159,18 @@ func (a *Auth) loadLDAP(getenv func(string) string) error {
 	l.GroupNameAttr = strings.TrimSpace(envOr(getenv, EnvLDAPGroupNameAttr, DefaultLDAPGroupNameAttr))
 	l.AdminGroups = splitGroups(getenv(EnvLDAPAdminGroups))
 	l.AllowedGroups = splitGroups(getenv(EnvLDAPAllowedGroups))
+	l.SyncInterval = DefaultLDAPSyncInterval
+	if v := strings.TrimSpace(getenv(EnvLDAPSyncInterval)); v != "" {
+		d, err := time.ParseDuration(v)
+		switch {
+		case err != nil || d < 0:
+			errs = append(errs, fmt.Errorf("%s: %q is not a duration (e.g. 15m, or 0 to turn it off)", EnvLDAPSyncInterval, v))
+		case d > 0 && d < time.Minute:
+			errs = append(errs, fmt.Errorf("%s: %q is too short (minimum 1m)", EnvLDAPSyncInterval, v))
+		default:
+			l.SyncInterval = d
+		}
+	}
 	return errors.Join(errs...)
 }
 
@@ -219,6 +237,11 @@ func (c Config) ldapSetting(name string) (string, bool) {
 		return strings.Join(l.AdminGroups, "; "), true
 	case EnvLDAPAllowedGroups:
 		return strings.Join(l.AllowedGroups, "; "), true
+	case EnvLDAPSyncInterval:
+		if !l.Enabled() {
+			return "", true
+		}
+		return l.SyncInterval.String(), true
 	}
 	return "", false
 }

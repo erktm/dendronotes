@@ -65,7 +65,20 @@ export interface SSOStatus {
   logout: boolean
 }
 
+export interface LDAPSyncStatus {
+  /** Empty: no sync in the background. */
+  interval: string
+  running: boolean
+  lastRun?: string
+  lastSuccess?: string
+  accounts: number
+  updated: number
+  signedOut: number
+  error?: string
+}
+
 export interface LDAPStatus {
+  sync: LDAPSyncStatus
   url: string
   baseDN: string
   bindDN: string
@@ -152,6 +165,7 @@ export const endSession = (id: number) => request<{ ok: boolean }>('DELETE', `/a
 export const server = () => request<ServerInfo>('GET', '/api/admin/server')
 export const checkSSO = () => request<SSOStatus>('POST', '/api/admin/sso/check')
 export const checkLDAP = () => request<LDAPStatus>('POST', '/api/admin/ldap/check')
+export const syncLDAP = () => request<LDAPSyncStatus>('POST', '/api/admin/ldap/sync')
 
 export const audit = (before = 0, limit = 100) =>
   request<{ entries: AuditEntry[] }>('GET', `/api/admin/audit?limit=${limit}${before ? `&before=${before}` : ''}`).then((r) => r.entries)

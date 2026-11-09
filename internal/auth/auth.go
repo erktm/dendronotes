@@ -75,6 +75,11 @@ type Config struct {
 	// dendronotes groups; OnDirectoryGroups hears which ones changed members.
 	DirectoryGroups   bool
 	OnDirectoryGroups func(ctx context.Context, changed []int64)
+	// OnLogin counts sign-ins (via: password, directory, sso).
+	OnLogin func(via string, ok bool)
+	// OnSignedOut runs after the directory sync signed an account out (to
+	// end its live streams).
+	OnSignedOut func(ctx context.Context, userID int64)
 
 	// Proxy mode.
 	ProxyHeader    string
@@ -456,6 +461,11 @@ func (a *Authenticator) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fail := func(reason string) {
+		via := "password"
+		if strings.HasSuffix(reason, "(directory)") {
+			via = "directory"
+		}
+		a.counted(via, false)
 		a.log.Warn("login failed", "ip", ip, "user", name, "reason", reason)
 		a.store.Audit(r.Context(), store.AuditEntry{Actor: name, Action: "login.failed", Detail: reason, IP: ip})
 		httpx.Error(w, http.StatusUnauthorized, "invalid_credentials")
@@ -494,10 +504,21 @@ func (a *Authenticator) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	a.startSession(w, r, u, ip, "")
 }
 
+// counted tells OnLogin about a sign-in.
+func (a *Authenticator) counted(via string, ok bool) {
+	if a.cfg.OnLogin != nil {
+		a.cfg.OnLogin(via, ok)
+	}
+}
+
 // startSession signs an account in after its password was checked: refused
 // for disabled accounts, else a session cookie and the account as answer.
 func (a *Authenticator) startSession(w http.ResponseWriter, r *http.Request, u store.User, ip, via string) {
+	if via == "" {
+		via = "password"
+	}
 	if u.Disabled {
+		a.counted(via, false)
 		a.log.Warn("login of disabled account", "ip", ip, "user", u.Username)
 		a.store.Audit(r.Context(), store.AuditEntry{ActorID: u.ID, Actor: u.Username, Action: "login.failed", Detail: "disabled", IP: ip})
 		httpx.Error(w, http.StatusForbidden, "account_disabled")
@@ -511,6 +532,7 @@ func (a *Authenticator) startSession(w http.ResponseWriter, r *http.Request, u s
 	}
 	_ = a.store.TouchLogin(r.Context(), u.ID)
 	a.setCookie(w, r, token)
+	a.counted(via, true)
 	a.log.Info("login", "ip", ip, "user", u.Username, "via", via)
 	a.store.Audit(r.Context(), store.AuditEntry{ActorID: u.ID, Actor: u.Username, Action: "login", Detail: via, IP: ip})
 	httpx.WriteJSON(w, http.StatusOK, MeResponse{User: u, Mode: a.cfg.Mode})

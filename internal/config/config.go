@@ -32,6 +32,7 @@ const (
 	EnvSomaDir         = Prefix + "SOMA_DIR"
 	EnvDataDir         = Prefix + "DATA_DIR"
 	EnvHTTPPort        = Prefix + "HTTP_PORT"
+	EnvMetricsPort     = Prefix + "METRICS_PORT"
 	EnvLogLevel        = Prefix + "LOG_LEVEL"
 	EnvLogFormat       = Prefix + "LOG_FORMAT"
 	EnvShutdownTimeout = Prefix + "SHUTDOWN_TIMEOUT"
@@ -68,7 +69,7 @@ const (
 // Vars lists every supported variable. README.md documents all of them
 // (enforced by a test).
 var Vars = []string{
-	EnvSomasDir, EnvSomaDir, EnvDataDir, EnvHTTPPort, EnvLogLevel, EnvLogFormat, EnvShutdownTimeout,
+	EnvSomasDir, EnvSomaDir, EnvDataDir, EnvHTTPPort, EnvMetricsPort, EnvLogLevel, EnvLogFormat, EnvShutdownTimeout,
 	EnvTrustedProxies, EnvMaxNoteMB, EnvMaxUploadMB, EnvIgnore, EnvRescanInterval, EnvHistoryDays, EnvAuthMode, EnvAdminUsername,
 	EnvAdminHash, EnvAdminHashFile, EnvAdminPassword, EnvSessionTTL, EnvCookieSecure,
 	EnvProxyHeader, EnvProxyAllowed, EnvProxyLogoutURL, EnvPublicURL, EnvLocalLogin,
@@ -84,6 +85,7 @@ type Config struct {
 	ImportSomaDir   string         // an existing soma to register for the first admin (optional)
 	DataDir         string         // state.db (accounts, sessions) and the search indexes
 	Port            int            // HTTP port
+	MetricsPort     int            // separate port for /metrics; 0 = off
 	LogLevel        slog.Level     // debug|info|warn|error
 	LogFormat       string         // json|text
 	ShutdownTimeout time.Duration  // max. time to drain on shutdown
@@ -198,6 +200,18 @@ func Load(getenv func(string) string) (Config, error) {
 			add(fmt.Errorf("%s: %q is not a valid port (1-65535)", EnvHTTPPort, v))
 		} else {
 			c.Port = p
+		}
+	}
+
+	if v := getenv(EnvMetricsPort); v != "" {
+		p, err := strconv.Atoi(v)
+		switch {
+		case err != nil || p < 1 || p > 65535:
+			add(fmt.Errorf("%s: %q is not a valid port (1-65535)", EnvMetricsPort, v))
+		case p == c.Port:
+			add(fmt.Errorf("%s: %d is the HTTP port already; metrics need a port of their own", EnvMetricsPort, p))
+		default:
+			c.MetricsPort = p
 		}
 	}
 
@@ -573,6 +587,11 @@ func (c Config) Describe(name string) string {
 		return c.ImportSomaDir
 	case EnvDataDir:
 		return c.DataDir
+	case EnvMetricsPort:
+		if c.MetricsPort == 0 {
+			return ""
+		}
+		return strconv.Itoa(c.MetricsPort)
 	case EnvHTTPPort:
 		return strconv.Itoa(c.Port)
 	case EnvLogLevel:

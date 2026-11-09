@@ -1440,6 +1440,33 @@ paths:
         of their own.
       responses:
         "200": { description: The ZIP., content: { application/zip: {} } }
+  /api/admin/ldap/sync:
+    post:
+      summary: Check all directory accounts now (admin)
+      description: >
+        Accounts that are gone, disabled in the directory or no longer in an
+        allowed group are signed out everywhere and lose their API tokens;
+        the others take over name, e-mail, role and groups. If most accounts
+        are missing at once, nobody is signed out (a wrong setting is more
+        likely). Runs on its own every DENDRONOTES_LDAP_SYNC_INTERVAL.
+      responses:
+        "200":
+          description: The result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  interval: { type: string }
+                  running: { type: boolean }
+                  lastRun: { type: string, format: date-time }
+                  lastSuccess: { type: string, format: date-time }
+                  accounts: { type: integer }
+                  updated: { type: integer }
+                  signedOut: { type: integer }
+                  error: { type: string }
+        "404": { description: LDAP is not configured. }
+        "409": { description: A sync is running (`sync_running`). }
   /api/admin/ldap/check:
     post:
       summary: Connect to the directory with the service account and read the base DN (admin)

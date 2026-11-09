@@ -242,6 +242,14 @@ volume snapshots for everything). Before a new release changes the database form
 dendronotes copies `state.db` to `state.db.v<n>.bak`; it refuses to open a database written by
 a newer release.
 
+**Monitoring.** With `DENDRONOTES_METRICS_PORT` (e.g. `9090`) dendronotes serves Prometheus
+metrics on that port – only `/metrics`, nothing else, so keep the port internal (a separate
+container port, not routed through the ingress): requests by route pattern, method and status
+with durations, sign-ins by way and result, accounts, sessions, somas, open somas, live
+connections, notes being edited, disk usage, whether the OpenID Connect provider and the
+directory answer, the last directory sync, and Go runtime figures. Note paths never become
+labels.
+
 **Locked out?** `dendronotes reset-password [user]` sets a new password for a local account
 (by default the admin account), enables it and ends its sessions – also while the server runs:
 
@@ -263,6 +271,7 @@ All variables carry the `DENDRONOTES_` prefix. Variables without it are ignored.
 | `DENDRONOTES_SOMA_DIR`                 |                    | An existing soma folder, registered once as the first admin's soma (for upgrades) |
 | `DENDRONOTES_DATA_DIR`                 | `/data`            | Account database `state.db` and search indexes; must be writable and outside the somas |
 | `DENDRONOTES_HTTP_PORT`                | `8080`             | HTTP port                                                  |
+| `DENDRONOTES_METRICS_PORT`             |                    | Port that serves only `/metrics` (Prometheus); empty: off. Keep it internal |
 | `DENDRONOTES_LOG_LEVEL`                | `info`             | `debug`, `info`, `warn`, `error`                           |
 | `DENDRONOTES_LOG_FORMAT`               | `json`             | `json` (stdout) or `text`                                  |
 | `DENDRONOTES_SHUTDOWN_TIMEOUT`         | `20s`              | Maximum time for in-flight requests after SIGTERM          |
@@ -310,6 +319,7 @@ All variables carry the `DENDRONOTES_` prefix. Variables without it are ignored.
 | `DENDRONOTES_LDAP_GROUP_NAME_ATTR`     | `cn`               | Attribute with a group's name                              |
 | `DENDRONOTES_LDAP_ADMIN_GROUPS`        |                    | Semicolon-separated groups (names or DNs) whose members are admins, synced on every sign-in |
 | `DENDRONOTES_LDAP_ALLOWED_GROUPS`      |                    | Semicolon-separated groups (names or DNs) allowed to sign in (empty: every account found) |
+| `DENDRONOTES_LDAP_SYNC_INTERVAL`       | `15m`              | How often all directory accounts are checked in the background (gone, disabled, groups); `0` turns it off |
 
 In local mode, one of the three admin password variables is required while no enabled admin
 account exists; without it, the server does not start. Once an admin exists, they are ignored
@@ -415,9 +425,15 @@ local account with a password, only that password counts.
   renamed or given other members. Keep the group base narrow – a dedicated OU – rather than the
   whole domain. A local group with the same name stays separate; the directory group is shown
   as "Name (AD)".
-- As with Keycloak, dendronotes keeps its own session (`DENDRONOTES_SESSION_TTL`): disabling an
-  account in Active Directory takes effect at its next sign-in. To end access at once, disable
-  the account or end its sessions in the administration area. With
+- **Sync in the background** (`DENDRONOTES_LDAP_SYNC_INTERVAL`, every 15 minutes; `0` turns it
+  off): every directory account is looked up again by its `objectGUID`. Accounts that are gone,
+  disabled in Active Directory or no longer in `LDAP_ALLOWED_GROUPS` are signed out everywhere
+  and lose their API tokens – the account itself stays, its next sign-in fails. The others take
+  over name, e-mail, the admin role and their groups without signing in. If the directory cannot
+  be reached nothing changes, and if most accounts are missing at once nobody is signed out (a
+  wrong base DN or filter is more likely); the administration area shows the last result and
+  offers *Sync now*. Without the sync, changes in Active Directory take effect at the next
+  sign-in, and dendronotes keeps its own session until then (`DENDRONOTES_SESSION_TTL`). With
   `DENDRONOTES_LOCAL_LOGIN=false` only directory accounts and the admin account sign in with a
   password.
 - The service account needs read access only. The administration area (*Server*) shows whether

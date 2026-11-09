@@ -33,6 +33,21 @@
     }
   }
 
+  let syncing = $state(false)
+  async function syncLDAP() {
+    if (!info?.ldap) return
+    syncing = true
+    try {
+      const sync = await admin.syncLDAP()
+      if (info.ldap) info = { ...info, ldap: { ...info.ldap, sync } }
+      if (!sync.error) app.toast(t.ldapSynced, 'info')
+    } catch (err) {
+      app.toast(errorMessage(err))
+    } finally {
+      syncing = false
+    }
+  }
+
   let checkingLDAP = $state(false)
   async function checkLDAP() {
     if (!info) return
@@ -156,9 +171,22 @@
             <dd class="admin-mono" class:admin-faint={!info.ldap.groupBaseDN}>{info.ldap.groupBaseDN || t.ldapNoGroups}</dd>
             <dt>{t.ssoChecked}</dt>
             <dd>{checked || t.never}</dd>
+            <dt>{t.ldapSync}</dt>
+            <dd>{info.ldap.sync?.interval ? t.ldapSyncEvery(info.ldap.sync.interval) : t.ldapSyncOff}</dd>
+            {#if info.ldap.sync?.lastRun}
+              {@const sync = info.ldap.sync}
+              <dt>{t.ldapSyncLast}</dt>
+              <dd>
+                {admin.formatDate(sync.lastRun ?? '')}
+                <div class="admin-faint" class:warn-text={!!sync.error}>
+                  {sync.error || t.ldapSyncResult(sync.accounts, sync.updated, sync.signedOut)}
+                </div>
+              </dd>
+            {/if}
           </dl>
           <div class="admin-actions">
             <button type="button" class="admin-btn" disabled={checkingLDAP} onclick={() => void checkLDAP()}>{t.ldapCheck}</button>
+            <button type="button" class="admin-btn" disabled={syncing || info.ldap.sync?.running} onclick={() => void syncLDAP()}>{t.ldapSyncNow}</button>
           </div>
         {:else}
           <p class="admin-faint">{t.ldapOff}</p>
@@ -206,6 +234,9 @@
 </div>
 
 <style>
+  .warn-text {
+    color: var(--warn-text);
+  }
   .section-title {
     margin: var(--space-2) 0 2px;
     font-size: var(--text-md);

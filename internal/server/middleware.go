@@ -101,7 +101,9 @@ func (s *Server) accessLog(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		r, label := withRouteLabel(r)
 		next.ServeHTTP(rec, r)
+		s.metrics.observe(r, label, rec.status, time.Since(start))
 
 		lvl := slog.LevelInfo
 		if r.URL.Path == "/healthz" || r.URL.Path == "/readyz" {

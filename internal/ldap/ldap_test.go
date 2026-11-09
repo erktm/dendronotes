@@ -16,6 +16,17 @@ func TestGUID(t *testing.T) {
 	if got := guid(raw); got != "3f2504e0-4f89-11d3-9a0c-0305e82c3301" {
 		t.Errorf("guid: %s", got)
 	}
+	if back := guidBytes(guid(raw)); string(back) != string(raw) {
+		t.Errorf("guidBytes: %x", back)
+	}
+	if escapeBytes(raw[:2]) != `\e0\04` {
+		t.Errorf("escapeBytes: %s", escapeBytes(raw[:2]))
+	}
+	for _, bad := range []string{"", "x", "3f2504e0-4f89-11d3-9a0c-0305e82c330g", "3f2504e04f8911d39a0c0305e82c3301"} {
+		if guidBytes(bad) != nil {
+			t.Errorf("guidBytes(%q) accepted", bad)
+		}
+	}
 }
 
 func TestInAny(t *testing.T) {
@@ -91,6 +102,14 @@ func TestDirectory(t *testing.T) {
 	}
 	if nested := env("EXPECT_NESTED"); nested != "" && !synced[nested] {
 		t.Errorf("nested group %q missing: %+v", nested, e.Groups)
+	}
+	// The sync finds the account again by its id.
+	again, err := c.Lookup(ctx, e.ID)
+	if err != nil || again.DN != e.DN || again.Disabled || len(again.Groups) != len(e.Groups) {
+		t.Errorf("lookup: %+v %v", again, err)
+	}
+	if _, err := c.Lookup(ctx, "00000000-0000-0000-0000-000000000000"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("lookup of an unknown id: %v", err)
 	}
 	if _, err := c.Authenticate(ctx, env("USER"), env("PASSWORD")+"x"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Errorf("wrong password: %v", err)

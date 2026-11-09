@@ -68,6 +68,7 @@ func (a *Authenticator) HandleSSOCallback(w http.ResponseWriter, r *http.Request
 	ip := a.ips.ClientIP(r).String()
 	q := r.URL.Query()
 	fail := func(code, actor, reason string) {
+		a.counted("sso", false)
 		a.log.Warn("SSO sign-in failed", "ip", ip, "user", actor, "reason", reason)
 		a.store.Audit(r.Context(), store.AuditEntry{Actor: actor, Action: "login.failed", Detail: "sso: " + reason, IP: ip})
 		a.loginError(w, r, code)
@@ -127,6 +128,7 @@ func (a *Authenticator) HandleSSOCallback(w http.ResponseWriter, r *http.Request
 	_ = a.store.TouchLogin(r.Context(), u.ID)
 	a.setCookie(w, r, token)
 	a.log.Info("login", "ip", ip, "user", u.Username, "via", "sso")
+	a.counted("sso", true)
 	a.store.Audit(r.Context(), store.AuditEntry{ActorID: u.ID, Actor: u.Username, Action: "login", Detail: "sso", IP: ip})
 	http.Redirect(w, r, next, http.StatusFound)
 }

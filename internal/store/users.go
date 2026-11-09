@@ -351,8 +351,17 @@ func (s *Store) DeleteSessionByID(ctx context.Context, id int64) error {
 
 // DeleteUserSessions ends all sessions of an account, except keep (0: none).
 func (s *Store) DeleteUserSessions(ctx context.Context, userID, keep int64) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ? AND id != ?`, userID, keep)
+	_, err := s.EndUserSessions(ctx, userID, keep)
 	return err
+}
+
+// EndUserSessions ends the sessions of an account (except keep) and says how many.
+func (s *Store) EndUserSessions(ctx context.Context, userID, keep int64) (int64, error) {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM sessions WHERE user_id = ? AND id != ?`, userID, keep)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 // Sessions lists the valid sessions, newest activity first.

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -36,6 +37,18 @@ func (d *fakeDirectory) Authenticate(_ context.Context, login, password string) 
 		return ldap.Entry{}, ldap.ErrInvalidCredentials
 	}
 	return a.entry, nil
+}
+
+func (d *fakeDirectory) Lookup(_ context.Context, id string) (ldap.Entry, error) {
+	if d.down {
+		return ldap.Entry{}, fmt.Errorf("%w: connection refused", ldap.ErrUnavailable)
+	}
+	for _, a := range d.accounts {
+		if a.entry.ID == id {
+			return a.entry, nil
+		}
+	}
+	return ldap.Entry{}, ldap.ErrNotFound
 }
 
 func newDirectoryFixture(t *testing.T, dir *fakeDirectory, change func(*Config)) *fixture {
@@ -208,4 +221,117 @@ func TestDirectoryGroupsDecide(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), `"local":true`) {
 		t.Errorf("methods: %s", rec.Body)
 	}
+}
+
+func TestDirectorySync(t *testing.T) {
+	garden := ldap.Group{ID: "g1", Name: "Garden", DN: "CN=Garden,OU=dendronotes,DC=corp", Synced: true}
+	staff := ldap.Group{ID: "g2", Name: "Staff", DN: "CN=Staff,DC=corp"}
+	entry := func(id, name string, groups ...ldap.Group) ldap.Entry {
+		return ldap.Entry{ID: id, DN: "CN=" + name + ",DC=corp", Username: strings.ToLower(name), Name: name, Groups: groups}
+	}
+	dir := &fakeDirectory{accounts: map[string]fakeAccount{
+		"ben":  {"pw ben", entry("id-ben", "Ben", garden, staff)},
+		"ada":  {"pw ada", entry("id-ada", "Ada", staff)},
+		"cara": {"pw cara", entry("id-cara", "Cara", staff)},
+		"dan":  {"pw dan", entry("id-dan", "Dan", staff)},
+	}}
+	var signedOut []int64
+	var changedGroups int
+	f := newDirectoryFixture(t, dir, func(c *Config) {
+		c.DirectoryAllowedGroups = []string{"Staff"}
+		c.OnSignedOut = func(_ context.Context, id int64) { signedOut = append(signedOut, id) }
+		c.OnDirectoryGroups = func(_ context.Context, ids []int64) { changedGroups += len(ids) }
+	})
+	ctx := context.Background()
+	users := map[string]store.User{}
+	for _, name := range []string{"ben", "ada", "cara", "dan"} {
+		users[name] = signedInAs(t, signIn(f.a, name, "pw "+name))
+	}
+	if _, _, err := f.st.CreateToken(ctx, users["ada"].ID, "script", store.ScopeRead, time.Time{}); err != nil {
+		t.Fatal(err)
+	}
+	changedGroups = 0
+
+	// Nothing changed: nothing to do.
+	res, err := f.a.SyncDirectory(ctx)
+	if err != nil || res != (DirectorySync{Accounts: 4}) {
+		t.Fatalf("quiet sync: %+v %v", res, err)
+	}
+
+	// Ben is renamed and leaves Garden; Ada is gone; Cara is disabled; Dan leaves Staff.
+	acc := dir.accounts["ben"]
+	acc.entry.Name, acc.entry.Groups = "Ben Miller", []ldap.Group{staff}
+	dir.accounts["ben"] = acc
+	delete(dir.accounts, "ada")
+	acc = dir.accounts["cara"]
+	acc.entry.Disabled = true
+	dir.accounts["cara"] = acc
+	acc = dir.accounts["dan"]
+	acc.entry.Groups = nil
+	dir.accounts["dan"] = acc
+
+	// Down: nothing happens.
+	dir.down = true
+	if _, err := f.a.SyncDirectory(ctx); !errors.Is(err, ldap.ErrUnavailable) {
+		t.Errorf("directory down: %v", err)
+	}
+	if n := f.sessions(t, users["ada"].ID); n != 1 {
+		t.Errorf("signed out while the directory was down: %d sessions left", n)
+	}
+	dir.down = false
+
+	res, err = f.a.SyncDirectory(ctx)
+	if err != nil || res != (DirectorySync{Accounts: 4, Updated: 1, SignedOut: 3}) {
+		t.Fatalf("sync: %+v %v", res, err)
+	}
+	if u, _ := f.st.UserByID(ctx, users["ben"].ID); u.DisplayName != "Ben Miller" {
+		t.Errorf("ben: %+v", u)
+	}
+	if changedGroups != 1 {
+		t.Errorf("changed groups: %d", changedGroups)
+	}
+	for _, name := range []string{"ada", "cara", "dan"} {
+		if n := f.sessions(t, users[name].ID); n != 0 {
+			t.Errorf("%s still has %d sessions", name, n)
+		}
+	}
+	if n := f.sessions(t, users["ben"].ID); n != 1 {
+		t.Errorf("ben was signed out")
+	}
+	if tokens, _ := f.st.Tokens(ctx, users["ada"].ID); len(tokens) != 0 {
+		t.Errorf("ada keeps her tokens: %+v", tokens)
+	}
+	if len(signedOut) != 3 {
+		t.Errorf("live streams ended for %v", signedOut)
+	}
+	// Signed out again: nothing left to end.
+	if res, _ := f.a.SyncDirectory(ctx); res.SignedOut != 0 {
+		t.Errorf("second sync: %+v", res)
+	}
+
+	// Most accounts missing at once: a wrong setting, not departures.
+	signIn(f.a, "ben", "pw ben")
+	dir.accounts = map[string]fakeAccount{"nobody": {"x", entry("id-x", "X", staff)}}
+	if _, err := f.a.SyncDirectory(ctx); !errors.Is(err, ErrSuspiciousSync) {
+		t.Errorf("suspicious sync: %v", err)
+	}
+	if n := f.sessions(t, users["ben"].ID); n == 0 {
+		t.Error("ben was signed out by a suspicious sync")
+	}
+}
+
+// sessions counts the sessions of an account.
+func (f *fixture) sessions(t *testing.T, userID int64) int {
+	t.Helper()
+	list, err := f.st.Sessions(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, s := range list {
+		if s.UserID == userID {
+			n++
+		}
+	}
+	return n
 }

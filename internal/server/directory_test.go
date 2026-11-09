@@ -63,6 +63,7 @@ func TestDirectoryAccountsAndGroupsReadOnly(t *testing.T) {
 
 	// Without LDAP there is nothing to check.
 	expect(t, admin.do("POST", "/api/admin/ldap/check", ``), 404, "not_available")
+	expect(t, admin.do("POST", "/api/admin/ldap/sync", ``), 404, "not_available")
 	if info := decode[map[string]any](t, admin.do("GET", "/api/admin/server", "")); info["ldap"] != nil {
 		t.Errorf("ldap status without LDAP: %v", info["ldap"])
 	}

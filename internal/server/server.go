@@ -40,8 +40,10 @@ type Server struct {
 	// ldapLast is the last directory check (api_ldap.go).
 	ldapMu   sync.Mutex
 	ldapLast ldapStatus
+	ldapSync ldapSyncStatus
 	// commentLimits holds a rate limiter per account (api_comments.go).
 	commentLimits sync.Map
+	metrics       *serverMetrics
 	ips           *clientip.Resolver
 	assets        *assets
 	version       string
@@ -68,6 +70,7 @@ func New(cfg config.Config, log *slog.Logger, webFS fs.FS, version string) (*Ser
 		return nil, err
 	}
 	s := &Server{cfg: cfg, log: log, store: st, ips: clientip.New(cfg.TrustedProxies), version: version, started: time.Now()}
+	s.metrics = s.newMetrics()
 	s.addCloser("state", st.Close)
 	fail := func(err error) (*Server, error) {
 		s.close()
@@ -121,6 +124,8 @@ func New(cfg config.Config, log *slog.Logger, webFS fs.FS, version string) (*Ser
 		ProxyAllowed:           cfg.Auth.ProxyAllowed,
 		ProxyLogoutURL:         cfg.Auth.ProxyLogoutURL,
 		OnProvision:            s.welcome,
+		OnLogin:                s.metrics.login,
+		OnSignedOut:            s.dropUserStreams,
 	}, st, s.ips, log)
 	if err != nil {
 		return fail(fmt.Errorf("auth: %w", err))
@@ -135,6 +140,12 @@ func New(cfg config.Config, log *slog.Logger, webFS fs.FS, version string) (*Ser
 		Log:            log,
 	})
 	s.addCloser("somas", s.somas.Close)
+	if s.ldap != nil && cfg.Auth.LDAP.SyncInterval > 0 {
+		s.ldapSync.Interval = cfg.Auth.LDAP.SyncInterval.String()
+		syncCtx, stopSync := context.WithCancel(context.Background())
+		go s.syncLDAPEvery(syncCtx, cfg.Auth.LDAP.SyncInterval)
+		s.addCloser("ldap sync", func() error { stopSync(); return nil })
+	}
 
 	ctx := context.Background()
 	if err := s.auth.Bootstrap(ctx, cfg.Auth.AdminHash, cfg.Auth.AdminPassword.Reveal()); err != nil {
@@ -240,6 +251,11 @@ func (s *Server) Run(ctx context.Context) error {
 func (s *Server) Serve(ctx context.Context, ln net.Listener) error {
 	errCh := make(chan error, 1)
 	go func() { errCh <- s.httpSrv.Serve(ln) }()
+	metricsCtx, stopMetrics := context.WithCancel(context.Background())
+	defer stopMetrics()
+	if err := s.serveMetrics(metricsCtx); err != nil {
+		s.log.Error("metrics listener failed", "port", s.cfg.MetricsPort, "err", err)
+	}
 
 	s.ready.Store(true)
 	s.log.Info("listening",

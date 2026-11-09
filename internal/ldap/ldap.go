@@ -9,10 +9,12 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -31,6 +33,8 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	// ErrUnavailable wraps everything else: network, TLS, service account.
 	ErrUnavailable = errors.New("directory unavailable")
+	// ErrNotFound means an account is no longer in the directory (Lookup).
+	ErrNotFound = errors.New("not in the directory")
 )
 
 // Entry is an account found in the directory.
@@ -41,6 +45,9 @@ type Entry struct {
 	Name     string
 	Email    string
 	Groups   []Group // only when groups are configured
+	// Disabled is Active Directory's "account disabled" flag
+	// (userAccountControl); other directories never set it.
+	Disabled bool
 }
 
 // Group is a group an account is in.
@@ -202,6 +209,87 @@ func (c *Client) Authenticate(ctx context.Context, login, password string) (Entr
 	}
 	e.Groups, err = c.groups(conn, found.DN)
 	return e, err
+}
+
+// Lookup finds an account again by the id dendronotes keeps (for the sync in
+// the background), with its groups when they are configured.
+func (c *Client) Lookup(ctx context.Context, id string) (Entry, error) {
+	if id == "" {
+		return Entry{}, ErrNotFound
+	}
+	conn, done, err := c.dial(ctx)
+	if err != nil {
+		return Entry{}, err
+	}
+	defer done()
+	attrs := []string{c.cfg.UsernameAttr, c.cfg.NameAttr, c.cfg.EmailAttr, c.cfg.IDAttr, "userAccountControl"}
+	base, scope, filter := c.cfg.BaseDN, goldap.ScopeWholeSubtree, ""
+	switch {
+	case strings.EqualFold(c.cfg.IDAttr, "objectGUID") && guidBytes(id) != nil:
+		filter = "(objectGUID=" + escapeBytes(guidBytes(id)) + ")"
+	case strings.Contains(id, "="): // no id attribute: the (lowercased) DN
+		if _, err := goldap.ParseDN(id); err != nil {
+			return Entry{}, ErrNotFound
+		}
+		base, scope, filter = id, goldap.ScopeBaseObject, "(objectClass=*)"
+	default:
+		filter = "(" + c.cfg.IDAttr + "=" + goldap.EscapeFilter(id) + ")"
+	}
+	res, err := conn.Search(goldap.NewSearchRequest(base, scope, goldap.NeverDerefAliases,
+		2, int(timeout.Seconds()), false, filter, attrs, nil))
+	switch {
+	case goldap.IsErrorWithCode(err, goldap.LDAPResultNoSuchObject):
+		return Entry{}, ErrNotFound
+	case err != nil:
+		return Entry{}, fmt.Errorf("%w: lookup: %v", ErrUnavailable, err)
+	case len(res.Entries) != 1:
+		return Entry{}, ErrNotFound
+	}
+	found := res.Entries[0]
+	e := Entry{
+		ID:       c.id(found),
+		DN:       found.DN,
+		Username: found.GetAttributeValue(c.cfg.UsernameAttr),
+		Name:     found.GetAttributeValue(c.cfg.NameAttr),
+		Email:    found.GetAttributeValue(c.cfg.EmailAttr),
+	}
+	if uac, err := strconv.ParseInt(found.GetAttributeValue("userAccountControl"), 10, 64); err == nil {
+		e.Disabled = uac&2 != 0 // ACCOUNTDISABLE
+	}
+	if c.cfg.NeedsGroups() {
+		if e.Groups, err = c.groups(conn, found.DN); err != nil {
+			return Entry{}, err
+		}
+	}
+	return e, nil
+}
+
+// guidBytes turns a GUID as guid() writes it back into the 16 bytes Active
+// Directory stores (nil if it is not one).
+func guidBytes(s string) []byte {
+	parts := strings.Split(s, "-")
+	if len(parts) != 5 || len(s) != 36 {
+		return nil
+	}
+	raw, err := hex.DecodeString(strings.Join(parts, ""))
+	if err != nil || len(raw) != 16 {
+		return nil
+	}
+	out := make([]byte, 16)
+	binary.LittleEndian.PutUint32(out[0:4], binary.BigEndian.Uint32(raw[0:4]))
+	binary.LittleEndian.PutUint16(out[4:6], binary.BigEndian.Uint16(raw[4:6]))
+	binary.LittleEndian.PutUint16(out[6:8], binary.BigEndian.Uint16(raw[6:8]))
+	copy(out[8:], raw[8:])
+	return out
+}
+
+// escapeBytes writes every byte as \hh for a filter on a binary attribute.
+func escapeBytes(b []byte) string {
+	var sb strings.Builder
+	for _, x := range b {
+		fmt.Fprintf(&sb, "\\%02x", x)
+	}
+	return sb.String()
 }
 
 // groups lists the groups of an account (below the base DN).

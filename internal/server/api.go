@@ -120,6 +120,7 @@ func (s *Server) routes() []route {
 		{"GET", "/api/admin/server", s.handleAdminServer, adminOnly},
 		{"POST", "/api/admin/sso/check", s.handleAdminSSOCheck, adminOnly},
 		{"POST", "/api/admin/ldap/check", s.handleAdminLDAPCheck, adminOnly},
+		{"POST", "/api/admin/ldap/sync", s.handleAdminLDAPSync, adminOnly},
 		{"GET", "/api/admin/backup", s.handleAdminBackup, adminOnly},
 		{"GET", "/api/admin/audit", s.handleAdminAudit, adminOnly},
 	}
@@ -137,7 +138,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 		default:
 			h = s.auth.Require(s.tokenGuard(rt, s.withSoma(rt.access.somaRole(), h)))
 		}
-		mux.Handle(rt.method+" "+rt.pattern, h)
+		mux.Handle(rt.method+" "+rt.pattern, labelRoute(rt.method+" "+rt.pattern, h))
 	}
 }
 
