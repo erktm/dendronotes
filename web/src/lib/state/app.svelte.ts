@@ -122,6 +122,8 @@ class App {
   profileOpen = $state(false)
   shareOpen = $state(false)
   trashOpen = $state(false)
+  /** The comments panel is shown next to the note. */
+  commentsOpen = $state(false)
   /** The history of the open note is shown. */
   historyOpen = $state(false)
   /** A heading the open view should scroll to (set by the outline). */

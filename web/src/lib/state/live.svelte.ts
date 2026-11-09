@@ -32,6 +32,10 @@ class Live {
   version = $state(0)
   /** Increases when the trash changed (restored, deleted for good). */
   trashVersion = $state(0)
+  /** The note whose comments changed last, and a counter. */
+  commentsChanged = $state.raw<{ path: string; n: number }>({ path: '', n: 0 })
+  /** Increases when this account got a notification. */
+  notificationVersion = $state(0)
   /** The id the server gave this stream ("hello"); notes are joined with it. */
   stream = $state('')
 
@@ -106,6 +110,15 @@ class Live {
     })
     es.addEventListener('access', () => this.handlers?.access())
     es.addEventListener('trash', () => this.trashVersion++)
+    es.addEventListener('comments', (e) => {
+      try {
+        const data = JSON.parse((e as MessageEvent<string>).data) as { path?: unknown }
+        if (typeof data.path === 'string') this.commentsChanged = { path: data.path, n: this.commentsChanged.n + 1 }
+      } catch {
+        // ignore
+      }
+    })
+    es.addEventListener('notification', () => this.notificationVersion++)
     es.onerror = () => {
       if (this.source !== es) return
       if (es.readyState === EventSource.CLOSED) {

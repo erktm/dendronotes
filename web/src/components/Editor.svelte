@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, untrack } from 'svelte'
   import { collab } from '@codemirror/collab'
   import { createEditor, type EditorHandle } from '../lib/editor/setup'
   import { readNote } from '../lib/api/soma'
@@ -10,6 +10,8 @@
   import { editorStatus } from '../lib/state/status.svelte'
   import { dirname, displayName } from '../lib/paths'
   import { pastedName } from '../lib/files'
+  import { comments } from '../lib/state/comments.svelte'
+  import { findAnchor, makeAnchor } from '../lib/anchors'
   import { strings } from '../lib/strings'
 
   /** visible: false while the reading view is shown (the editor stays open). */
@@ -43,6 +45,18 @@
       },
       onVimMode: (mode) => (editorStatus.vimMode = mode),
       onFiles: (files, pos) => void embedFiles(files, pos),
+      comments: {
+        label: strings.comments.add,
+        comment: (from, to) => {
+          comments.draft = makeAnchor(editor.view.state.doc.toString(), from, to)
+          comments.draftFocus++
+          app.commentsOpen = true
+        },
+        focus: (id) => {
+          comments.active = id
+          app.commentsOpen = true
+        },
+      },
     })
     handle = editor
     editor.restore(s.lastSelection, s.lastScroll)
@@ -64,6 +78,32 @@
   $effect(() => {
     const peers = session.peers
     handle?.setPeers(peers.filter((p) => p.sel).map((p) => ({ id: p.id, name: p.name, color: p.color, anchor: p.sel!.anchor, head: p.sel!.head })))
+  })
+
+  // The passages comments are about: found anew when the comments or the
+  // document change from outside; while typing, the marks move along.
+  $effect(() => {
+    const threads = comments.threads
+    const active = comments.active
+    void session.generation
+    if (!handle || comments.path !== session.path) return
+    const text = handle.view.state.doc.toString()
+    const ranges = []
+    for (const t of threads) {
+      const span = findAnchor(text, t.root)
+      if (span) ranges.push({ id: t.root.id, ...span, active: t.root.id === active, resolved: !!t.root.resolvedAt })
+    }
+    handle.setComments(ranges)
+  })
+
+  // A thread chosen in the panel: show its passage.
+  $effect(() => {
+    if (!comments.reveal || !handle || !visible) return
+    const h = handle
+    untrack(() => {
+      const pos = comments.active !== null ? h.commentPositions().get(comments.active) : undefined
+      if (pos) h.reveal(pos.from, pos.to)
+    })
   })
 
   // Shown again after the reading view: measure, and take the focus.

@@ -86,6 +86,11 @@ class Router {
     this.push({ soma: this.soma, notePath: path, view: 'soma', adminTab: '' }, replace)
   }
 
+  /** Opens a note in any soma. */
+  goNote(soma: string, path: string): void {
+    this.push({ soma, notePath: path, view: 'soma', adminTab: '' }, false)
+  }
+
   /** Switches to another soma (without a note). */
   goSoma(soma: string, replace = false): void {
     this.push({ soma, notePath: null, view: 'soma', adminTab: '' }, replace)

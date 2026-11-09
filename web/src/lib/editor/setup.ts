@@ -12,6 +12,7 @@ import { outline, type Heading } from '../outline'
 import { dirname, displayName } from '../paths'
 import { livePreview, refreshDecorations, synapseHost, type SynapseHost } from './livePreview'
 import { presence, setPeers, type PeerCursor } from './presence'
+import { commentExtension, commentPositions, setCommentRanges, type CommentHost, type CommentRange } from './comments'
 import { SynapseSyntax } from './synapseSyntax'
 
 export interface EditorOptions {
@@ -35,6 +36,8 @@ export interface EditorOptions {
   onVimMode: (mode: string | null) => void
   /** Files pasted or dropped into the editor at a position. */
   onFiles: (files: File[], pos: number) => void
+  /** Commenting on selected text, and threads clicked in the text. */
+  comments: CommentHost
 }
 
 export interface EditorHandle {
@@ -51,6 +54,12 @@ export interface EditorHandle {
   insertAt(pos: number, text: string): void
   /** Shows the cursors of the others. */
   setPeers(peers: PeerCursor[]): void
+  /** Marks the passages comments are about. */
+  setComments(ranges: CommentRange[]): void
+  /** Where each thread's passage is now. */
+  commentPositions(): Map<number, { from: number; to: number }>
+  /** Selects a passage and scrolls it into view. */
+  reveal(from: number, to: number): void
   /** Puts back cursor and scroll position (after the editor started over). */
   restore(sel: { anchor: number; head: number } | null, scrollTop: number): void
   /** Measures again (after being hidden). */
@@ -168,6 +177,7 @@ export function createEditor(parent: HTMLElement, o: EditorOptions): EditorHandl
     synapseHost.of(o.host),
     o.collab,
     presence,
+    commentExtension(o.comments),
     previewC.of(o.livePreview ? livePreview : []),
     readOnlyC.of(EditorState.readOnly.of(o.readOnly)),
     EditorView.contentAttributes.of({ 'aria-label': o.label, spellcheck: 'true' }),
@@ -247,6 +257,19 @@ export function createEditor(parent: HTMLElement, o: EditorOptions): EditorHandl
     },
     setPeers(peers) {
       view.dispatch({ effects: setPeers.of(peers) })
+    },
+    setComments(ranges) {
+      view.dispatch({ effects: setCommentRanges.of(ranges) })
+    },
+    commentPositions() {
+      return commentPositions(view.state)
+    },
+    reveal(from, to) {
+      const n = view.state.doc.length
+      view.dispatch({
+        selection: EditorSelection.single(Math.min(from, n), Math.min(to, n)),
+        effects: EditorView.scrollIntoView(Math.min(from, n), { y: 'center' }),
+      })
     },
     restore(sel, scrollTop) {
       if (sel) {

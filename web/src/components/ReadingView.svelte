@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import type { NoteSession } from '../lib/state/note.svelte'
   import { app } from '../lib/state/app.svelte'
   import { settings } from '../lib/state/settings.svelte'
@@ -8,10 +9,14 @@
   import { live } from '../lib/state/live.svelte'
   import { section } from '../lib/outline'
   import { strings } from '../lib/strings'
+  import { comments } from '../lib/state/comments.svelte'
+  import { anchorFromRendered, CONTEXT, findAnchor, type Anchor } from '../lib/anchors'
+  import { cssVars } from '../lib/actions'
 
   let { session }: { session: NoteSession } = $props()
 
   let article: HTMLElement | undefined = $state()
+  let surface: HTMLDivElement | undefined = $state()
 
   /** Resolves synapses and attachments as written in the note at path. */
   const contextFor = (path: string): RenderContext => ({
@@ -88,7 +93,14 @@
         return
       }
       const a = target.closest('a')
-      if (!a) return
+      if (!a) {
+        const id = threadAt(e.clientX, e.clientY)
+        if (id !== null && window.getSelection()?.isCollapsed !== false) {
+          comments.active = id
+          app.commentsOpen = true
+        }
+        return
+      }
       if (a.dataset.synapse !== undefined) {
         e.preventDefault()
         void app.openSynapse(a.dataset.synapse, a.dataset.markdown === 'true', from)
@@ -111,6 +123,145 @@
     return found
   }
 
+  // --- Comments --------------------------------------------------------------
+  // Passages are marked with the CSS Custom Highlight API: the rendered (and
+  // sanitized) HTML stays untouched. Browsers without it show no marks.
+
+  /** The rendered text and where each text node starts in it. */
+  function textIndex(root: HTMLElement): { text: string; nodes: { node: Text; start: number }[] } {
+    const nodes: { node: Text; start: number }[] = []
+    let text = ''
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      nodes.push({ node: n as Text, start: text.length })
+      text += n.nodeValue ?? ''
+    }
+    return { text, nodes }
+  }
+
+  function rangeOf(index: ReturnType<typeof textIndex>, from: number, to: number): Range | null {
+    const at = (pos: number) => {
+      let lo = 0
+      let hi = index.nodes.length - 1
+      while (lo < hi) {
+        const mid = (lo + hi + 1) >> 1
+        if ((index.nodes[mid]?.start ?? 0) <= pos) lo = mid
+        else hi = mid - 1
+      }
+      const n = index.nodes[lo]
+      return n ? { node: n.node, offset: Math.min(pos - n.start, n.node.length) } : null
+    }
+    const a = at(from)
+    const b = at(to)
+    if (!a || !b) return null
+    const r = document.createRange()
+    r.setStart(a.node, a.offset)
+    r.setEnd(b.node, b.offset)
+    return r
+  }
+
+  let marked: { id: number; range: Range }[] = []
+  const highlights = typeof CSS !== 'undefined' && 'highlights' in CSS ? CSS.highlights : null
+
+  $effect(() => {
+    void html
+    const threads = comments.threads
+    const active = comments.active
+    if (!article || !highlights || comments.path !== session.path) return
+    const index = textIndex(article)
+    marked = []
+    const normal: Range[] = []
+    const focused: Range[] = []
+    for (const th of threads) {
+      if (th.root.resolvedAt || !th.root.quote) continue
+      const span = findAnchor(index.text, th.root)
+      const range = span && rangeOf(index, span.from, span.to)
+      if (!range) continue
+      marked.push({ id: th.root.id, range })
+      ;(th.root.id === active ? focused : normal).push(range)
+    }
+    highlights.set('dn-comment', new Highlight(...normal))
+    highlights.set('dn-comment-active', new Highlight(...focused))
+    return () => {
+      highlights.delete('dn-comment')
+      highlights.delete('dn-comment-active')
+    }
+  })
+
+  /** The thread whose passage is at a point (for clicks). */
+  function threadAt(x: number, y: number): number | null {
+    const doc = document as Document & { caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null }
+    let node: Node | null = null
+    let offset = 0
+    if (doc.caretPositionFromPoint) {
+      const p = doc.caretPositionFromPoint(x, y)
+      if (p) ({ offsetNode: node, offset } = p)
+    } else {
+      const r = document.caretRangeFromPoint?.(x, y)
+      if (r) ({ startContainer: node, startOffset: offset } = r)
+    }
+    if (!node) return null
+    for (const m of marked) {
+      try {
+        if (m.range.isPointInRange(node, offset)) return m.id
+      } catch {
+        // a point in another document part
+      }
+    }
+    return null
+  }
+
+  // A thread chosen in the panel: scroll its passage into view.
+  $effect(() => {
+    if (!comments.reveal) return
+    const id = untrack(() => comments.active)
+    const m = marked.find((x) => x.id === id)
+    const el = m?.range.startContainer.parentElement
+    el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  })
+
+  // A selection gets a small button to comment on it.
+  let selection = $state.raw<{ x: number; y: number; anchor: Anchor } | null>(null)
+
+  function selected() {
+    const sel = window.getSelection()
+    const range = sel && sel.rangeCount && !sel.isCollapsed ? sel.getRangeAt(0) : null
+    if (!range || !article || !surface || !article.contains(range.commonAncestorContainer) || !sel?.toString().trim()) {
+      selection = null
+      return
+    }
+    const before = document.createRange()
+    before.setStart(article, 0)
+    before.setEnd(range.startContainer, range.startOffset)
+    const start = before.toString().length
+    const text = textIndex(article).text
+    const quote = range.toString()
+    const anchor = anchorFromRendered(
+      session.content,
+      quote,
+      text.slice(Math.max(0, start - CONTEXT), start),
+      text.slice(start + quote.length, start + quote.length + CONTEXT),
+    )
+    const box = surface.getBoundingClientRect()
+    const rect = range.getBoundingClientRect()
+    selection = { x: Math.max(0, rect.right - box.left - 40), y: rect.bottom - box.top + 6, anchor }
+  }
+
+  function comment() {
+    if (!selection) return
+    comments.draft = selection.anchor
+    comments.draftFocus++
+    app.commentsOpen = true
+    selection = null
+    window.getSelection()?.removeAllRanges()
+  }
+
+  $effect(() => {
+    const update = () => setTimeout(selected, 0)
+    document.addEventListener('selectionchange', update)
+    return () => document.removeEventListener('selectionchange', update)
+  })
+
   $effect(() => {
     const req = app.scrollRequest
     if (req && article) {
@@ -121,7 +272,52 @@
   })
 </script>
 
-<div class="note-surface" class:serif={settings.noteFont === 'serif'} class:readable={settings.readableWidth}>
+<div class="note-surface" class:serif={settings.noteFont === 'serif'} class:readable={settings.readableWidth} bind:this={surface}>
   <!-- Sanitized by DOMPurify in renderMarkdown. -->
   <article class="reading" bind:this={article} use:interactions>{@html html}</article>
+  {#if selection}
+    <button
+      type="button"
+      class="comment-on"
+      use:cssVars={{ '--x': `${selection.x}px`, '--y': `${selection.y}px` }}
+      onmousedown={(e) => e.preventDefault()}
+      onclick={comment}
+    >
+      {strings.comments.add}
+    </button>
+  {/if}
 </div>
+
+<style>
+  .note-surface {
+    position: relative;
+  }
+  .comment-on {
+    position: absolute;
+    z-index: 5;
+    top: var(--y);
+    left: var(--x);
+    padding: 3px 10px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: var(--bg-raised);
+    color: var(--text);
+    box-shadow: var(--shadow);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .comment-on:hover {
+    background: var(--bg-hover);
+  }
+  :global(::highlight(dn-comment)) {
+    background-color: color-mix(in srgb, var(--warn) 18%, transparent);
+    text-decoration: underline 2px color-mix(in srgb, var(--warn) 60%, transparent);
+    text-underline-offset: 3px;
+  }
+  :global(::highlight(dn-comment-active)) {
+    background-color: color-mix(in srgb, var(--warn) 34%, transparent);
+    text-decoration: underline 2px var(--warn);
+    text-underline-offset: 3px;
+  }
+</style>

@@ -515,3 +515,39 @@
   pointer-events: none;
   opacity: 0.92;
 }
+
+/* Comments: the passages threads are about, and the button on a selection. */
+.cm-comment {
+  background: color-mix(in srgb, var(--warn) 16%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--warn) 55%, transparent);
+  cursor: pointer;
+}
+.cm-comment-active {
+  background: color-mix(in srgb, var(--warn) 32%, transparent);
+  border-bottom-color: var(--warn);
+}
+.cm-editor .cm-tooltip.cm-comment-tip,
+.cm-editor .cm-tooltip:has(> .cm-comment-tip) {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.cm-editor:not(.cm-focused) .cm-tooltip.cm-comment-tip {
+  display: none;
+}
+.cm-comment-tip button {
+  margin-top: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+}
+.cm-comment-tip button:hover {
+  background: var(--bg-hover);
+}

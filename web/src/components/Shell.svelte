@@ -12,6 +12,10 @@
   import ShareDialog from './ShareDialog.svelte'
   import TrashDialog from './TrashDialog.svelte'
   import HistoryDialog from './HistoryDialog.svelte'
+  import CommentsPanel from './CommentsPanel.svelte'
+  import NotificationBell from './NotificationBell.svelte'
+  import { comments } from '../lib/state/comments.svelte'
+  import { live } from '../lib/state/live.svelte'
   import EmptyState from './EmptyState.svelte'
   import ConfirmDialog from './ConfirmDialog.svelte'
   import QuickSwitcher from './QuickSwitcher.svelte'
@@ -120,6 +124,22 @@
   /** An editable note is open (not loading, missing or an attachment). */
   const noteReady = $derived(app.note?.status === 'ready')
 
+  // The comments of the open note (also for the count in the top bar),
+  // again when someone changed them or the connection came back.
+  $effect(() => {
+    const path = app.note?.path
+    if (!path) {
+      comments.clear()
+      return
+    }
+    void live.state
+    const changed = live.commentsChanged
+    untrack(() => {
+      if (changed.path === '' || changed.path === path || comments.path !== path) void comments.load(path)
+    })
+  })
+  const openThreads = $derived(comments.path === app.note?.path ? comments.threads.filter((th) => !th.root.resolvedAt).length : 0)
+
   const save = $derived.by(() => {
     const n = app.note
     if (!n || n.status !== 'ready') return null
@@ -226,6 +246,18 @@
           {/if}
           <button
             type="button"
+            class="icon-btn counted"
+            class:on={app.commentsOpen}
+            aria-pressed={app.commentsOpen}
+            aria-label={strings.comments.openCount(openThreads)}
+            title={strings.comments.openCount(openThreads)}
+            onclick={() => (app.commentsOpen = !app.commentsOpen)}
+          >
+            <Icon name="comment" size={18} />
+            {#if openThreads}<span class="count" aria-hidden="true">{openThreads}</span>{/if}
+          </button>
+          <button
+            type="button"
             class="icon-btn"
             aria-label={strings.history.open}
             title={strings.history.open}
@@ -245,6 +277,7 @@
             <Icon name="panel" size={18} />
           </button>
         {/if}
+        <NotificationBell />
         <ProfileMenu />
       </div>
     </header>
@@ -268,7 +301,9 @@
           <EmptyState />
         {/if}
       </div>
-      {#if app.note && noteReady && settings.showDetails}
+      {#if app.note && noteReady && app.commentsOpen}
+        <CommentsPanel session={app.note} />
+      {:else if app.note && noteReady && settings.showDetails}
         <DetailsPanel session={app.note} />
       {/if}
     </div>
@@ -428,5 +463,22 @@
     .save {
       display: none;
     }
+  }
+  .counted {
+    position: relative;
+  }
+  .count {
+    position: absolute;
+    top: 2px;
+    right: 0;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 3px;
+    border-radius: 999px;
+    background: var(--warn-soft);
+    color: var(--warn-text);
+    font-size: 9.5px;
+    font-weight: 700;
+    line-height: 15px;
   }
 </style>
