@@ -100,6 +100,15 @@ func TestEditingTogether(t *testing.T) {
 	if b, _ := os.ReadFile(filepath.Join(somaDir(s), "Plan.md")); string(b) != "Beds and paths\r\n" {
 		t.Errorf("file: %q", b)
 	}
+	// The save is a version, with who wrote it and the file's line breaks.
+	if code, h := call("GET", "/api/somas/testsoma01/history/Plan.md", ""); code != 200 {
+		t.Errorf("history: %d", code)
+	} else if vs := h["versions"].([]any); len(vs) != 1 || vs[0].(map[string]any)["reason"] != "edit" ||
+		len(vs[0].(map[string]any)["authors"].([]any)) != 1 {
+		t.Errorf("history after a collab save: %v", h)
+	} else if code, v := call("GET", fmt.Sprintf("/api/somas/testsoma01/versions/%v", vs[0].(map[string]any)["id"]), ""); code != 200 || v["content"] != "Beds and paths\r\n" {
+		t.Errorf("version content: %d %v", code, v)
+	}
 
 	if code, r := push(0, `[[0,"x"],15]`); code != 409 || r["error"] != "version_mismatch" || r["version"] != 1.0 {
 		t.Errorf("stale push: %d %v", code, r)

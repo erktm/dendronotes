@@ -599,6 +599,125 @@ paths:
                   trashedTo: { type: string, example: .trash/Projects/Idea.md }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/export:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+    get:
+      summary: Download the soma as a ZIP
+      description: >
+        Every visible file and folder; hidden entries (.trash, .obsidian …)
+        and DENDRONOTES_IGNORE patterns stay out. Notes being edited are
+        saved first.
+      responses:
+        "200": { description: The ZIP (Content-Disposition attachment)., content: { application/zip: {} } }
+  /api/somas/{soma}/history/{path}:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+      - $ref: "#/components/parameters/path"
+    get:
+      summary: Earlier versions of a note, newest first
+      description: >
+        Every save through dendronotes is a version; saves by the same people
+        within 10 minutes update the newest one. Changes made outside
+        dendronotes are versions too (reason `outside`). The history follows
+        renames; versions older than DENDRONOTES_HISTORY_DAYS are removed,
+        except the newest of every note.
+      responses:
+        "200":
+          description: The versions and the people who wrote them (by id; accounts that are gone are missing).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  versions: { type: array, items: { $ref: "#/components/schemas/Version" } }
+                  people: { type: object, additionalProperties: { $ref: "#/components/schemas/Person" } }
+  /api/somas/{soma}/versions/{id}:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      summary: One version with its content
+      responses:
+        "200":
+          description: The version.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version: { $ref: "#/components/schemas/Version" }
+                  content: { type: string }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/versions/{id}/restore:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      summary: Write a version back to its note (writer); open editors take it up like a change made elsewhere
+      responses:
+        "200": { description: The note's new version (path, etag, size, mtime). }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "412": { description: The note changed meanwhile (`conflict`); try again. }
+  /api/somas/{soma}/trash:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+    get:
+      summary: What is in the trash (editor)
+      description: >
+        Entries deleted through dendronotes come with their original path,
+        who deleted them and when. Files that were put into .trash otherwise
+        (Obsidian) are listed one by one with their file time.
+      responses:
+        "200":
+          description: Newest first; `path` is relative to the trash.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        path: { type: string, example: Projects/Idea.md }
+                        original: { type: string }
+                        type: { type: string, enum: [file, dir] }
+                        size: { type: integer }
+                        files: { type: integer, description: Files inside a folder. }
+                        deletedAt: { type: string, format: date-time }
+                        deletedBy: { $ref: "#/components/schemas/Person" }
+    delete:
+      summary: Empty the trash – everything in it is deleted for good (owner)
+      responses:
+        "200": { description: Emptied. }
+        "403": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/trash/{path}:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+      - { name: path, in: path, required: true, schema: { type: string }, description: Path relative to the trash. }
+    get:
+      summary: A note in the trash, for a preview (editor)
+      responses:
+        "200": { description: The note., content: { application/json: { schema: { $ref: "#/components/schemas/Note" } } } }
+        "404": { $ref: "#/components/responses/Error" }
+        "415": { $ref: "#/components/responses/Error" }
+    post:
+      summary: Restore an entry to where it was deleted from (editor)
+      description: Missing folders are created; an occupied place gets a " (n)" suffix.
+      responses:
+        "200":
+          description: Restored.
+          content: { application/json: { schema: { type: object, properties: { path: { type: string } } } } }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Delete an entry in the trash for good (owner)
+      responses:
+        "200": { description: Deleted. }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /api/somas/{soma}/search:
     parameters:
       - $ref: "#/components/parameters/soma"
@@ -1047,7 +1166,58 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
     delete:
-      summary: Delete a soma (admin); its folder moves to SOMAS_DIR/.trash
+      summary: Delete a soma (admin); its folder moves to SOMAS_DIR/.trash and it can be restored
+      responses:
+        "200": { description: Deleted. }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/admin/somas/deleted:
+    get:
+      summary: Deleted somas that can be restored (admin)
+      responses:
+        "200":
+          description: Newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  somas:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        folder: { type: string, description: Where its files are now (in SOMAS_DIR/.trash, or absolute for an imported soma). }
+                        originalFolder: { type: string }
+                        owner: { $ref: "#/components/schemas/Person" }
+                        members: { type: integer }
+                        groups: { type: integer }
+                        createdAt: { type: string, format: date-time }
+                        deletedBy: { $ref: "#/components/schemas/Person" }
+                        deletedAt: { type: string, format: date-time }
+  /api/admin/somas/deleted/{id}/restore:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    post:
+      summary: Restore a deleted soma with its shares, as far as their accounts and groups still exist (admin)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ownerId: { type: integer, description: The owner; required when the old one is gone (`owner_required`). }
+      responses:
+        "200": { description: The restored soma. }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { description: Its folder is gone (`folder_missing`). }
+  /api/admin/somas/deleted/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    delete:
+      summary: Delete a deleted soma for good – its files in the trash too (an imported folder stays) (admin)
       responses:
         "200": { description: Deleted. }
         "404": { $ref: "#/components/responses/Error" }
@@ -1075,6 +1245,16 @@ paths:
       responses:
         "200": { description: Provider state (as `sso` in /api/admin/server). }
         "404": { description: OpenID Connect is not configured. }
+  /api/admin/backup:
+    get:
+      summary: Download a backup of state.db and the note histories (admin)
+      description: >
+        Consistent copies made while the server runs, as a ZIP with a
+        manifest. To restore, stop dendronotes and unpack it into
+        DENDRONOTES_DATA_DIR. The notes themselves (SOMAS_DIR) need a backup
+        of their own.
+      responses:
+        "200": { description: The ZIP., content: { application/zip: {} } }
   /api/admin/ldap/check:
     post:
       summary: Connect to the directory with the service account and read the base DN (admin)
@@ -1245,6 +1425,16 @@ components:
               color: { type: integer, minimum: 0, maximum: 7 }
               sel: { type: object, properties: { anchor: { type: integer }, head: { type: integer } } }
         conflict: { type: boolean }
+    Version:
+      type: object
+      properties:
+        id: { type: integer }
+        path: { type: string }
+        at: { type: string, format: date-time }
+        authors: { type: array, items: { type: integer }, description: Accounts that changed the note in this version. }
+        reason: { type: string, enum: [edit, create, outside, relink, restore] }
+        size: { type: integer }
+        restoredFrom: { type: integer, description: The version a restore brought back. }
     Person:
       type: object
       properties:

@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 
+	"dendronotes/internal/auth"
+	"dendronotes/internal/history"
 	"dendronotes/internal/httpx"
 	"dendronotes/internal/relink"
 	"dendronotes/internal/soma"
@@ -63,6 +65,15 @@ func (s *Server) routes() []route {
 		{"POST", "/api/somas/{soma}/files/{path...}", s.handleUpload, somaContributor},
 		{"POST", "/api/somas/{soma}/move", s.handleMove, somaEditor},
 		{"DELETE", "/api/somas/{soma}/entries/{path...}", s.handleTrash, somaEditor},
+		{"GET", "/api/somas/{soma}/export", s.handleExport, somaViewer},
+		{"GET", "/api/somas/{soma}/history/{path...}", s.handleHistory, somaViewer},
+		{"GET", "/api/somas/{soma}/versions/{id}", s.handleVersion, somaViewer},
+		{"POST", "/api/somas/{soma}/versions/{id}/restore", s.handleRestoreVersion, somaWriter},
+		{"GET", "/api/somas/{soma}/trash", s.handleListTrash, somaEditor},
+		{"DELETE", "/api/somas/{soma}/trash", s.handleEmptyTrash, somaOwner},
+		{"GET", "/api/somas/{soma}/trash/{path...}", s.handleReadTrash, somaEditor},
+		{"POST", "/api/somas/{soma}/trash/{path...}", s.handleRestoreTrash, somaEditor},
+		{"DELETE", "/api/somas/{soma}/trash/{path...}", s.handlePurgeTrash, somaOwner},
 		{"GET", "/api/somas/{soma}/search", s.handleSearch, somaViewer},
 		{"GET", "/api/somas/{soma}/backlinks/{path...}", s.handleBacklinks, somaViewer},
 		{"GET", "/api/somas/{soma}/tags", s.handleTags, somaViewer},
@@ -91,11 +102,15 @@ func (s *Server) routes() []route {
 		{"POST", "/api/admin/somas", s.handleAdminCreateSoma, adminOnly},
 		{"PATCH", "/api/admin/somas/{soma}", s.handleAdminTransferSoma, adminOnly},
 		{"DELETE", "/api/admin/somas/{soma}", s.handleAdminDeleteSoma, adminOnly},
+		{"GET", "/api/admin/somas/deleted", s.handleAdminDeletedSomas, adminOnly},
+		{"POST", "/api/admin/somas/deleted/{id}/restore", s.handleAdminRestoreSoma, adminOnly},
+		{"DELETE", "/api/admin/somas/deleted/{id}", s.handleAdminPurgeSoma, adminOnly},
 		{"GET", "/api/admin/sessions", s.handleAdminSessions, adminOnly},
 		{"DELETE", "/api/admin/sessions/{id}", s.handleAdminEndSession, adminOnly},
 		{"GET", "/api/admin/server", s.handleAdminServer, adminOnly},
 		{"POST", "/api/admin/sso/check", s.handleAdminSSOCheck, adminOnly},
 		{"POST", "/api/admin/ldap/check", s.handleAdminLDAPCheck, adminOnly},
+		{"GET", "/api/admin/backup", s.handleAdminBackup, adminOnly},
 		{"GET", "/api/admin/audit", s.handleAdminAudit, adminOnly},
 	}
 }
@@ -174,6 +189,8 @@ func (s *Server) handleWriteNote(w http.ResponseWriter, r *http.Request) {
 		s.somaError(w, r, err)
 		return
 	}
+	me, _ := auth.UserFrom(r.Context())
+	rt.RecordVersion(n.Path, []byte(*body.Content), []int64{me.ID}, history.ReasonEdit)
 	if ch, err := rt.Index.Put(context.WithoutCancel(r.Context()), n); err != nil {
 		s.log.Error("index update after save failed", "path", n.Path, "err", err)
 	} else {
@@ -197,6 +214,8 @@ func (s *Server) handleCreateNote(w http.ResponseWriter, r *http.Request) {
 		s.somaError(w, r, err)
 		return
 	}
+	me, _ := auth.UserFrom(r.Context())
+	rt.RecordVersion(n.Path, []byte(body.Content), []int64{me.ID}, history.ReasonCreate)
 	rt.SyncAfterWrite(r.Context())
 	w.Header().Set("ETag", quoteETag(n.ETag))
 	httpx.WriteJSON(w, http.StatusCreated, metaOf(n))
@@ -215,6 +234,7 @@ func (s *Server) handleMkdir(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 	rt := runtimeOf(r)
+	me, _ := auth.UserFrom(r.Context())
 	var body struct {
 		From           string `json:"from"`
 		To             string `json:"to"`
@@ -231,7 +251,11 @@ func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 	}
 	// Open documents are saved first and follow the move.
 	move := func() (string, error) {
-		return rt.Collab.Move(from, func() (string, error) { return rt.Soma.Move(from, body.To) })
+		to, err := rt.Collab.Move(from, func() (string, error) { return rt.Soma.Move(from, body.To) })
+		if err == nil {
+			rt.MoveHistory(from, to)
+		}
+		return to, err
 	}
 	if !body.UpdateSynapses {
 		to, err := move()
@@ -266,6 +290,7 @@ func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 			res.Failed = append(res.Failed, e.Path)
 			continue
 		}
+		rt.RecordVersion(e.Path, []byte(e.Content), []int64{me.ID}, history.ReasonRelink)
 		res.Notes++
 		res.Synapses += e.Synapses
 	}
@@ -323,16 +348,25 @@ func (s *Server) handleTrash(w http.ResponseWriter, r *http.Request) {
 		s.somaError(w, r, err)
 		return
 	}
+	entry, _ := rt.Soma.Stat(p) // only to remember whether it was a folder
+	deletedDirs, err := s.trashedFolders(r, rt.ID)
+	if err != nil {
+		s.internalError(w, r, "reading trash records", err)
+		return
+	}
 	// Open documents are saved before they go to the trash, then closed.
 	var dst string
 	err = rt.Collab.Remove(p, func() (err error) {
-		dst, err = rt.Soma.Trash(p)
+		dst, err = rt.Soma.TrashAvoiding(p, func(d string) bool { return deletedDirs[d] })
 		return err
 	})
 	if err != nil {
 		s.somaError(w, r, err)
 		return
 	}
+	s.recordTrash(r, rt.ID, p, dst, entry.Type == "dir")
+	rt.MoveHistory(p, dst)
+	trashChanged(rt)
 	rt.SyncAfterWrite(r.Context())
 	httpx.WriteJSON(w, http.StatusOK, map[string]string{"trashedTo": dst})
 }

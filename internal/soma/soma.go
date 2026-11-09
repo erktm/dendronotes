@@ -211,6 +211,11 @@ func (s *Soma) ReadNote(p string) (Note, error) {
 	if !IsNote(p) {
 		return Note{}, ErrNotNote
 	}
+	return s.readNote(p)
+}
+
+// readNote reads a note at p, which the caller has checked.
+func (s *Soma) readNote(p string) (Note, error) {
 	lst, err := s.root.Lstat(p)
 	if err != nil {
 		return Note{}, mapErr(err)
@@ -403,7 +408,13 @@ func (s *Soma) Move(from, to string) (string, error) {
 
 // Trash moves a file or folder into .trash/, keeping its relative path.
 // Name clashes in the trash get a " (n)" suffix. It returns the trash path.
-func (s *Soma) Trash(p string) (string, error) {
+func (s *Soma) Trash(p string) (string, error) { return s.TrashAvoiding(p, nil) }
+
+// TrashAvoiding is Trash, but never moves the entry into a folder of the
+// trash for which avoid (given a path relative to the trash) is true – a
+// folder deleted as a whole earlier. That folder level gets a free name
+// instead ("Garden (1)/Note.md").
+func (s *Soma) TrashAvoiding(p string, avoid func(string) bool) (string, error) {
 	p, err := CleanPath(p)
 	if err != nil {
 		return "", err
@@ -415,7 +426,23 @@ func (s *Soma) Trash(p string) (string, error) {
 	if _, err := s.root.Lstat(p); err != nil {
 		return "", mapErr(err)
 	}
-	dst := path.Join(TrashDir, p)
+	rel := p
+	if avoid != nil {
+		segs := strings.Split(p, "/")
+		for i := 1; i < len(segs); i++ { // ancestors only
+			if !avoid(strings.Join(segs[:i], "/")) {
+				continue
+			}
+			free, err := s.freeName(path.Join(TrashDir, strings.Join(segs[:i], "/")))
+			if err != nil {
+				return "", err
+			}
+			segs[i-1] = path.Base(free)
+			break // below a new name, nothing else can be in the way
+		}
+		rel = strings.Join(segs, "/")
+	}
+	dst := path.Join(TrashDir, rel)
 	if err := s.root.MkdirAll(path.Dir(dst), 0o755); err != nil {
 		return "", mapErr(err)
 	}

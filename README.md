@@ -88,6 +88,21 @@ admin's first soma.
   Files keep their line breaks (also Windows-style) and a byte order mark. Without a
   connection, changes stay in the tab ("Offline – changes kept here") and are sent as soon as
   it is back – also if the server restarted meanwhile: they are merged into the current text.
+- **History** (the clock in the top bar). Every save is kept as a version: saves by the same
+  people within ten minutes count as one, changes made outside dendronotes and restored
+  versions get their own. The history lists who changed what and when, shows the changes from
+  any version to the current note line by line, and – for everyone who may change notes –
+  brings a version back (the current text stays in the history). It follows renames and the
+  trash; versions older than `DENDRONOTES_HISTORY_DAYS` (90 days) are removed, but the newest
+  version of every note always stays. The history lives in `DENDRONOTES_DATA_DIR/history/`,
+  never in the soma.
+- **Trash** (the bin at the bottom of the sidebar, for everyone who may delete). Deleted files
+  and folders wait in the soma's `.trash` folder – the same place Obsidian uses – with who
+  deleted them, when and from where. Restore puts them back where they were (missing folders
+  are created again, an occupied name gets a " (n)" suffix); the owner can also delete single
+  entries or everything for good, which takes their history along.
+- **Download as ZIP** (soma switcher). All visible notes, files and folders of the soma as they
+  are now; hidden folders such as `.trash` and `.obsidian` stay out.
 - **Live updates.** Changes made outside dendronotes – another editor, git, a sync tool –
   appear right away: the file tree, search and backlinks update, and an open note takes over
   the change. If it was edited here at the same time, both are merged line by line; where both
@@ -123,8 +138,9 @@ up to `DENDRONOTES_MAX_UPLOAD_MB`. The content must match the extension.
   "Notes". The switcher at the top of the sidebar changes the soma ("Switch soma") and creates,
   renames or deletes one. Each soma is a folder in `DENDRONOTES_SOMAS_DIR`, named after the
   soma when it is created (renaming the soma keeps the folder). Deleting a soma moves its
-  folder to `DENDRONOTES_SOMAS_DIR/.trash/`, so the notes stay recoverable as files; a soma
-  registered from `DENDRONOTES_SOMA_DIR` keeps its folder where it is.
+  folder to `DENDRONOTES_SOMAS_DIR/.trash/`; admins find it under *Somas → Deleted somas* and
+  restore it with its notes and shares, or delete it for good. A soma registered from
+  `DENDRONOTES_SOMA_DIR` keeps its folder where it is.
 - **Sharing** ("Share soma …" in the soma switcher). The owner adds people and groups by name,
   each with a role; every role includes the ones above it:
 
@@ -162,9 +178,9 @@ up to `DENDRONOTES_MAX_UPLOAD_MB`. The content must match the extension.
     account – optionally shared with a group right away, for example *Everyone* –, hand a soma
     to another owner or delete it.
   - *Sessions*: who is signed in from where; end single sessions.
-  - *Server*: version, uptime, storage, open somas, whether the OpenID Connect provider and
-    the directory are reachable, and the effective configuration (secrets show only whether
-    they are set).
+  - *Server*: version, uptime, storage, open somas, a backup download, whether the OpenID
+    Connect provider and the directory are reachable, and the effective configuration
+    (secrets show only whether they are set).
   - *Audit log*: sign-ins (failed ones too), account and soma changes.
 
 Disabling an account, setting its password or ending its sessions takes effect at once; open
@@ -201,11 +217,27 @@ docker run -d --name dendronotes -p 8080:8080 \
 The image runs as UID 65532. `/somas` holds the notes (one folder per soma), `/data` the
 account database `state.db` and the search indexes; both must be writable.
 
-**Backups** need both: the somas directory and `state.db` (accounts, sessions, profile pictures,
-who owns which soma). Stop the container for the backup or use a volume snapshot, since `state.db` is written
-while running. The indexes in `/data/index` are caches and can be left out. Before a new
-release changes the database format, dendronotes copies it to `state.db.v<n>.bak`; it refuses
-to open a database written by a newer release.
+**Backups** need both: the somas directory and what in `/data` is not a cache – `state.db`
+(accounts, shares, groups, profile pictures, the trash records) and the note histories in
+`/data/history/`. The indexes in `/data/index` are caches and can be left out. The databases
+are written while running, so copy them consistently: *Admin → Server → Download backup*, or
+
+```bash
+docker exec dendronotes dendronotes backup /data/backup-$(date +%F).zip
+```
+
+Both make a ZIP of consistent copies while dendronotes keeps running; to restore, stop it and
+unpack the ZIP into `/data`. The somas directory is plain files: back it up as such (or use
+volume snapshots for everything). Before a new release changes the database format,
+dendronotes copies `state.db` to `state.db.v<n>.bak`; it refuses to open a database written by
+a newer release.
+
+**Locked out?** `dendronotes reset-password [user]` sets a new password for a local account
+(by default the admin account), enables it and ends its sessions – also while the server runs:
+
+```bash
+docker exec -it dendronotes dendronotes reset-password
+```
 
 **Upgrading from a single soma** (before M6): mount the old notes folder, e.g. at `/soma`, and
 set `DENDRONOTES_SOMA_DIR=/soma`. On the first start with no somas registered, it becomes the
@@ -228,6 +260,7 @@ All variables carry the `DENDRONOTES_` prefix. Variables without it are ignored.
 | `DENDRONOTES_MAX_UPLOAD_MB`            | `25`               | Largest file that can be uploaded (images, PDFs, media …)  |
 | `DENDRONOTES_IGNORE`                   |                    | Extra name patterns hidden from the tree, e.g. `node_modules,*.tmp` (dot entries are always hidden) |
 | `DENDRONOTES_RESCAN_INTERVAL`          | `5m`               | How often the whole soma is compared with the index, in addition to file system events; `0` turns it off |
+| `DENDRONOTES_HISTORY_DAYS`             | `90`               | How long earlier versions of notes are kept (the newest version of every note always stays); `0` keeps everything |
 | `DENDRONOTES_TRUSTED_PROXIES`          |                    | IPs/CIDRs of reverse proxies whose `X-Forwarded-*` headers are believed |
 | `DENDRONOTES_AUTH_MODE`                | `local`            | `local` (accounts with passwords) or `proxy`               |
 | `DENDRONOTES_ADMIN_USERNAME`           | `admin`            | The first admin account, created at start while no admin exists |
@@ -444,6 +477,9 @@ which a test keeps in sync with the server.
 | `POST /api/somas/{soma}/folders/{path}` | Create a folder                                      |
 | `POST /api/somas/{soma}/move`           | Rename or move: `{"from": …, "to": …, "updateSynapses": true}` |
 | `DELETE /api/somas/{soma}/entries/{path}` | Move a file or folder to `.trash/` in the soma     |
+| `GET /api/somas/{soma}/trash`           | The trash; `POST …/trash/{path}` restores, `DELETE` deletes for good (owner) |
+| `GET /api/somas/{soma}/history/{path}`  | Versions of a note; `GET …/versions/{id}`, `POST …/versions/{id}/restore` |
+| `GET /api/somas/{soma}/export`          | The soma as a ZIP                                    |
 | `GET /api/somas/{soma}/files/{path}`    | Download a file (attachments, images, media)         |
 | `POST /api/somas/{soma}/files/{path}`   | Upload a file (raw body; `?unique=1` avoids name clashes) |
 | `GET /api/somas/{soma}/search?q=`       | Full-text search (words, "phrases", #tags)           |
@@ -477,7 +513,7 @@ make image-offline   # rebuild without cache and without network in the build st
 ## Layout
 
 ```
-cmd/dendronotes/   entry point: serve, hash-password, healthcheck, version
+cmd/dendronotes/   entry point: serve, hash-password, reset-password, backup, healthcheck, version
 internal/config/   read and validate DENDRONOTES_* environment variables
 internal/soma/     soma access exclusively through os.Root (tree, notes, move, trash)
 internal/mdparse/  synapses and tags of a note (same rules as web/src/lib/synapses.ts)
@@ -486,12 +522,15 @@ internal/avatar/   checks uploaded profile photos and encodes them anew (square 
 internal/somas/    soma manager: opens somas on demand (index, watcher, live updates), closes idle ones
 internal/collab/   editing together: live documents, change sets (UTF-16), saving, 3-way merge
 internal/index/    SQLite cache per soma: versions, synapses, tags, full-text search
+internal/history/  earlier versions of notes, one SQLite database per soma (not a cache)
+internal/backup/   consistent copies of state.db and the histories as a ZIP
 internal/watch/    file system events (fsnotify) for changes made outside dendronotes
 internal/events/   fan-out of live updates to connected browsers
 internal/relink/   rewrites synapses when notes are renamed or moved
 internal/attach/   which files may be uploaded (type allow list, content check) and how they are served
 internal/auth/     sign-in (argon2id, OIDC accounts, proxy header), sessions, rate limits, first admin
 internal/sso/      OpenID Connect client: discovery, PKCE, ID token checks, groups
+internal/ldap/     Active Directory / LDAP: service-account search, bind, nested groups
 internal/clientip/ client address behind trusted proxies
 internal/httpx/    JSON helpers
 internal/server/   route table with access levels, API and admin handlers, middleware (CSP with nonce,

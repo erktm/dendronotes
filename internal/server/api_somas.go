@@ -138,7 +138,8 @@ func (s *Server) handleDeleteSoma(w http.ResponseWriter, r *http.Request) {
 	sm, _ := somaOf(r)
 	// The request holds the soma open; Delete waits for nothing but takes it
 	// out of the manager, so later requests no longer find it.
-	if err := s.somas.Delete(r.Context(), sm); err != nil && !errors.Is(err, store.ErrNotFound) {
+	me, _ := auth.UserFrom(r.Context())
+	if err := s.somas.Delete(r.Context(), sm, me.ID); err != nil && !errors.Is(err, store.ErrNotFound) {
 		s.internalError(w, r, "deleting soma", err)
 		return
 	}

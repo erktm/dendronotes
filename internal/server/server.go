@@ -129,6 +129,7 @@ func New(cfg config.Config, log *slog.Logger, webFS fs.FS, version string) (*Ser
 		DataDir:        cfg.DataDir,
 		Soma:           soma.Options{Ignore: cfg.Ignore, MaxNoteBytes: cfg.MaxNoteBytes},
 		RescanInterval: cfg.RescanInterval,
+		HistoryDays:    cfg.HistoryDays,
 		Log:            log,
 	})
 	s.addCloser("somas", s.somas.Close)

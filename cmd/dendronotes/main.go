@@ -35,6 +35,10 @@ func run(args []string, getenv func(string) string, stdin io.Reader, stdout, std
 		return serve(getenv, stdout)
 	case "hash-password":
 		return hashPassword(stdin, stdout, stderr)
+	case "reset-password":
+		return resetPassword(args[1:], getenv, stdin, stdout, stderr)
+	case "backup":
+		return backupState(args[1:], getenv, stdout, stderr)
 	case "healthcheck":
 		return healthcheck(getenv, stderr)
 	case "version", "--version", "-v":
@@ -57,6 +61,13 @@ Commands:
   serve           Start the server (default)
   hash-password   Read a password from the terminal or stdin and print an
                   argon2id hash for DENDRONOTES_ADMIN_PASSWORD_HASH
+  reset-password [user]
+                  Set a new password for a local account (default: the admin
+                  account) read from the terminal or stdin; enables it and
+                  ends its sessions. Works while the server runs.
+  backup <file.zip>
+                  Write a consistent copy of state.db and the note histories
+                  in DENDRONOTES_DATA_DIR to a new ZIP file
   healthcheck     Query /healthz of the running server (for Docker HEALTHCHECK)
   version         Print the version
 

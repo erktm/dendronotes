@@ -18,14 +18,18 @@ import (
 
 	"golang.org/x/text/unicode/norm"
 
+	"dendronotes/internal/history"
 	"dendronotes/internal/soma"
 	"dendronotes/internal/store"
 )
 
 // Options configure the manager.
 type Options struct {
-	SomasDir       string
-	DataDir        string // search indexes go to DataDir/index/<soma id>/
+	SomasDir string
+	DataDir  string // search indexes go to DataDir/index/<soma id>/, histories to DataDir/history/
+	// HistoryDays keeps versions of notes this long (0: forever); the newest
+	// version of every note always stays.
+	HistoryDays    int
 	Soma           soma.Options
 	RescanInterval time.Duration
 	// IdleAfter closes a soma nobody used for this long (0: 30 minutes).
@@ -100,11 +104,15 @@ func (m *Manager) start(s store.Soma) (*Runtime, error) {
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return nil, err
 	}
+	hist := history.FileName(m.opts.DataDir, s.ID)
+	if err := os.MkdirAll(filepath.Dir(hist), 0o750); err != nil {
+		return nil, err
+	}
 	sm, err := soma.Open(m.Path(s), m.opts.Soma)
 	if err != nil {
 		return nil, fmt.Errorf("open soma %s: %w", s.ID, err)
 	}
-	rt, err := newRuntime(s.ID, sm, dir, m.opts.RescanInterval, m.opts.Soma.MaxNoteBytes, m.opts.Log.With("soma", s.ID))
+	rt, err := newRuntime(s.ID, sm, dir, hist, m.opts.RescanInterval, m.opts.Soma.MaxNoteBytes, m.opts.Log.With("soma", s.ID))
 	if err != nil {
 		sm.Close()
 		return nil, err
@@ -136,6 +144,9 @@ func (m *Manager) reap(ctx context.Context) {
 			return
 		case <-t.C:
 			m.closeIdle(time.Now().Add(-m.opts.IdleAfter))
+			for _, rt := range m.Running() {
+				rt.pruneHistory(m.opts.HistoryDays)
+			}
 		}
 	}
 }
@@ -234,28 +245,126 @@ func (m *Manager) Import(ctx context.Context, dir, name string, ownerID int64) (
 	return m.store.CreateSoma(ctx, store.NewSomaID(), name, abs, ownerID)
 }
 
-// Delete takes a soma out of service and unregisters it. Its folder moves to
-// SOMAS_DIR/.trash/ (an imported folder outside SOMAS_DIR stays where it is);
-// nothing is deleted for good.
-func (m *Manager) Delete(ctx context.Context, s store.Soma) error {
+// Delete takes a soma out of service and unregisters it, keeping what an
+// admin needs to restore it. Its folder moves to SOMAS_DIR/.trash/ (an
+// imported folder outside SOMAS_DIR stays where it is); nothing is deleted
+// for good. by is the account that deleted it.
+func (m *Manager) Delete(ctx context.Context, s store.Soma, by int64) error {
 	if err := m.closeOne(s.ID); err != nil {
 		m.opts.Log.Error("closing soma failed", "soma", s.ID, "err", err)
 	}
+	folder := s.Folder
 	if !filepath.IsAbs(s.Folder) {
 		trash := filepath.Join(m.opts.SomasDir, TrashDir)
 		if err := os.MkdirAll(trash, 0o755); err != nil {
 			return err
 		}
-		dst := filepath.Join(trash, fmt.Sprintf("%s-%s", s.Folder, time.Now().UTC().Format("20060102-150405")))
-		if err := os.Rename(m.Path(s), dst); err != nil && !errors.Is(err, os.ErrNotExist) {
+		folder = filepath.Join(TrashDir, fmt.Sprintf("%s-%s", s.Folder, time.Now().UTC().Format("20060102-150405")))
+		if err := os.Rename(m.Path(s), filepath.Join(m.opts.SomasDir, folder)); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 	}
-	if err := m.store.DeleteSoma(ctx, s.ID); err != nil {
+	if err := m.store.DeleteSomaKeep(ctx, s.ID, folder, by); err != nil {
 		return err
 	}
 	_ = os.RemoveAll(m.indexDir(s.ID))
 	return nil
+}
+
+// ErrFolderMissing means a deleted soma's files are no longer where they were.
+var ErrFolderMissing = errors.New("the soma's folder is missing")
+
+// Restore brings a deleted soma back with ownerID as owner: its folder moves
+// from the trash to SOMAS_DIR (under its old name if free).
+func (m *Manager) Restore(ctx context.Context, id string, ownerID int64) (store.Soma, error) {
+	d, err := m.store.DeletedSomaByID(ctx, id)
+	if err != nil {
+		return store.Soma{}, err
+	}
+	if filepath.IsAbs(d.Folder) { // imported: it never moved
+		if st, err := os.Stat(d.Folder); err != nil || !st.IsDir() {
+			return store.Soma{}, ErrFolderMissing
+		}
+		return m.store.RestoreSoma(ctx, id, d.Folder, ownerID)
+	}
+	src, err := m.trashFolder(d.Folder)
+	if err != nil {
+		return store.Soma{}, err
+	}
+	if st, err := os.Stat(src); err != nil || !st.IsDir() {
+		return store.Soma{}, ErrFolderMissing
+	}
+	base := d.OriginalFolder
+	if filepath.IsAbs(base) || base == "" {
+		base = folderName(d.Name)
+	}
+	for i := 1; i < 1000; i++ {
+		folder := base
+		if i > 1 {
+			folder = fmt.Sprintf("%s-%d", base, i)
+		}
+		dst := filepath.Join(m.opts.SomasDir, folder)
+		if _, err := os.Lstat(dst); !errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err := os.Rename(src, dst); err != nil {
+			return store.Soma{}, err
+		}
+		s, err := m.store.RestoreSoma(ctx, id, folder, ownerID)
+		if err != nil {
+			_ = os.Rename(dst, src) // back to the trash
+			if errors.Is(err, store.ErrTaken) {
+				continue
+			}
+			return store.Soma{}, err
+		}
+		return s, nil
+	}
+	return store.Soma{}, errors.New("no free folder name")
+}
+
+// Purge deletes a deleted soma for good: its files in the trash (an
+// imported folder stays untouched) and what was kept about it.
+func (m *Manager) Purge(ctx context.Context, id string) error {
+	d, err := m.store.DeletedSomaByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if !filepath.IsAbs(d.Folder) {
+		dir, err := m.trashFolder(d.Folder)
+		if err != nil {
+			return err
+		}
+		if err := os.RemoveAll(dir); err != nil {
+			return err
+		}
+	}
+	if err := m.store.ForgetDeletedSoma(ctx, id); err != nil {
+		return err
+	}
+	return m.removeHistory(id)
+}
+
+// removeHistory deletes the history database of a soma.
+func (m *Manager) removeHistory(id string) error {
+	file := history.FileName(m.opts.DataDir, id)
+	var errs []error
+	for _, f := range []string{file, file + "-wal", file + "-shm"} {
+		if err := os.Remove(f); err != nil && !errors.Is(err, os.ErrNotExist) {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// trashFolder resolves a deleted soma's folder, which must be directly in
+// SOMAS_DIR/.trash.
+func (m *Manager) trashFolder(folder string) (string, error) {
+	clean := filepath.Clean(folder)
+	if filepath.Dir(clean) != TrashDir || filepath.Base(clean) == TrashDir || strings.HasPrefix(filepath.Base(clean), ".") {
+		return "", fmt.Errorf("deleted soma folder %q is not in the trash", folder)
+	}
+	return filepath.Join(m.opts.SomasDir, clean), nil
 }
 
 // CleanName checks a soma's display name.

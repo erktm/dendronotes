@@ -102,8 +102,11 @@ type Options struct {
 	MaxBytes int64
 	// Send delivers an event to the given streams (non-blocking).
 	Send func(streams []string, e events.Event)
-	// Saved runs after the manager wrote a note (index update, change events).
-	Saved     func(n soma.Note)
+	// Saved runs after the manager wrote a note (index update, change
+	// events, history) with what was written and who changed it since the
+	// last save (none: merged changes from elsewhere). It runs with the
+	// document locked.
+	Saved     func(n soma.Note, content []byte, authors []int64)
 	Log       *slog.Logger
 	SaveDelay time.Duration // after the last change (default 1s)
 	MaxDelay  time.Duration // after the first unsaved change (default 5s)
@@ -372,6 +375,10 @@ func (m *Manager) Push(streamID string, userID int64, path, docID string, versio
 		return 0, soma.ErrTooLarge
 	}
 	d.commit(text, updates)
+	if d.authors == nil {
+		d.authors = map[int64]bool{}
+	}
+	d.authors[userID] = true
 	if saveNow {
 		d.save()
 	}

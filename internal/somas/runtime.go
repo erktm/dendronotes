@@ -11,6 +11,7 @@ import (
 
 	"dendronotes/internal/collab"
 	"dendronotes/internal/events"
+	"dendronotes/internal/history"
 	"dendronotes/internal/index"
 	"dendronotes/internal/soma"
 	"dendronotes/internal/watch"
@@ -31,8 +32,12 @@ type Runtime struct {
 	Index  *index.Index
 	Hub    *events.Hub
 	Collab *collab.Manager
+	// History keeps earlier versions of the notes (not a cache).
+	History *history.Store
 	// MoveMu serializes moves that rewrite synapses in other notes.
 	MoveMu sync.Mutex
+
+	pruned atomic.Int64 // when the history was last pruned (unix nanoseconds)
 
 	log      *slog.Logger
 	stop     context.CancelFunc
@@ -41,18 +46,24 @@ type Runtime struct {
 	lastUsed atomic.Int64 // unix nanoseconds
 }
 
-func newRuntime(id string, sm *soma.Soma, indexDir string, rescan time.Duration, maxNote int64, log *slog.Logger) (*Runtime, error) {
-	ix, err := index.Open(indexDir, sm, log)
+func newRuntime(id string, sm *soma.Soma, indexDir, historyFile string, rescan time.Duration, maxNote int64, log *slog.Logger) (*Runtime, error) {
+	hist, err := history.Open(historyFile)
 	if err != nil {
 		return nil, err
 	}
+	ix, err := index.Open(indexDir, sm, log)
+	if err != nil {
+		hist.Close()
+		return nil, err
+	}
 	ctx, stop := context.WithCancel(context.Background())
-	rt := &Runtime{ID: id, Soma: sm, Index: ix, Hub: events.NewHub(maxStreams), log: log, stop: stop, done: make(chan struct{})}
+	rt := &Runtime{ID: id, Soma: sm, Index: ix, History: hist, Hub: events.NewHub(maxStreams), log: log, stop: stop, done: make(chan struct{})}
 	rt.Collab = collab.New(collab.Options{
 		Soma:     sm,
 		MaxBytes: maxNote,
 		Send:     rt.Hub.Send,
-		Saved: func(n soma.Note) {
+		Saved: func(n soma.Note, content []byte, authors []int64) {
+			rt.RecordVersion(n.Path, content, authors, history.ReasonEdit)
 			ch, err := rt.Index.Put(context.Background(), n)
 			if err != nil {
 				log.Error("index update after save failed", "path", n.Path, "err", err)
@@ -98,7 +109,44 @@ func (rt *Runtime) close() error {
 	rt.Hub.Close()
 	rt.stop()
 	<-rt.done
-	return errors.Join(rt.Index.Close(), rt.Soma.Close())
+	return errors.Join(rt.Index.Close(), rt.History.Close(), rt.Soma.Close())
+}
+
+// RecordVersion adds content to the history of a note (errors are logged:
+// a missing version must not fail a save).
+func (rt *Runtime) RecordVersion(p string, content []byte, authors []int64, reason string) {
+	if err := rt.History.Record(context.Background(), p, content, authors, reason); err != nil {
+		rt.log.Error("recording a version failed", "path", p, "err", err)
+	}
+}
+
+// MoveHistory lets the history of from (a note or folder) follow it to to.
+func (rt *Runtime) MoveHistory(from, to string) {
+	if err := rt.History.Move(context.Background(), from, to); err != nil {
+		rt.log.Error("moving history failed", "from", from, "to", to, "err", err)
+	}
+}
+
+// RemoveHistory forgets the history of p (a note or folder).
+func (rt *Runtime) RemoveHistory(p string) {
+	if err := rt.History.Remove(context.Background(), p); err != nil {
+		rt.log.Error("removing history failed", "path", p, "err", err)
+	}
+}
+
+// pruneHistory removes versions older than days (once a day at most).
+func (rt *Runtime) pruneHistory(days int) {
+	if days <= 0 || time.Since(time.Unix(0, rt.pruned.Load())) < 24*time.Hour {
+		return
+	}
+	rt.pruned.Store(time.Now().UnixNano())
+	n, err := rt.History.Prune(context.Background(), time.Now().AddDate(0, 0, -days))
+	switch {
+	case err != nil:
+		rt.log.Error("pruning history failed", "err", err)
+	case n > 0:
+		rt.log.Info("history pruned", "versions", n)
+	}
 }
 
 // follow brings the index up to date with the soma, then follows changes via
@@ -190,6 +238,13 @@ func (rt *Runtime) applyBatch(ctx context.Context, w *watch.Watcher, b watch.Bat
 func (rt *Runtime) afterChange(w *watch.Watcher, ch index.Changes) {
 	if ch.Tree && w != nil {
 		w.UpdateDirs()
+	}
+	// Notes changed outside dendronotes (own writes are recorded when made,
+	// so these find their content already there and are skipped).
+	for _, n := range ch.Notes {
+		if note, err := rt.Soma.ReadNote(n.Path); err == nil {
+			rt.RecordVersion(n.Path, []byte(note.Content), nil, history.ReasonOutside)
+		}
 	}
 	rt.Publish(ch)
 }

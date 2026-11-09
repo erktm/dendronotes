@@ -2,6 +2,8 @@ package collab
 
 import (
 	"errors"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -37,6 +39,8 @@ type doc struct {
 	idle         *time.Timer // closes the document once nobody is in it
 
 	peers map[string]*peer // by stream id
+	// authors changed the document since the last save (for the history).
+	authors map[int64]bool
 }
 
 type peer struct {
@@ -156,7 +160,8 @@ func (d *doc) save() {
 	}
 	for attempt := 0; attempt < 3; attempt++ {
 		text := toString(d.text)
-		n, err := d.m.opts.Soma.WriteNote(d.path, d.format.apply(text), d.etag)
+		content := d.format.apply(text)
+		n, err := d.m.opts.Soma.WriteNote(d.path, content, d.etag)
 		var ce *soma.ConflictError
 		switch {
 		case err == nil:
@@ -164,8 +169,10 @@ func (d *doc) save() {
 			d.dirty = false
 			d.stop()
 			d.send(events.Event{Name: "saved", Data: map[string]any{"path": d.path, "doc": d.id, "version": d.version}})
+			authors := slices.Sorted(maps.Keys(d.authors))
+			d.authors = nil
 			if d.m.opts.Saved != nil {
-				d.m.opts.Saved(n)
+				d.m.opts.Saved(n, content, authors)
 			}
 			return
 		case errors.As(err, &ce):

@@ -78,7 +78,7 @@ func newFixture(t *testing.T, files map[string]string) *fixture {
 	f := &fixture{t: t, dir: dir, soma: sm, sink: &sink{evts: map[string][]events.Event{}}, saved: make(chan string, 100)}
 	f.m = New(Options{
 		Soma: sm, MaxBytes: 1 << 16, Send: f.sink.send, Log: slog.New(slog.DiscardHandler),
-		Saved:     func(n soma.Note) { f.saved <- n.Path },
+		Saved:     func(n soma.Note, _ []byte, _ []int64) { f.saved <- n.Path },
 		SaveDelay: 20 * time.Millisecond, MaxDelay: 100 * time.Millisecond, Linger: 30 * time.Millisecond,
 	})
 	t.Cleanup(func() { f.m.Close(); sm.Close() })

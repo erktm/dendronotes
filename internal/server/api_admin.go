@@ -248,7 +248,7 @@ func (s *Server) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 			err = s.store.TransferSoma(r.Context(), sm.ID, heir.ID)
 			s.audit(r, "soma.transfer", sm.ID, u.Username+" → "+heir.Username)
 		} else {
-			err = s.somas.Delete(r.Context(), sm)
+			err = s.somas.Delete(r.Context(), sm, me.ID)
 			s.audit(r, "soma.delete", sm.ID, sm.Name)
 		}
 		if err != nil {
@@ -420,7 +420,8 @@ func (s *Server) handleAdminDeleteSoma(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if err := s.somas.Delete(r.Context(), sm); err != nil {
+	me, _ := auth.UserFrom(r.Context())
+	if err := s.somas.Delete(r.Context(), sm, me.ID); err != nil {
 		s.internalError(w, r, "deleting soma", err)
 		return
 	}

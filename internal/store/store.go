@@ -169,6 +169,30 @@ var migrations = []string{
 		UNION ALL
 		SELECT g.soma_id, u.id, g.role FROM soma_groups g JOIN groups e ON e.id = g.group_id AND e.everyone = 1
 			CROSS JOIN users u WHERE u.disabled = 0;`,
+	// 5: the trash – who deleted what from where (the files themselves are in
+	// the soma's .trash) – and deleted somas, which admins can restore. Both
+	// outlive their soma row on purpose (no foreign key on the soma).
+	`CREATE TABLE trash (
+		soma_id    TEXT NOT NULL,
+		path       TEXT NOT NULL,
+		original   TEXT NOT NULL,
+		is_dir     INTEGER NOT NULL DEFAULT 0,
+		deleted_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+		deleted_at INTEGER NOT NULL,
+		PRIMARY KEY (soma_id, path)
+	);
+	CREATE TABLE deleted_somas (
+		id              TEXT PRIMARY KEY,
+		name            TEXT NOT NULL,
+		folder          TEXT NOT NULL,
+		original_folder TEXT NOT NULL,
+		owner_id        INTEGER REFERENCES users(id) ON DELETE SET NULL,
+		member_roles    TEXT NOT NULL DEFAULT '[]',
+		group_roles     TEXT NOT NULL DEFAULT '[]',
+		created_at      INTEGER NOT NULL,
+		deleted_by      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+		deleted_at      INTEGER NOT NULL
+	);`,
 }
 
 // rebuilds are the migrations (by index) that recreate a table others refer
@@ -213,6 +237,13 @@ func Open(dataDir string, log *slog.Logger) (*Store, error) {
 func (s *Store) Close() error {
 	_, err := s.db.Exec(`PRAGMA wal_checkpoint(TRUNCATE)`)
 	return errors.Join(err, s.db.Close())
+}
+
+// Backup writes a consistent copy of the database to file (which must not
+// exist), while it stays in use.
+func (s *Store) Backup(ctx context.Context, file string) error {
+	_, err := s.db.ExecContext(ctx, `VACUUM INTO ?`, file)
+	return err
 }
 
 // Ping reports whether the database answers (readiness).

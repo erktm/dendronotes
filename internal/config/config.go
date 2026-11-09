@@ -40,6 +40,7 @@ const (
 	EnvMaxUploadMB     = Prefix + "MAX_UPLOAD_MB"
 	EnvIgnore          = Prefix + "IGNORE"
 	EnvRescanInterval  = Prefix + "RESCAN_INTERVAL"
+	EnvHistoryDays     = Prefix + "HISTORY_DAYS"
 	EnvAuthMode        = Prefix + "AUTH_MODE"
 	EnvAdminUsername   = Prefix + "ADMIN_USERNAME"
 	EnvAdminHash       = Prefix + "ADMIN_PASSWORD_HASH"
@@ -68,7 +69,7 @@ const (
 // (enforced by a test).
 var Vars = []string{
 	EnvSomasDir, EnvSomaDir, EnvDataDir, EnvHTTPPort, EnvLogLevel, EnvLogFormat, EnvShutdownTimeout,
-	EnvTrustedProxies, EnvMaxNoteMB, EnvMaxUploadMB, EnvIgnore, EnvRescanInterval, EnvAuthMode, EnvAdminUsername,
+	EnvTrustedProxies, EnvMaxNoteMB, EnvMaxUploadMB, EnvIgnore, EnvRescanInterval, EnvHistoryDays, EnvAuthMode, EnvAdminUsername,
 	EnvAdminHash, EnvAdminHashFile, EnvAdminPassword, EnvSessionTTL, EnvCookieSecure,
 	EnvProxyHeader, EnvProxyAllowed, EnvProxyLogoutURL, EnvPublicURL, EnvLocalLogin,
 	EnvOIDCIssuer, EnvOIDCClientID, EnvOIDCSecretFile, EnvOIDCScopes, EnvOIDCUserClaim, EnvOIDCGroupsClaim,
@@ -91,6 +92,7 @@ type Config struct {
 	MaxUploadBytes  int64          // largest file that can be uploaded
 	Ignore          []string       // extra name patterns hidden from the tree
 	RescanInterval  time.Duration  // periodic full comparison of soma and index; 0 = off
+	HistoryDays     int            // how long earlier versions of notes are kept; 0 = forever
 	Auth            Auth
 }
 
@@ -150,6 +152,7 @@ const (
 	DefaultSessionTTL      = 30 * 24 * time.Hour
 	DefaultMaxNoteMB       = 5
 	DefaultMaxUploadMB     = 25
+	DefaultHistoryDays     = 90
 	DefaultProxyHeader     = "X-Forwarded-User"
 	DefaultOIDCScopes      = "openid profile email"
 	DefaultOIDCUserClaim   = "preferred_username"
@@ -172,6 +175,7 @@ func Load(getenv func(string) string) (Config, error) {
 		RescanInterval:  DefaultRescanInterval,
 		MaxNoteBytes:    DefaultMaxNoteMB << 20,
 		MaxUploadBytes:  DefaultMaxUploadMB << 20,
+		HistoryDays:     DefaultHistoryDays,
 		Auth: Auth{
 			Mode:          "local",
 			AdminUsername: DefaultAdminUsername,
@@ -238,6 +242,15 @@ func Load(getenv func(string) string) (Config, error) {
 			add(fmt.Errorf("%s: %v (expected IPs or CIDRs, comma-separated)", EnvTrustedProxies, err))
 		}
 		c.TrustedProxies = p
+	}
+
+	if v := getenv(EnvHistoryDays); v != "" {
+		days, err := strconv.Atoi(v)
+		if err != nil || days < 0 || days > 36500 {
+			add(fmt.Errorf("%s: %q must be a whole number of days (0 keeps everything)", EnvHistoryDays, v))
+		} else {
+			c.HistoryDays = days
+		}
 	}
 
 	if v := getenv(EnvMaxNoteMB); v != "" {
@@ -582,6 +595,8 @@ func (c Config) Describe(name string) string {
 		return strings.Join(c.Ignore, ", ")
 	case EnvRescanInterval:
 		return c.RescanInterval.String()
+	case EnvHistoryDays:
+		return strconv.Itoa(c.HistoryDays)
 	case EnvAuthMode:
 		return c.Auth.Mode
 	case EnvAdminUsername:
