@@ -1,5 +1,5 @@
 import { request } from './client'
-import type { Group, Person, User } from './soma'
+import type { Group, Person, ShareRole, User } from './soma'
 
 export interface AdminSoma {
   id: string
@@ -97,6 +97,13 @@ export const addGroupMember = (id: number, userId: number) =>
   request<GroupMembers>('PUT', `/api/admin/groups/${id}/members/${userId}`)
 export const removeGroupMember = (id: number, userId: number) =>
   request<GroupMembers>('DELETE', `/api/admin/groups/${id}/members/${userId}`)
+export interface NewSoma {
+  name: string
+  ownerId: number
+  /** Shared with this group right away. */
+  group?: { id: number; role: ShareRole }
+}
+export const createSoma = (s: NewSoma) => request<AdminSoma>('POST', '/api/admin/somas', { body: s })
 export const transferSoma = (id: string, ownerId: number) =>
   request<{ id: string }>('PATCH', `/api/admin/somas/${encodeURIComponent(id)}`, { body: { ownerId } })
 export const deleteSoma = (id: string) => request<{ id: string }>('DELETE', `/api/admin/somas/${encodeURIComponent(id)}`)

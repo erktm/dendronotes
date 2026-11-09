@@ -157,8 +157,9 @@ up to `DENDRONOTES_MAX_UPLOAD_MB`. The content must match the extension.
   - *Groups*: create, rename and delete groups and choose their members. The group
     *Everyone* is built in and contains every account, also future ones; share a soma with it
     to open it to the whole server.
-  - *Somas*: every soma with owner, members, groups, size and folder; hand it to another owner
-    or delete it.
+  - *Somas*: every soma with owner, members, groups, size and folder; create a soma for any
+    account – optionally shared with a group right away, for example *Everyone* –, hand a soma
+    to another owner or delete it.
   - *Sessions*: who is signed in from where; end single sessions.
   - *Server*: version, uptime, storage, open somas and the effective configuration (secrets
     show only whether they are set).

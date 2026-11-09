@@ -14,6 +14,7 @@ import (
 	"dendronotes/internal/auth"
 	"dendronotes/internal/config"
 	"dendronotes/internal/httpx"
+	"dendronotes/internal/somas"
 	"dendronotes/internal/sso"
 	"dendronotes/internal/store"
 )
@@ -314,6 +315,79 @@ func (s *Server) adminPathSoma(w http.ResponseWriter, r *http.Request) (store.So
 		return sm, false
 	}
 	return sm, true
+}
+
+// handleAdminCreateSoma creates a soma for any account, optionally shared with
+// a group right away – the admin is no member of somas of others, so this is
+// the one place to give such a soma its first group.
+func (s *Server) handleAdminCreateSoma(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Name    string `json:"name"`
+		OwnerID int64  `json:"ownerId"`
+		Group   *struct {
+			ID   int64  `json:"id"`
+			Role string `json:"role"`
+		} `json:"group"`
+	}
+	if err := httpx.DecodeJSON(w, r, &body, 4096); err != nil {
+		httpx.WriteDecodeError(w, err)
+		return
+	}
+	name, err := somas.CleanName(body.Name)
+	if err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid_name")
+		return
+	}
+	owner, err := s.store.UserByID(r.Context(), body.OwnerID)
+	if errors.Is(err, store.ErrNotFound) || (err == nil && owner.Disabled) {
+		httpx.Error(w, http.StatusBadRequest, "unknown_user")
+		return
+	}
+	if err != nil {
+		s.internalError(w, r, "user lookup", err)
+		return
+	}
+	var group store.Group
+	if body.Group != nil {
+		if !store.IsShareRole(body.Group.Role) {
+			httpx.Error(w, http.StatusBadRequest, "invalid_role")
+			return
+		}
+		group, err = s.store.GroupByID(r.Context(), body.Group.ID)
+		if errors.Is(err, store.ErrNotFound) {
+			httpx.Error(w, http.StatusBadRequest, "unknown_group")
+			return
+		}
+		if err != nil {
+			s.internalError(w, r, "group lookup", err)
+			return
+		}
+	}
+	if owned, err := s.store.SomasOwnedBy(r.Context(), owner.ID); err != nil {
+		s.internalError(w, r, "counting somas", err)
+		return
+	} else if len(owned) >= maxSomasPerUser {
+		httpx.Error(w, http.StatusConflict, "too_many_somas")
+		return
+	}
+	sm, err := s.somas.Create(r.Context(), name, owner.ID)
+	if err != nil {
+		s.internalError(w, r, "creating soma", err)
+		return
+	}
+	info := store.SomaInfo{Soma: sm, Members: 1,
+		Owner: store.Person{ID: owner.ID, Username: owner.Username, DisplayName: owner.DisplayName}}
+	detail := sm.Name + " for " + owner.Username
+	if body.Group != nil {
+		if err := s.store.SetSomaGroup(r.Context(), sm.ID, group.ID, body.Group.Role); err != nil {
+			s.internalError(w, r, "sharing with group", err)
+			return
+		}
+		info.Groups = 1
+		detail += ", shared with " + group.Name + ": " + body.Group.Role
+	}
+	s.audit(r, "soma.create", sm.ID, detail)
+	httpx.WriteJSON(w, http.StatusCreated, info)
 }
 
 func (s *Server) handleAdminTransferSoma(w http.ResponseWriter, r *http.Request) {

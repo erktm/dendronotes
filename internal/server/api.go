@@ -88,6 +88,7 @@ func (s *Server) routes() []route {
 		{"PUT", "/api/admin/groups/{id}/members/{user}", s.handleAdminAddGroupMember, adminOnly},
 		{"DELETE", "/api/admin/groups/{id}/members/{user}", s.handleAdminRemoveGroupMember, adminOnly},
 		{"GET", "/api/admin/somas", s.handleAdminSomas, adminOnly},
+		{"POST", "/api/admin/somas", s.handleAdminCreateSoma, adminOnly},
 		{"PATCH", "/api/admin/somas/{soma}", s.handleAdminTransferSoma, adminOnly},
 		{"DELETE", "/api/admin/somas/{soma}", s.handleAdminDeleteSoma, adminOnly},
 		{"GET", "/api/admin/sessions", s.handleAdminSessions, adminOnly},

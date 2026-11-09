@@ -3,7 +3,9 @@
   import { app } from '../lib/state/app.svelte'
   import * as admin from '../lib/api/admin'
   import type { AdminSoma } from '../lib/api/admin'
-  import type { User } from '../lib/api/soma'
+  import type { Group, ShareRole, User } from '../lib/api/soma'
+  import { SHARE_ROLES } from '../lib/roles'
+  import Icon from './Icon.svelte'
   import { formatSize } from '../lib/files'
   import { errorMessage } from '../lib/errors'
   import { strings } from '../lib/strings'
@@ -12,11 +14,12 @@
 
   let somas = $state.raw<AdminSoma[] | null>(null)
   let users = $state.raw<User[]>([])
+  let groups = $state.raw<Group[]>([])
   let filter = $state('')
 
   async function load() {
     try {
-      ;[somas, users] = await Promise.all([admin.somas(), admin.users()])
+      ;[somas, users, groups] = await Promise.all([admin.somas(), admin.users(), admin.groups()])
     } catch (err) {
       app.toast(errorMessage(err))
     }
@@ -61,6 +64,45 @@
     }
   }
 
+  // --- New soma --------------------------------------------------------------
+
+  let createDialog: HTMLDialogElement | undefined = $state()
+  let newName = $state('')
+  let newOwner = $state(0)
+  let newGroup = $state(0)
+  let newRole = $state<ShareRole>('viewer')
+  const roles = [...SHARE_ROLES].reverse()
+  const userName = (u: User) => (u.displayName ? `${u.displayName} (${u.username})` : u.username)
+
+  function openCreate() {
+    newName = ''
+    newOwner = app.user?.id ?? users[0]?.id ?? 0
+    newGroup = 0
+    newRole = 'viewer'
+    createDialog?.showModal()
+  }
+
+  async function create(e: SubmitEvent) {
+    e.preventDefault()
+    busy = true
+    try {
+      const s = await admin.createSoma({
+        name: newName,
+        ownerId: newOwner,
+        group: newGroup ? { id: newGroup, role: newRole } : undefined,
+      })
+      const owner = users.find((u) => u.id === newOwner)
+      app.toast(t.somaCreated(s.name, owner?.displayName || owner?.username || ''), 'info')
+      createDialog?.close()
+      await load()
+      await app.refreshSomas()
+    } catch (err) {
+      app.toast(errorMessage(err))
+    } finally {
+      busy = false
+    }
+  }
+
   async function remove(s: AdminSoma) {
     const ok = await app.ask({ title: t.deleteSomaTitle(s.name), message: t.deleteSomaText, confirmLabel: t.deleteSoma, danger: true })
     if (!ok) return
@@ -77,6 +119,7 @@
 <div class="admin-page">
   <div class="admin-toolbar">
     <input class="admin-filter" type="search" placeholder={t.somaName} aria-label={t.somaName} bind:value={filter} />
+    <button type="button" class="admin-btn primary" onclick={openCreate}><Icon name="plus" size={15} /> {t.newSoma}</button>
   </div>
   {#if somas === null}
     <p class="admin-empty">{t.loading}</p>
@@ -130,3 +173,45 @@
     </div>
   </form>
 </dialog>
+
+<dialog class="admin-dialog" bind:this={createDialog} use:closeOnBackdrop aria-labelledby="new-soma-title">
+  <form onsubmit={create}>
+    <h2 id="new-soma-title">{t.newSomaTitle}</h2>
+    <p>{t.newSomaText}</p>
+    <label for="new-soma-name">{t.newSomaName}</label>
+    <input id="new-soma-name" class="admin-field" bind:value={newName} maxlength="100" required autocomplete="off" />
+    <label for="new-soma-owner">{t.newSomaOwner}</label>
+    <select id="new-soma-owner" class="admin-field" bind:value={newOwner}>
+      {#each users.filter((u) => !u.disabled) as u (u.id)}
+        <option value={u.id}>{userName(u)}</option>
+      {/each}
+    </select>
+    <label for="new-soma-group">{t.newSomaGroup}</label>
+    <select id="new-soma-group" class="admin-field" bind:value={newGroup}>
+      <option value={0}>{t.newSomaNoGroup}</option>
+      {#each groups as g (g.id)}
+        <option value={g.id}>{g.everyone ? t.everyone : g.name}</option>
+      {/each}
+    </select>
+    {#if newGroup}
+      <label for="new-soma-role">{t.newSomaRole}</label>
+      <select id="new-soma-role" class="admin-field" bind:value={newRole} aria-describedby="new-soma-role-hint">
+        {#each roles as r (r)}
+          <option value={r}>{strings.share.roles[r]}</option>
+        {/each}
+      </select>
+      <p id="new-soma-role-hint" class="hint">{strings.share.roleHints[newRole]}</p>
+    {/if}
+    <div class="admin-actions">
+      <button type="button" class="admin-btn" onclick={() => createDialog?.close()}>{t.cancel}</button>
+      <button type="submit" class="admin-btn primary" disabled={busy || !newName.trim() || !newOwner}>{t.createSoma}</button>
+    </div>
+  </form>
+</dialog>
+
+<style>
+  .hint {
+    margin-top: 6px;
+    font-size: var(--text-xs);
+  }
+</style>

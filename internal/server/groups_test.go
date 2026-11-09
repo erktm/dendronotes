@@ -165,3 +165,47 @@ func TestGroups(t *testing.T) {
 		t.Error("group changes are audited")
 	}
 }
+
+func TestAdminCreatesSomas(t *testing.T) {
+	s := newTestServer(t, testFS())
+	admin := newClient(t, s)
+	admin.login()
+	cara, caraUser := newUser(t, s, admin, "cara")
+	dave, _ := newUser(t, s, admin, "dave")
+	everyone := decode[struct{ Groups []store.Group }](t, admin.do("GET", "/api/admin/groups", "")).Groups[0]
+
+	create := func(body string) *httptest.ResponseRecorder {
+		return admin.do("POST", "/api/admin/somas", body)
+	}
+	expect(t, create(fmt.Sprintf(`{"name":" ","ownerId":%d}`, caraUser.ID)), 400, "invalid_name")
+	expect(t, create(`{"name":"Team","ownerId":9999}`), 400, "unknown_user")
+	expect(t, create(fmt.Sprintf(`{"name":"Team","ownerId":%d,"group":{"id":9999,"role":"viewer"}}`, caraUser.ID)), 400, "unknown_group")
+	expect(t, create(fmt.Sprintf(`{"name":"Team","ownerId":%d,"group":{"id":%d,"role":"owner"}}`, caraUser.ID, everyone.ID)), 400, "invalid_role")
+	expect(t, cara.do("POST", "/api/admin/somas", `{"name":"Mine","ownerId":1}`), 403, "")
+
+	rec := create(fmt.Sprintf(`{"name":"Team notes","ownerId":%d,"group":{"id":%d,"role":"viewer"}}`, caraUser.ID, everyone.ID))
+	expect(t, rec, 201, "")
+	info := decode[store.SomaInfo](t, rec)
+	if info.Name != "Team notes" || info.OwnerID != caraUser.ID || info.Groups != 1 {
+		t.Fatalf("created: %+v", info)
+	}
+	// Cara owns it, everyone else reads it.
+	somas := decode[struct{ Somas []store.Membership }](t, cara.do("GET", "/api/somas", "")).Somas
+	found := false
+	for _, m := range somas {
+		found = found || (m.ID == info.ID && m.Role == store.MemberOwner)
+	}
+	if !found {
+		t.Fatalf("cara does not own the new soma: %+v", somas)
+	}
+	expect(t, dave.do("GET", "/api/somas/"+info.ID+"/tree", ""), 200, "")
+	expect(t, dave.do("POST", "/api/somas/"+info.ID+"/notes/x.md", `{"content":""}`), 403, "forbidden")
+	// The admin reads it through Everyone as well, but sharing stays with the owner.
+	expect(t, admin.do("GET", "/api/somas/"+info.ID+"/tree", ""), 200, "")
+	expect(t, admin.do("PUT", fmt.Sprintf("/api/somas/%s/groups/%d", info.ID, everyone.ID), `{"role":"editor"}`), 403, "forbidden")
+
+	// Without a group only the owner has access.
+	rec = create(fmt.Sprintf(`{"name":"Private","ownerId":%d}`, caraUser.ID))
+	expect(t, rec, 201, "")
+	expect(t, dave.do("GET", "/api/somas/"+decode[store.SomaInfo](t, rec).ID+"/tree", ""), 404, "not_found")
+}

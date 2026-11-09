@@ -997,6 +997,33 @@ paths:
       responses:
         "200": { description: Somas. }
         "403": { $ref: "#/components/responses/Error" }
+    post:
+      summary: Create a soma for any account, optionally shared with a group (admin)
+      description: >
+        The owner gets the soma like one they created themselves; with group, the group gets the
+        role right away (the owner shares further in the soma). Errors invalid_name,
+        unknown_user, unknown_group, invalid_role (400) and too_many_somas (409).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, ownerId]
+              properties:
+                name: { type: string, maxLength: 100 }
+                ownerId: { type: integer }
+                group:
+                  type: object
+                  required: [id, role]
+                  properties:
+                    id: { type: integer }
+                    role: { type: string, enum: [editor, contributor, writer, viewer] }
+      responses:
+        "201": { description: Created. }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
   /api/admin/somas/{soma}:
     parameters:
       - { name: soma, in: path, required: true, schema: { type: string } }
