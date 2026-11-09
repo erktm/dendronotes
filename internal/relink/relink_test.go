@@ -20,7 +20,7 @@ func plan(t *testing.T, files map[string]string, moves map[string]string) map[st
 		return c, soma.ETag([]byte(c)), nil
 	}
 	notes := slices.Sorted(maps.Keys(files))
-	edits, err := Plan(read, notes, notes, moves)
+	edits, err := Plan(read, notes, notes, notes, moves)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,5 +135,67 @@ func TestRelPath(t *testing.T) {
 		if got := relPath(c.dir, c.target); got != c.want {
 			t.Errorf("relPath(%q, %q) = %q, want %q", c.dir, c.target, got, c.want)
 		}
+	}
+}
+
+// planFiles runs Plan with attachments next to the notes.
+func planFiles(t *testing.T, notes map[string]string, attachments []string, moves map[string]string) (map[string]string, int) {
+	t.Helper()
+	read := func(p string) (string, string, error) {
+		c, ok := notes[p]
+		if !ok {
+			return "", "", errors.New("not found")
+		}
+		return c, soma.ETag([]byte(c)), nil
+	}
+	paths := slices.Sorted(maps.Keys(notes))
+	files := slices.Sorted(slices.Values(append(slices.Clone(paths), attachments...)))
+	edits, err := Plan(read, paths, paths, files, moves)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := map[string]string{}
+	embeds := 0
+	for _, e := range edits {
+		out[e.Path] = e.Content
+		embeds += e.Embeds
+	}
+	return out, embeds
+}
+
+func TestAttachmentMoves(t *testing.T) {
+	notes := map[string]string{
+		"Garden/Beds.md": "![[north.png|300]] and ![photo](north.png \"North\") and [[plan.pdf]] and [[Day]]",
+		"Journal/Day.md": "![](../Garden/north.png) ![[Garden/north.png]] `![[north.png]]`",
+	}
+	attachments := []string{"Garden/north.png", "Docs/plan.pdf", "Zoo/north.png"}
+
+	// Renamed: every reference follows, in the form it had.
+	out, n := planFiles(t, notes, attachments, map[string]string{"Garden/north.png": "Garden/north bed.png"})
+	if n != 4 {
+		t.Errorf("rewritten references: %d", n)
+	}
+	if want := "![[north bed.png|300]] and ![photo](north%20bed.png \"North\") and [[plan.pdf]] and [[Day]]"; out["Garden/Beds.md"] != want {
+		t.Errorf("Beds:\n got %q\nwant %q", out["Garden/Beds.md"], want)
+	}
+	if want := "![](../Garden/north%20bed.png) ![[Garden/north bed.png]] `![[north.png]]`"; out["Journal/Day.md"] != want {
+		t.Errorf("Day:\n got %q\nwant %q", out["Journal/Day.md"], want)
+	}
+
+	// Moved where its name would find another file: the path is written.
+	out, _ = planFiles(t, notes, attachments, map[string]string{"Garden/north.png": "Media/Deep/north.png"})
+	if want := "![[Media/Deep/north.png|300]] and ![photo](../Media/Deep/north.png \"North\") and [[plan.pdf]] and [[Day]]"; out["Garden/Beds.md"] != want {
+		t.Errorf("Beds after the move:\n got %q\nwant %q", out["Garden/Beds.md"], want)
+	}
+
+	// Still found by name: nothing to do.
+	if out, n := planFiles(t, notes, attachments, map[string]string{"Docs/plan.pdf": "Archive/Docs/plan.pdf"}); len(out) != 0 || n != 0 {
+		t.Errorf("unneeded edits: %v", out)
+	}
+
+	// A moved note takes its relative attachment links along.
+	out, _ = planFiles(t, notes, attachments, map[string]string{"Journal/Day.md": "Day.md"})
+	if want := "![](Garden/north.png) ![[Garden/north.png]] `![[north.png]]`"; out["Day.md"] != want {
+		t.Errorf("moved note:\n got %q\nwant %q", out["Day.md"], want)
 	}
 }

@@ -11,11 +11,14 @@
   const t = strings.admin
 
   let users = $state.raw<User[] | null>(null)
+  let tokenCounts = $state.raw<Record<string, number>>({})
   let filter = $state('')
 
   async function load() {
     try {
-      users = await admin.users()
+      const r = await admin.usersWithTokens()
+      users = r.users
+      tokenCounts = r.tokens
     } catch (err) {
       app.toast(errorMessage(err))
     }
@@ -94,6 +97,18 @@
     }
   }
 
+  async function revokeTokens(u: User) {
+    const ok = await app.ask({ title: t.revokeTokensTitle(u.username), message: t.revokeTokensText, confirmLabel: t.revokeTokens, danger: true })
+    if (!ok) return
+    try {
+      const r = await admin.revokeUserTokens(u.id)
+      app.toast(t.tokensRevoked(r.revoked), 'info')
+      await load()
+    } catch (err) {
+      app.toast(errorMessage(err))
+    }
+  }
+
   async function endSessions(u: User) {
     try {
       await admin.endUserSessions(u.id)
@@ -154,7 +169,10 @@
               </td>
               <td><span class="admin-pill" class:accent={u.role === 'admin'}>{u.role === 'admin' ? t.roleAdmin : t.roleUser}</span></td>
               <td class="admin-muted">{strings.profile.sources[u.source] ?? u.source}</td>
-              <td><span class="admin-pill" class:warn={u.disabled}>{u.disabled ? t.disabled : t.active}</span></td>
+              <td>
+                <span class="admin-pill" class:warn={u.disabled}>{u.disabled ? t.disabled : t.active}</span>
+                {#if tokenCounts[String(u.id)]}<div class="admin-faint">{t.tokens(tokenCounts[String(u.id)] ?? 0)}</div>{/if}
+              </td>
               <td class="admin-muted nowrap">{admin.formatDate(u.lastLoginAt) || t.never}</td>
               <td>
                 <div class="admin-actions" role="group" aria-label={t.actions(u.username)}>
@@ -163,6 +181,9 @@
                     <button type="button" class="admin-btn" onclick={() => openDialog('password', u)}>{t.resetPassword}</button>
                   {/if}
                   <button type="button" class="admin-btn" onclick={() => endSessions(u)}>{t.endSessions}</button>
+                  {#if tokenCounts[String(u.id)]}
+                    <button type="button" class="admin-btn" onclick={() => revokeTokens(u)}>{t.revokeTokens}</button>
+                  {/if}
                   {#if !me}
                     <button type="button" class="admin-btn" onclick={() => toggleDisabled(u)}>{u.disabled ? t.enable : t.disable}</button>
                     <button type="button" class="admin-btn danger" onclick={() => openDialog('delete', u)}>{t.deleteUser}</button>

@@ -2,6 +2,7 @@
   import { closeOnBackdrop } from '../lib/actions'
   import Icon from './Icon.svelte'
   import AvatarEditor from './AvatarEditor.svelte'
+  import TokensSection from './TokensSection.svelte'
   import { app } from '../lib/state/app.svelte'
   import * as api from '../lib/api/soma'
   import { errorMessage } from '../lib/errors'
@@ -107,6 +108,7 @@
         </div>
       </form>
     {/if}
+    {#if app.profileOpen}<TokensSection />{/if}
   {/if}
 </dialog>
 

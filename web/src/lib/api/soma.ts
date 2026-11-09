@@ -113,10 +113,11 @@ export interface MoveResult {
   path: string
   updatedNotes?: number
   updatedSynapses?: number
+  updatedEmbeds?: number
   failed?: string[]
 }
 
-/** Renames or moves; with updateSynapses, synapses to moved notes are rewritten. */
+/** Renames or moves; with updateSynapses, synapses, embeds and links to moved files are rewritten. */
 export const move = (from: string, to: string, updateSynapses = false) =>
   request<MoveResult>('POST', `${somaBase()}/move`, { body: { from, to, updateSynapses } })
 

@@ -90,10 +90,12 @@ type Authenticator struct {
 	store   *store.Store
 	limiter *rateLimiter // per client IP and globally
 	byUser  *rateLimiter // per account name
-	starts  *rateLimiter // SSO sign-in attempts per client IP
-	allowed map[string]bool
-	sem     chan struct{} // bounds concurrent argon2 computations (memory)
-	dummy   *Hash         // verified for unknown users, so timing reveals nothing
+	// badTokens slows down clients that keep sending invalid API tokens.
+	badTokens *rateLimiter
+	starts    *rateLimiter // SSO sign-in attempts per client IP
+	allowed   map[string]bool
+	sem       chan struct{} // bounds concurrent argon2 computations (memory)
+	dummy     *Hash         // verified for unknown users, so timing reveals nothing
 }
 
 // New validates cfg and builds an authenticator.
@@ -102,14 +104,15 @@ func New(cfg Config, st *store.Store, ips *clientip.Resolver, log *slog.Logger) 
 		cfg.HashParams = DefaultParams
 	}
 	a := &Authenticator{
-		cfg:     cfg,
-		log:     log,
-		ips:     ips,
-		store:   st,
-		limiter: newRateLimiter(12*time.Second, 5, time.Second, 20),
-		byUser:  newRateLimiter(30*time.Second, 5, time.Millisecond, 1<<30),
-		starts:  newRateLimiter(3*time.Second, 20, 20*time.Millisecond, 500),
-		sem:     make(chan struct{}, 2),
+		cfg:       cfg,
+		log:       log,
+		ips:       ips,
+		store:     st,
+		limiter:   newRateLimiter(12*time.Second, 5, time.Second, 20),
+		byUser:    newRateLimiter(30*time.Second, 5, time.Millisecond, 1<<30),
+		badTokens: newRateLimiter(2*time.Second, 10, time.Millisecond, 1<<30),
+		starts:    newRateLimiter(3*time.Second, 20, 20*time.Millisecond, 500),
+		sem:       make(chan struct{}, 2),
 	}
 	enc, err := HashPassword("not a real password", cfg.HashParams)
 	if err != nil {
@@ -211,12 +214,22 @@ type ctxKey struct{}
 type identity struct {
 	user      store.User
 	sessionID int64
+	token     *store.APIToken // signed in with a personal API token
 }
 
 // UserFrom returns the account stored by Require.
 func UserFrom(ctx context.Context) (store.User, bool) {
 	id, ok := ctx.Value(ctxKey{}).(identity)
 	return id.user, ok
+}
+
+// TokenFrom returns the API token a request was authenticated with, if any.
+func TokenFrom(ctx context.Context) (store.APIToken, bool) {
+	id, _ := ctx.Value(ctxKey{}).(identity)
+	if id.token == nil {
+		return store.APIToken{}, false
+	}
+	return *id.token, true
 }
 
 // SessionIDFrom returns the session of the request (0 in proxy mode).
@@ -235,6 +248,17 @@ func (a *Authenticator) Require(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, ok := a.authenticate(r)
 		if !ok {
+			if _, bearer := bearerToken(r); bearer {
+				// Wrong or revoked tokens: scripts retrying in a loop slow down.
+				ip := a.ips.ClientIP(r).String()
+				if allowed, wait := a.badTokens.allow(ip); !allowed {
+					secs := int(math.Ceil(wait.Seconds()))
+					w.Header().Set("Retry-After", strconv.Itoa(secs))
+					httpx.WriteJSON(w, http.StatusTooManyRequests, map[string]any{"error": "rate_limited", "retryAfter": secs})
+					return
+				}
+				a.log.Warn("invalid API token", "ip", ip)
+			}
 			a.unauthorized(w)
 			return
 		}
@@ -260,8 +284,25 @@ func (a *Authenticator) Authenticated(r *http.Request) bool {
 	return ok
 }
 
+// bearerToken returns the token of an "Authorization: Bearer …" header.
+func bearerToken(r *http.Request) (string, bool) {
+	h := r.Header.Get("Authorization")
+	if len(h) < 7 || !strings.EqualFold(h[:7], "bearer ") {
+		return "", false
+	}
+	return strings.TrimSpace(h[7:]), true
+}
+
 func (a *Authenticator) authenticate(r *http.Request) (identity, bool) {
 	ctx := r.Context()
+	// A personal API token decides on its own: no fallback to cookies.
+	if token, ok := bearerToken(r); ok {
+		u, t, ok := a.store.LookupToken(ctx, token, a.ips.ClientIP(r).String())
+		if !ok {
+			return identity{}, false
+		}
+		return identity{user: u, token: &t}, true
+	}
 	if a.cfg.Mode == ModeProxy {
 		u, ok := a.proxyUser(r)
 		return identity{user: u}, ok

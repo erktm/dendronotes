@@ -37,13 +37,16 @@ type Synapse struct {
 // Doc is the parsed content of a note.
 type Doc struct {
 	Synapses []Synapse
-	Tags     []string // without "#", in order of first appearance, deduplicated case-insensitively
+	// Files are references to attachments: ![[photo.png]], [[manual.pdf]],
+	// ![](photo.png), [report](report.pdf) – same fields as synapses.
+	Files []Synapse
+	Tags  []string // without "#", in order of first appearance, deduplicated case-insensitively
 }
 
-// Parse extracts synapses and tags from a note.
+// Parse extracts synapses, attachment references and tags from a note.
 func Parse(src string) Doc {
 	masked := MaskCode(src)
-	return Doc{Synapses: parseSynapses(src, masked), Tags: parseTags(src, masked)}
+	return Doc{Synapses: parseRefs(src, masked, false), Files: parseRefs(src, masked, true), Tags: parseTags(src, masked)}
 }
 
 // attachmentExtensions are file types that are attachments, never notes.
@@ -165,14 +168,15 @@ func SplitWikiTarget(inner string) (target, heading, alias string) {
 	return strings.TrimSpace(rest), heading, alias
 }
 
-// parseSynapses reads synapses from the masked text (like the frontend), so
-// code inside a construct is blank there too; offsets are the same in both.
-func parseSynapses(src, masked string) []Synapse {
+// parseRefs reads synapses – or, with files, references to attachments –
+// from the masked text (like the frontend), so code inside a construct is
+// blank there too; offsets are the same in both.
+func parseRefs(src, masked string, files bool) []Synapse {
 	var out []Synapse
 	for _, m := range wikiLink.FindAllStringSubmatchIndex(masked, -1) {
 		target, heading, alias := SplitWikiTarget(masked[m[4]:m[5]])
-		if target == "" || !IsNoteTarget(target) {
-			continue // heading in the same note, or an attachment
+		if target == "" || IsNoteTarget(target) == files {
+			continue // heading in the same note, or the other kind
 		}
 		out = append(out, Synapse{
 			Target: target, Heading: heading, Alias: alias,
@@ -195,7 +199,7 @@ func parseSynapses(src, masked string) []Synapse {
 			p, heading = href[:i], decodeSafe(href[i+1:])
 		}
 		p = decodeSafe(p)
-		if p == "" || !soma.IsNote(p) {
+		if p == "" || soma.IsNote(p) == files {
 			continue
 		}
 		out = append(out, Synapse{

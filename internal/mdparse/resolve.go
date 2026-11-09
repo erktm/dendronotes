@@ -58,14 +58,26 @@ func NameKey(target string) string {
 
 // Resolver finds the note a synapse points to within a fixed set of notes.
 type Resolver struct {
-	notes  []string
-	set    map[string]bool
-	byFold map[string]string
-	byName map[string][]string // folded file name → notes
+	// noteExt: targets without an extension mean notes (.md); off for files.
+	noteExt bool
+	notes   []string
+	set     map[string]bool
+	byFold  map[string]string
+	byName  map[string][]string // folded file name → notes
 }
 
 // NewResolver indexes the soma-relative paths of all notes.
 func NewResolver(notes []string) *Resolver {
+	r := newResolver(notes)
+	r.noteExt = true
+	return r
+}
+
+// NewFileResolver resolves references to any file (attachments): the same
+// rules as for notes, without adding .md (like resolveFile in the frontend).
+func NewFileResolver(files []string) *Resolver { return newResolver(files) }
+
+func newResolver(notes []string) *Resolver {
 	r := &Resolver{
 		notes:  notes,
 		set:    make(map[string]bool, len(notes)),
@@ -107,7 +119,10 @@ func (r *Resolver) Resolve(target string, markdown bool, from string) string {
 		return r.exact(NormalizePath(target))
 	}
 
-	t := WithNoteExt(strings.TrimLeft(target, "/"))
+	t := strings.TrimLeft(target, "/")
+	if r.noteExt {
+		t = WithNoteExt(t)
+	}
 	var candidates []string
 	if strings.Contains(t, "/") {
 		if p := r.exact(NormalizePath(t)); p != "" {

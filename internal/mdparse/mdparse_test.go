@@ -2,6 +2,7 @@ package mdparse
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"reflect"
 	"strings"
@@ -24,6 +25,15 @@ type shared struct {
 			Expected *string `json:"expected"`
 		} `json:"cases"`
 	} `json:"resolve"`
+	ResolveFiles struct {
+		Files []string `json:"files"`
+		Cases []struct {
+			Target   string  `json:"target"`
+			Markdown bool    `json:"markdown"`
+			From     string  `json:"from"`
+			Expected *string `json:"expected"`
+		} `json:"cases"`
+	} `json:"resolveFiles"`
 }
 
 func loadShared(t *testing.T) shared {
@@ -67,6 +77,38 @@ func TestSharedResolveCases(t *testing.T) {
 		if got := r.Resolve(c.Target, c.Markdown, c.From); got != want {
 			t.Errorf("Resolve(%q, md=%v, from %q) = %q, want %q", c.Target, c.Markdown, c.From, got, want)
 		}
+	}
+}
+
+func TestSharedResolveFileCases(t *testing.T) {
+	s := loadShared(t)
+	r := NewFileResolver(s.ResolveFiles.Files)
+	if len(s.ResolveFiles.Cases) == 0 {
+		t.Fatal("no cases")
+	}
+	for _, c := range s.ResolveFiles.Cases {
+		want := ""
+		if c.Expected != nil {
+			want = *c.Expected
+		}
+		if got := r.Resolve(c.Target, c.Markdown, c.From); got != want {
+			t.Errorf("Resolve file (%q, md=%v, from %q) = %q, want %q", c.Target, c.Markdown, c.From, got, want)
+		}
+	}
+}
+
+func TestParseFiles(t *testing.T) {
+	src := "![[photo.png|300]] [[manual.pdf]] [[Note]] ![](img/a%20b.jpg) [report](../report.pdf) [x](Other.md)\n`![[code.png]]` [w](https://x.org/a.png)"
+	var got []string
+	for _, f := range Parse(src).Files {
+		got = append(got, fmt.Sprintf("%s|%s|%v|%v", f.Target, f.Alias, f.Embed, f.Markdown))
+	}
+	want := []string{"photo.png|300|true|false", "manual.pdf||false|false", "img/a b.jpg||true|true", "../report.pdf|report|false|true"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("files:\n got %v\nwant %v", got, want)
+	}
+	if syns := Parse(src).Synapses; len(syns) != 2 {
+		t.Errorf("synapses: %+v", syns)
 	}
 }
 

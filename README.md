@@ -77,8 +77,10 @@ admin's first soma.
 - **Embedded notes.** `![[Note]]` shows another note inside this one in the reading view,
   `![[Note#Heading]]` only that section (up to three levels deep).
 - **Renaming and moving.** Synapses in other notes are rewritten so they keep pointing to the
-  renamed or moved note (Markdown links included), unless switched off in the settings. A note
-  that was changed by someone else in that moment is left alone and reported.
+  renamed or moved note (Markdown links included), and so are embeds and links to renamed or
+  moved attachments (`![[photo.png]]`, `![](photo.png)`, `[report](report.pdf)`), unless
+  switched off in the settings. A note that was changed by someone else in that moment is left
+  alone and reported.
 - **Editing together.** Everyone who has a note open – other people the soma is shared with,
   or your own second tab – edits the same text at once: changes appear right away, the others'
   cursors and selections show with their names, and the bar at the bottom of the note shows who
@@ -505,6 +507,15 @@ which a test keeps in sync with the server.
 | `GET /api/users/search?q=`              | Find people to share with (two characters or more)   |
 | `GET /api/auth/methods`, `/api/auth/oidc/login`, `/api/auth/oidc/callback` | Sign-in options and the OpenID Connect flow |
 | `/api/admin/users`, `/groups`, `/somas`, `/sessions`, `/server`, `/sso/check`, `/audit` | Administration (admins only) |
+
+**Personal API tokens** (profile → *API tokens*) let scripts use the API as their account:
+"Read" tokens only read, "Read and write" tokens also change notes and files. No token manages
+anything – administration, sharing, renaming or deleting somas, the account and its tokens
+answer `403 token_not_allowed`. A token is shown once; only its hash is stored.
+
+```bash
+curl -H "Authorization: Bearer dn_…" https://notes.example.org/api/somas
+```
 
 ## Air gap and reproducible builds
 

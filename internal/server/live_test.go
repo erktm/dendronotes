@@ -259,3 +259,41 @@ func TestExternalChangesAreFollowed(t *testing.T) {
 		t.Errorf("search after external write: %+v", hits)
 	}
 }
+
+// Renaming or moving attachments rewrites the embeds and links to them.
+func TestMoveUpdatesEmbeds(t *testing.T) {
+	s := newTestServer(t, testFS())
+	c := newClient(t, s)
+	c.login()
+	base := "/api/somas/" + testSoma
+	expect(t, c.do("POST", base+"/notes/Garden/Beds.md", `{"content":"![[north.png|300]] and [map](north.png)"}`), 201, "")
+	expect(t, c.upload(base+"/files/Garden/north.png", pngBytes), 201, "")
+	expect(t, c.do("POST", base+"/notes/Log.md", `{"content":"![](Garden/north.png)"}`), 201, "")
+
+	rec := c.do("POST", base+"/move", `{"from":"Garden/north.png","to":"Garden/north bed.png","updateSynapses":true}`)
+	expect(t, rec, 200, "")
+	if res := decode[moveResult](t, rec); res.Embeds != 3 || res.Notes != 2 || res.Synapses != 0 {
+		t.Errorf("move result: %+v", res)
+	}
+	read := func(p string) string {
+		data, _ := os.ReadFile(filepath.Join(somaDir(s), filepath.FromSlash(p)))
+		return string(data)
+	}
+	if got := read("Garden/Beds.md"); got != "![[north bed.png|300]] and [map](north%20bed.png)" {
+		t.Errorf("Beds.md = %q", got)
+	}
+	if got := read("Log.md"); got != "![](Garden/north%20bed.png)" {
+		t.Errorf("Log.md = %q", got)
+	}
+
+	// A folder with an attachment moves: relative links follow, names still match.
+	expect(t, c.do("POST", base+"/folders/Allotment", ``), 201, "")
+	rec = c.do("POST", base+"/move", `{"from":"Garden","to":"Allotment/Garden","updateSynapses":true}`)
+	expect(t, rec, 200, "")
+	if got := read("Log.md"); got != "![](Allotment/Garden/north%20bed.png)" {
+		t.Errorf("Log.md after the folder move = %q", got)
+	}
+	if got := read("Allotment/Garden/Beds.md"); got != "![[north bed.png|300]] and [map](north%20bed.png)" {
+		t.Errorf("Beds.md after the folder move = %q", got)
+	}
+}

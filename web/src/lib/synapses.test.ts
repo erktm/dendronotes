@@ -114,6 +114,14 @@ describe('shared synapse cases', () => {
   }
 })
 
+describe('resolveFile (shared catalog)', () => {
+  for (const c of shared.resolveFiles.cases) {
+    it(`resolves the file ${c.target} from ${c.from}`, () => {
+      expect(resolveFile({ target: c.target, markdown: c.markdown }, c.from, shared.resolveFiles.files)).toBe(c.expected)
+    })
+  }
+})
+
 describe('resolveFile', () => {
   const files = ['photo.png', 'Projects/photo.png', 'Projects/report.pdf', 'Projects/Plan.md']
   it('finds attachments by name, path or relative link, without adding .md', () => {

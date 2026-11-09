@@ -305,6 +305,33 @@ func (ix *Index) Referrers(ctx context.Context, targets []string) ([]string, err
 	return out, rows.Err()
 }
 
+// FileReferrers returns the notes that may refer to any of the given
+// attachments (same file name); callers resolve each reference to be sure.
+func (ix *Index) FileReferrers(ctx context.Context, files []string) ([]string, error) {
+	if len(files) == 0 {
+		return nil, nil
+	}
+	keys := make([]any, 0, len(files))
+	for _, f := range files {
+		keys = append(keys, mdparse.Fold(path.Base(f)))
+	}
+	rows, err := ix.db.QueryContext(ctx, `SELECT DISTINCT n.path FROM file_refs f JOIN notes n ON n.id = f.note_id
+		WHERE f.name_key IN (?`+strings.Repeat(", ?", len(keys)-1)+`) ORDER BY n.path`, keys...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var p string
+		if err := rows.Scan(&p); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
 // TagCount is a tag with the number of notes carrying it.
 type TagCount struct {
 	Tag   string `json:"tag"`

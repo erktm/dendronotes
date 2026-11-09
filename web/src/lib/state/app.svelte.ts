@@ -467,7 +467,8 @@ class App {
       return false
     }
     const moved = res.path
-    if (res.updatedSynapses) this.toast(strings.toasts.synapsesUpdated(res.updatedSynapses, res.updatedNotes ?? 0), 'info')
+    if (res.updatedSynapses || res.updatedEmbeds)
+      this.toast(strings.toasts.synapsesUpdated(res.updatedSynapses ?? 0, res.updatedEmbeds ?? 0, res.updatedNotes ?? 0), 'info')
     if (res.failed?.length) this.toast(strings.toasts.synapsesSkipped(res.failed.length))
     // Carry expanded folders and the open note over to the new location.
     for (const p of [...this.expanded]) {

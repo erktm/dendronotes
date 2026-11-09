@@ -1,5 +1,6 @@
-// Package relink rewrites synapses when notes are renamed or moved, so that
-// every synapse that pointed to a note still points to it afterwards.
+// Package relink rewrites synapses when notes are renamed or moved, and
+// references to attachments (embeds and links) when files are, so that every
+// one still points where it pointed before.
 //
 // Planning happens before the move (with the old paths), writing after it;
 // each edit carries the version it was computed from, so a note changed in
@@ -21,26 +22,40 @@ type Edit struct {
 	ETag     string // version the edit is based on
 	Content  string
 	Synapses int // number of rewritten synapses
+	Embeds   int // number of rewritten references to attachments
 }
 
 // ReadFunc reads a note before the move.
 type ReadFunc func(p string) (content, etag string, err error)
 
-// Plan computes the edits for moving notes according to moves (old path →
-// new path). sources are the notes that may refer to moved notes; moved notes
-// are always checked too, since their relative links change with them.
-// notes lists all notes before the move.
-func Plan(read ReadFunc, sources, notes []string, moves map[string]string) ([]Edit, error) {
-	oldRes := mdparse.NewResolver(notes)
-	newNotes := make([]string, len(notes))
-	for i, n := range notes {
-		newNotes[i] = moved(moves, n)
+// resolvers before and after the move, for notes and for all files.
+type resolvers struct {
+	oldNotes, newNotes, oldFiles, newFiles *mdparse.Resolver
+}
+
+// Plan computes the edits for moving files according to moves (old path →
+// new path; notes and attachments). sources are the notes that may refer to
+// moved files; moved notes are always checked too, since their relative
+// links change with them. notes lists all notes, files all files (notes
+// included) before the move.
+func Plan(read ReadFunc, sources, notes, files []string, moves map[string]string) ([]Edit, error) {
+	after := func(list []string) []string {
+		out := make([]string, len(list))
+		for i, p := range list {
+			out[i] = moved(moves, p)
+		}
+		return out
 	}
-	newRes := mdparse.NewResolver(newNotes)
+	r := resolvers{
+		oldNotes: mdparse.NewResolver(notes), newNotes: mdparse.NewResolver(after(notes)),
+		oldFiles: mdparse.NewFileResolver(files), newFiles: mdparse.NewFileResolver(after(files)),
+	}
 
 	check := slices.Clone(sources)
 	for from := range moves {
-		check = append(check, from)
+		if soma.IsNote(from) {
+			check = append(check, from)
+		}
 	}
 	slices.Sort(check)
 	check = slices.Compact(check)
@@ -52,9 +67,9 @@ func Plan(read ReadFunc, sources, notes []string, moves map[string]string) ([]Ed
 			continue // unreadable or too large: nothing to rewrite
 		}
 		newSrc := moved(moves, src)
-		out, n := rewrite(content, src, newSrc, moves, oldRes, newRes)
-		if n > 0 {
-			edits = append(edits, Edit{Path: newSrc, ETag: etag, Content: out, Synapses: n})
+		out, syn, emb := rewrite(content, src, newSrc, moves, r)
+		if syn+emb > 0 {
+			edits = append(edits, Edit{Path: newSrc, ETag: etag, Content: out, Synapses: syn, Embeds: emb})
 		}
 	}
 	return edits, nil
@@ -67,13 +82,33 @@ func moved(moves map[string]string, p string) string {
 	return p
 }
 
-// rewrite returns content with every synapse fixed that would no longer
-// reach its note after the move, and the number of changes.
-func rewrite(content, src, newSrc string, moves map[string]string, oldRes, newRes *mdparse.Resolver) (string, int) {
-	syns := mdparse.Parse(content).Synapses
+// ref is a synapse or a reference to an attachment.
+type ref struct {
+	mdparse.Synapse
+	file bool
+}
+
+// rewrite returns content with every synapse and attachment reference fixed
+// that would no longer reach its target after the move, and the numbers of
+// changes.
+func rewrite(content, src, newSrc string, moves map[string]string, r resolvers) (string, int, int) {
+	doc := mdparse.Parse(content)
+	refs := make([]ref, 0, len(doc.Synapses)+len(doc.Files))
+	for _, s := range doc.Synapses {
+		refs = append(refs, ref{s, false})
+	}
+	for _, f := range doc.Files {
+		refs = append(refs, ref{f, true})
+	}
+	slices.SortFunc(refs, func(a, b ref) int { return a.Start - b.Start })
+
 	var b strings.Builder
-	last, count := 0, 0
-	for _, s := range syns {
+	last, syn, emb := 0, 0, 0
+	for _, s := range refs {
+		oldRes, newRes := r.oldNotes, r.newNotes
+		if s.file {
+			oldRes, newRes = r.oldFiles, r.newFiles
+		}
 		target := oldRes.Resolve(s.Target, s.Markdown, src)
 		if target == "" {
 			continue // unresolved before: leave it
@@ -86,7 +121,7 @@ func rewrite(content, src, newSrc string, moves map[string]string, oldRes, newRe
 		if s.Markdown {
 			repl = markdownLink(content[s.Start:s.End], newSrc, newTarget, newRes)
 		} else {
-			repl = wikiLink(s, newSrc, newTarget, newRes)
+			repl = wikiLink(s.Synapse, newSrc, newTarget, newRes, s.file)
 		}
 		if repl == "" {
 			continue
@@ -94,19 +129,24 @@ func rewrite(content, src, newSrc string, moves map[string]string, oldRes, newRe
 		b.WriteString(content[last:s.Start])
 		b.WriteString(repl)
 		last = s.End
-		count++
+		if s.file {
+			emb++
+		} else {
+			syn++
+		}
 	}
-	if count == 0 {
-		return content, 0
+	if syn+emb == 0 {
+		return content, 0, 0
 	}
 	b.WriteString(content[last:])
-	return b.String(), count
+	return b.String(), syn, emb
 }
 
 // wikiLink writes [[target#heading|alias]] for the new location: the bare
 // name when that is unambiguous (and was used before), the path otherwise.
-func wikiLink(s mdparse.Synapse, newSrc, newTarget string, res *mdparse.Resolver) string {
-	keepExt := soma.IsNote(s.Target)
+// Attachments always keep their extension.
+func wikiLink(s mdparse.Synapse, newSrc, newTarget string, res *mdparse.Resolver, file bool) string {
+	keepExt := file || soma.IsNote(s.Target)
 	strip := func(p string) string {
 		if keepExt {
 			return p

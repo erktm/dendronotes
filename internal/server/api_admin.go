@@ -52,7 +52,12 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, "listing users", err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"users": users})
+	tokens, err := s.store.TokenCounts(r.Context())
+	if err != nil {
+		s.internalError(w, r, "counting tokens", err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"users": users, "tokens": tokens})
 }
 
 // handleAdminCreateUser creates a local account with a first soma.

@@ -16,6 +16,7 @@ info:
     (internal/server/openapi_test.go).
 security:
   - session: []
+  - bearer: []
 paths:
   /healthz:
     get:
@@ -187,6 +188,48 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Error" }
+  /api/me/tokens:
+    get:
+      summary: Your personal API tokens (never the tokens themselves)
+      responses:
+        "200":
+          description: Newest first.
+          content:
+            application/json:
+              schema: { type: object, properties: { tokens: { type: array, items: { $ref: "#/components/schemas/APIToken" } } } }
+    post:
+      summary: Create a personal API token – it is shown in this answer only (at most 20 per account)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, scope]
+              properties:
+                name: { type: string, maxLength: 64 }
+                scope: { type: string, enum: [read, write] }
+                expiresInDays: { type: integer, minimum: 0, maximum: 3650, description: 0 never expires. }
+      responses:
+        "201":
+          description: The token and what is kept about it.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string, example: dn_7Kq… }
+                  info: { $ref: "#/components/schemas/APIToken" }
+        "400": { description: "`invalid_name`, `invalid_scope` or `invalid_expiry`." }
+        "409": { description: Already 20 tokens (`too_many_tokens`). }
+  /api/me/tokens/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    delete:
+      summary: Revoke one of your tokens
+      responses:
+        "200": { description: Revoked. }
+        "404": { $ref: "#/components/responses/Error" }
   /api/me/notifications:
     get:
       summary: Your newest notifications (mentions and replies) and how many are unread
@@ -615,6 +658,7 @@ paths:
                 properties:
                   path: { type: string }
                   updatedNotes: { type: integer }
+                  updatedEmbeds: { type: integer, description: Embeds and links to moved attachments. }
                   updatedSynapses: { type: integer }
                   failed: { type: array, items: { type: string } }
         "400": { $ref: "#/components/responses/Error" }
@@ -1251,6 +1295,14 @@ paths:
         "200": { description: The group and its members. }
         "400": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
+  /api/admin/users/{id}/tokens:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    delete:
+      summary: Revoke all API tokens of an account (admin)
+      responses:
+        "200": { description: How many were revoked., content: { application/json: { schema: { type: object, properties: { revoked: { type: integer } } } } } }
+        "404": { $ref: "#/components/responses/Error" }
   /api/admin/somas:
     get:
       summary: All somas with owner, members, groups and size (admin)
@@ -1424,6 +1476,16 @@ components:
       description: >
         Session cookie (named dendronotes_session over plain HTTP). In proxy
         mode the reverse proxy authenticates every request instead.
+    bearer:
+      type: http
+      scheme: bearer
+      description: >
+        A personal API token (dn_…), created in the profile. "read" tokens only
+        read (GET); "write" tokens also change notes, folders and files. No
+        token manages anything: administration, sharing, renaming or deleting
+        somas, the trash's final deletion, the account and its tokens answer
+        403 `token_not_allowed`. Wrong tokens answer 401, and after a few of
+        them 429.
   parameters:
     soma:
       name: soma
@@ -1477,7 +1539,8 @@ components:
             managed_by_provider, not_available, unknown_stream, resync,
             builtin_group, directory_group, name_taken, directory_unavailable,
             account_not_allowed, owner_required, folder_missing, invalid_comment,
-            not_author, not_a_thread,
+            not_author, not_a_thread, token_not_allowed, invalid_scope,
+            invalid_expiry, too_many_tokens,
             version_mismatch, invalid_update, shutting_down, internal_error.
     Readiness:
       type: object
@@ -1559,6 +1622,16 @@ components:
               color: { type: integer, minimum: 0, maximum: 7 }
               sel: { type: object, properties: { anchor: { type: integer }, head: { type: integer } } }
         conflict: { type: boolean }
+    APIToken:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        scope: { type: string, enum: [read, write] }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time, description: Missing when it never expires. }
+        lastUsedAt: { type: string, format: date-time }
+        lastUsedIp: { type: string }
     Comment:
       type: object
       properties:

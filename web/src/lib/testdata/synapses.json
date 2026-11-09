@@ -1,5 +1,5 @@
 {
-  "comment": "Shared by web/src/lib/synapses.test.ts and internal/mdparse: frontend and server must find and resolve synapses identically.",
+  "comment": "Shared by web/src/lib/synapses.test.ts and internal/mdparse: frontend and server must find and resolve synapses – and references to attachments (resolveFiles) – identically.",
   "parse": [
     {
       "name": "wiki links with alias and heading",
@@ -314,6 +314,103 @@
         "markdown": false,
         "from": "x.md",
         "expected": null
+      }
+    ]
+  },
+  "resolveFiles": {
+    "files": [
+      "photo.png",
+      "Projects/photo.png",
+      "Projects/report.pdf",
+      "Projects/Plan.md",
+      "Media/Clips/Talk.MP4",
+      "Media/talk.mp4",
+      "Café/menü.pdf"
+    ],
+    "cases": [
+      {
+        "target": "report.pdf",
+        "markdown": false,
+        "from": "x.md",
+        "expected": "Projects/report.pdf"
+      },
+      {
+        "target": "photo.png",
+        "markdown": false,
+        "from": "Projects/Plan.md",
+        "expected": "Projects/photo.png"
+      },
+      {
+        "target": "photo.png",
+        "markdown": false,
+        "from": "Journal/x.md",
+        "expected": "photo.png"
+      },
+      {
+        "target": "PHOTO.PNG",
+        "markdown": false,
+        "from": "Journal/x.md",
+        "expected": "photo.png"
+      },
+      {
+        "target": "Projects/photo.png",
+        "markdown": false,
+        "from": "x.md",
+        "expected": "Projects/photo.png"
+      },
+      {
+        "target": "talk.mp4",
+        "markdown": false,
+        "from": "x.md",
+        "expected": "Media/talk.mp4"
+      },
+      {
+        "target": "Clips/talk.mp4",
+        "markdown": false,
+        "from": "x.md",
+        "expected": "Media/Clips/Talk.MP4"
+      },
+      {
+        "target": "menü.pdf",
+        "markdown": false,
+        "from": "x.md",
+        "expected": "Café/menü.pdf"
+      },
+      {
+        "target": "report",
+        "markdown": false,
+        "from": "x.md",
+        "expected": null
+      },
+      {
+        "target": "../photo.png",
+        "markdown": true,
+        "from": "Projects/Plan.md",
+        "expected": "photo.png"
+      },
+      {
+        "target": "photo.png",
+        "markdown": true,
+        "from": "Projects/Plan.md",
+        "expected": "Projects/photo.png"
+      },
+      {
+        "target": "report.pdf",
+        "markdown": true,
+        "from": "x.md",
+        "expected": null
+      },
+      {
+        "target": "Projects/report.pdf",
+        "markdown": true,
+        "from": "Journal/x.md",
+        "expected": "Projects/report.pdf"
+      },
+      {
+        "target": "Plan.md",
+        "markdown": false,
+        "from": "x.md",
+        "expected": "Projects/Plan.md"
       }
     ]
   }

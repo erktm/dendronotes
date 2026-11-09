@@ -3,9 +3,7 @@ package server
 import (
 	"context"
 	"errors"
-	"maps"
 	"net/http"
-	"slices"
 	"strings"
 
 	"dendronotes/internal/auth"
@@ -56,6 +54,9 @@ func (s *Server) routes() []route {
 		{"DELETE", "/api/somas/{soma}/membership", s.handleLeaveSoma, somaViewer},
 		{"GET", "/api/users/search", s.handleSearchUsers, signedIn},
 		{"GET", "/api/me/notifications", s.handleNotifications, signedIn},
+		{"GET", "/api/me/tokens", s.handleTokens, signedIn},
+		{"POST", "/api/me/tokens", s.handleCreateToken, signedIn},
+		{"DELETE", "/api/me/tokens/{id}", s.handleDeleteToken, signedIn},
 		{"POST", "/api/me/notifications/read", s.handleReadNotifications, signedIn},
 
 		{"GET", "/api/somas/{soma}/tree", s.handleTree, somaViewer},
@@ -99,6 +100,7 @@ func (s *Server) routes() []route {
 		{"POST", "/api/admin/users/{id}/password", s.handleAdminSetPassword, adminOnly},
 		{"DELETE", "/api/admin/users/{id}", s.handleAdminDeleteUser, adminOnly},
 		{"DELETE", "/api/admin/users/{id}/sessions", s.handleAdminEndUserSessions, adminOnly},
+		{"DELETE", "/api/admin/users/{id}/tokens", s.handleAdminRevokeTokens, adminOnly},
 		{"GET", "/api/admin/groups", s.handleAdminGroups, adminOnly},
 		{"POST", "/api/admin/groups", s.handleAdminCreateGroup, adminOnly},
 		{"PATCH", "/api/admin/groups/{id}", s.handleAdminRenameGroup, adminOnly},
@@ -129,11 +131,11 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 		switch rt.access {
 		case public:
 		case signedIn:
-			h = s.auth.Require(h)
+			h = s.auth.Require(s.tokenGuard(rt, h))
 		case adminOnly:
-			h = s.auth.RequireAdmin(h)
+			h = s.auth.RequireAdmin(s.tokenGuard(rt, h))
 		default:
-			h = s.auth.Require(s.withSoma(rt.access.somaRole(), h))
+			h = s.auth.Require(s.tokenGuard(rt, s.withSoma(rt.access.somaRole(), h)))
 		}
 		mux.Handle(rt.method+" "+rt.pattern, h)
 	}
@@ -301,6 +303,7 @@ func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 		rt.RecordVersion(e.Path, []byte(e.Content), []int64{me.ID}, history.ReasonRelink)
 		res.Notes++
 		res.Synapses += e.Synapses
+		res.Embeds += e.Embeds
 	}
 	rt.SyncAfterWrite(r.Context())
 	httpx.WriteJSON(w, http.StatusOK, res)
@@ -311,11 +314,13 @@ type moveResult struct {
 	Path     string   `json:"path"`
 	Notes    int      `json:"updatedNotes"`
 	Synapses int      `json:"updatedSynapses"`
+	Embeds   int      `json:"updatedEmbeds"`
 	Failed   []string `json:"failed"`
 }
 
-// planRelink computes the synapse rewrites for moving from to to: a single
-// note or a folder with all notes inside it.
+// planRelink computes the rewrites of synapses and attachment references
+// for moving from to to: a note, an attachment or a folder with everything
+// inside it.
 func (s *Server) planRelink(r *http.Request, rt *somas.Runtime, from, to string) ([]relink.Edit, error) {
 	from, err := soma.CleanPath(from)
 	if err != nil {
@@ -325,20 +330,40 @@ func (s *Server) planRelink(r *http.Request, rt *somas.Runtime, from, to string)
 	if err != nil {
 		return nil, err
 	}
+	entries, err := rt.Soma.Tree()
+	if err != nil {
+		return nil, err
+	}
 	notes := rt.Index.Resolver().Notes()
+	var files, movedNotes, movedFiles []string
 	moves := map[string]string{}
-	for _, n := range notes {
+	for _, e := range entries {
+		if e.Type != "file" {
+			continue
+		}
+		files = append(files, e.Path)
 		switch {
-		case n == from:
-			moves[n] = to
-		case strings.HasPrefix(n, from+"/"):
-			moves[n] = to + n[len(from):]
+		case e.Path == from:
+			moves[e.Path] = to
+		case strings.HasPrefix(e.Path, from+"/"):
+			moves[e.Path] = to + e.Path[len(from):]
+		default:
+			continue
+		}
+		if soma.IsNote(e.Path) {
+			movedNotes = append(movedNotes, e.Path)
+		} else {
+			movedFiles = append(movedFiles, e.Path)
 		}
 	}
 	if len(moves) == 0 {
-		return nil, nil // no notes involved (an attachment or an empty folder)
+		return nil, nil // an empty folder
 	}
-	sources, err := rt.Index.Referrers(r.Context(), slices.Collect(maps.Keys(moves)))
+	sources, err := rt.Index.Referrers(r.Context(), movedNotes)
+	if err != nil {
+		return nil, err
+	}
+	fileSources, err := rt.Index.FileReferrers(r.Context(), movedFiles)
 	if err != nil {
 		return nil, err
 	}
@@ -346,7 +371,7 @@ func (s *Server) planRelink(r *http.Request, rt *somas.Runtime, from, to string)
 		n, err := rt.Soma.ReadNote(p)
 		return n.Content, n.ETag, err
 	}
-	return relink.Plan(read, sources, notes, moves)
+	return relink.Plan(read, append(sources, fileSources...), notes, files, moves)
 }
 
 func (s *Server) handleTrash(w http.ResponseWriter, r *http.Request) {

@@ -225,6 +225,19 @@ var migrations = []string{
 		read_at    INTEGER NOT NULL DEFAULT 0
 	);
 	CREATE INDEX notifications_user ON notifications(user_id, created_at);`,
+	// 7: personal API tokens (only their SHA-256 is kept).
+	`CREATE TABLE api_tokens (
+		id           INTEGER PRIMARY KEY,
+		user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		name         TEXT NOT NULL,
+		token_hash   TEXT NOT NULL UNIQUE,
+		scope        TEXT NOT NULL CHECK (scope IN ('read', 'write')),
+		created_at   INTEGER NOT NULL,
+		expires_at   INTEGER NOT NULL DEFAULT 0,
+		last_used_at INTEGER NOT NULL DEFAULT 0,
+		last_used_ip TEXT NOT NULL DEFAULT ''
+	);
+	CREATE INDEX api_tokens_user ON api_tokens(user_id);`,
 }
 
 // rebuilds are the migrations (by index) that recreate a table others refer

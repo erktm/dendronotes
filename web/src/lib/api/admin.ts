@@ -85,6 +85,9 @@ export interface NewUser {
 }
 
 export const users = () => request<{ users: User[] }>('GET', '/api/admin/users').then((r) => r.users)
+/** The accounts with how many API tokens each has (by id; none: missing). */
+export const usersWithTokens = () => request<{ users: User[]; tokens: Record<string, number> }>('GET', '/api/admin/users')
+export const revokeUserTokens = (id: number) => request<{ revoked: number }>('DELETE', `/api/admin/users/${id}/tokens`)
 export const createUser = (u: NewUser) => request<User>('POST', '/api/admin/users', { body: u })
 export const updateUser = (id: number, body: Partial<Pick<User, 'displayName' | 'email' | 'role' | 'disabled'>>) =>
   request<User>('PATCH', `/api/admin/users/${id}`, { body })
