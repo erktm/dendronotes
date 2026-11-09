@@ -528,3 +528,123 @@ func TestMigrationKeepsShares(t *testing.T) {
 		t.Errorf("Everyone after migrating: %+v %v", groups, err)
 	}
 }
+
+func TestDirectoryAccountsAndGroups(t *testing.T) {
+	s := open(t, t.TempDir())
+	ctx := context.Background()
+	local := user(t, s, "team", RoleUser) // a local group name clash comes later
+
+	anna, err := s.CreateUser(ctx, User{Username: "anna", Role: RoleUser, Source: SourceLDAP, LDAPID: "guid-anna"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u, err := s.UserByLDAP(ctx, "guid-anna"); err != nil || u.ID != anna.ID || u.Source != SourceLDAP {
+		t.Fatalf("by directory id: %+v %v", u, err)
+	}
+	if _, err := s.CreateUser(ctx, User{Username: "anna2", Role: RoleUser, Source: SourceLDAP, LDAPID: "guid-anna"}); !errors.Is(err, ErrTaken) {
+		t.Errorf("same directory id twice: %v", err)
+	}
+	if _, err := s.UserByLDAP(ctx, "guid-none"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("unknown id: %v", err)
+	}
+
+	// A local group with the name of a directory group stays; the directory one gets " (AD)".
+	if _, err := s.CreateGroup(ctx, "Team"); err != nil {
+		t.Fatal(err)
+	}
+	changed, err := s.SyncDirectoryGroups(ctx, anna.ID, []DirectoryGroup{{ID: "g-team", Name: "Team"}, {ID: "g-garden", Name: "Garden"}})
+	if err != nil || len(changed) != 2 {
+		t.Fatalf("first sync: %v %v", changed, err)
+	}
+	byName := func() map[string]Group {
+		list, _ := s.Groups(ctx)
+		m := map[string]Group{}
+		for _, g := range list {
+			m[g.Name] = g
+		}
+		return m
+	}
+	groups := byName()
+	if g := groups["Team (AD)"]; g.Source != "ldap" || g.Members != 1 || groups["Team"].Source != "local" || groups["Garden"].Members != 1 {
+		t.Fatalf("groups after sync: %+v", groups)
+	}
+	// Nothing changed: nothing reported.
+	if changed, _ := s.SyncDirectoryGroups(ctx, anna.ID, []DirectoryGroup{{ID: "g-team", Name: "Team"}, {ID: "g-garden", Name: "Garden"}}); len(changed) != 0 {
+		t.Errorf("unchanged sync reported %v", changed)
+	}
+	// Renamed in the directory, left another one.
+	changed, err = s.SyncDirectoryGroups(ctx, anna.ID, []DirectoryGroup{{ID: "g-garden", Name: "Allotment"}})
+	if err != nil || len(changed) != 1 {
+		t.Fatalf("second sync: %v %v", changed, err)
+	}
+	groups = byName()
+	if g, ok := groups["Allotment"]; !ok || g.Members != 1 || groups["Team (AD)"].Members != 0 || groups["Garden"].ID != 0 {
+		t.Fatalf("after renaming and leaving: %+v", groups)
+	}
+	// Directory groups are read-only in dendronotes, except for deleting.
+	ad := groups["Allotment"]
+	if _, err := s.RenameGroup(ctx, ad.ID, "Mine"); !errors.Is(err, ErrDirectoryGroup) {
+		t.Errorf("rename: %v", err)
+	}
+	if err := s.AddGroupMember(ctx, ad.ID, local.ID); !errors.Is(err, ErrDirectoryGroup) {
+		t.Errorf("add member: %v", err)
+	}
+	if err := s.RemoveGroupMember(ctx, ad.ID, anna.ID); !errors.Is(err, ErrDirectoryGroup) {
+		t.Errorf("remove member: %v", err)
+	}
+	if m, err := s.GroupMembers(ctx, ad.ID); err != nil || len(m) != 1 {
+		t.Errorf("members of a directory group: %+v %v", m, err)
+	}
+	if err := s.DeleteGroup(ctx, ad.ID); err != nil {
+		t.Errorf("delete a directory group: %v", err)
+	}
+}
+
+func TestMigrationRebuildsUsers(t *testing.T) {
+	// A state.db at version 3 with everything that refers to accounts keeps it.
+	dir := t.TempDir()
+	db, err := driver.Open("file:" + filepath.ToSlash(filepath.Join(dir, FileName)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(migrations[0] + `;` + migrations[1] + `;` + migrations[2] + `; PRAGMA user_version = 3;
+		INSERT INTO users (id, username, role, source, created_at, avatar_style, avatar_photo)
+			VALUES (1, 'anna', 'admin', 'local', 1, '{"color":3,"pattern":"rings","initials":""}', 7), (2, 'ben', 'user', 'oidc', 1, '', 0);
+		UPDATE users SET oidc_issuer = 'https://sso', oidc_subject = 'ben' WHERE id = 2;
+		INSERT INTO sessions (token_hash, user_id, created_at, expires_at, seen_at) VALUES ('h', 2, 1, 9999999999, 1);
+		INSERT INTO somas (id, name, folder, owner_id, created_at) VALUES ('somaaaaaaa', 'Garden', 'garden', 1, 1);
+		INSERT INTO soma_members (soma_id, user_id, role) VALUES ('somaaaaaaa', 1, 'owner'), ('somaaaaaaa', 2, 'writer');
+		INSERT INTO groups (name, created_at) VALUES ('Team', 1);
+		INSERT INTO group_members (group_id, user_id) VALUES (2, 2);
+		INSERT INTO avatars (user_id, image) VALUES (1, x'89');`); err != nil {
+		t.Fatal(err)
+	}
+	db.Close()
+	s := open(t, dir)
+	ctx := context.Background()
+	anna, err := s.UserByUsername(ctx, "anna")
+	if err != nil || anna.Avatar.Pattern != "rings" || anna.Avatar.Photo != 7 || anna.Role != RoleAdmin {
+		t.Fatalf("anna after the rebuild: %+v %v", anna, err)
+	}
+	if ben, err := s.UserByOIDC(ctx, "https://sso", "ben"); err != nil || ben.ID != 2 {
+		t.Errorf("ben by provider: %+v %v", ben, err)
+	}
+	if r, err := s.EffectiveRole(ctx, "somaaaaaaa", 2); err != nil || r != MemberWriter {
+		t.Errorf("ben's role: %q %v", r, err)
+	}
+	if img, _, err := s.AvatarPhoto(ctx, 1); err != nil || len(img) != 1 {
+		t.Errorf("avatar: %v", err)
+	}
+	// Foreign keys still hold: deleting an account takes its references along.
+	if _, err := s.db.Exec(`DELETE FROM sessions WHERE user_id = 2; DELETE FROM users WHERE id = 2`); err != nil {
+		t.Fatal(err)
+	}
+	var left int
+	if err := s.db.QueryRow(`SELECT (SELECT COUNT(*) FROM soma_members WHERE user_id = 2) + (SELECT COUNT(*) FROM group_members WHERE user_id = 2)`).Scan(&left); err != nil || left != 0 {
+		t.Errorf("cascade after the rebuild: %d %v", left, err)
+	}
+	var fk int
+	if err := s.db.QueryRow(`PRAGMA foreign_keys`).Scan(&fk); err != nil || fk != 1 {
+		t.Errorf("foreign keys are off after migrating: %d %v", fk, err)
+	}
+}

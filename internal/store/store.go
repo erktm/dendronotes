@@ -130,7 +130,52 @@ var migrations = []string{
 		UNION ALL
 		SELECT g.soma_id, u.id, g.role FROM soma_groups g JOIN groups e ON e.id = g.group_id AND e.everyone = 1
 			CROSS JOIN users u WHERE u.disabled = 0;`,
+	// 4: accounts and groups from Active Directory / LDAP. users is rebuilt
+	// for the new source (a CHECK constraint cannot be changed), so this one
+	// runs without foreign key enforcement (see rebuilds).
+	`DROP VIEW soma_access;
+	CREATE TABLE users_v4 (
+		id            INTEGER PRIMARY KEY,
+		username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
+		display_name  TEXT NOT NULL DEFAULT '',
+		email         TEXT NOT NULL DEFAULT '',
+		role          TEXT NOT NULL CHECK (role IN ('admin', 'user')),
+		source        TEXT NOT NULL CHECK (source IN ('local', 'oidc', 'proxy', 'ldap')),
+		password_hash TEXT NOT NULL DEFAULT '',
+		oidc_issuer   TEXT NOT NULL DEFAULT '',
+		oidc_subject  TEXT NOT NULL DEFAULT '',
+		ldap_id       TEXT NOT NULL DEFAULT '',
+		disabled      INTEGER NOT NULL DEFAULT 0,
+		created_at    INTEGER NOT NULL,
+		last_login_at INTEGER NOT NULL DEFAULT 0,
+		avatar_style  TEXT NOT NULL DEFAULT '',
+		avatar_photo  INTEGER NOT NULL DEFAULT 0
+	);
+	INSERT INTO users_v4 (id, username, display_name, email, role, source, password_hash, oidc_issuer, oidc_subject,
+		disabled, created_at, last_login_at, avatar_style, avatar_photo)
+		SELECT id, username, display_name, email, role, source, password_hash, oidc_issuer, oidc_subject,
+		disabled, created_at, last_login_at, avatar_style, avatar_photo FROM users;
+	DROP TABLE users;
+	ALTER TABLE users_v4 RENAME TO users;
+	CREATE UNIQUE INDEX users_oidc ON users(oidc_issuer, oidc_subject) WHERE source = 'oidc';
+	CREATE UNIQUE INDEX users_ldap ON users(ldap_id) WHERE source = 'ldap';
+	ALTER TABLE groups ADD COLUMN source TEXT NOT NULL DEFAULT 'local' CHECK (source IN ('local', 'ldap'));
+	ALTER TABLE groups ADD COLUMN ldap_id TEXT NOT NULL DEFAULT '';
+	CREATE UNIQUE INDEX groups_ldap ON groups(ldap_id) WHERE source = 'ldap';
+	CREATE VIEW soma_access (soma_id, user_id, role) AS
+		SELECT soma_id, user_id, role FROM soma_members
+		UNION ALL
+		SELECT g.soma_id, m.user_id, g.role FROM soma_groups g JOIN group_members m ON m.group_id = g.group_id
+		UNION ALL
+		SELECT g.soma_id, u.id, g.role FROM soma_groups g JOIN groups e ON e.id = g.group_id AND e.everyone = 1
+			CROSS JOIN users u WHERE u.disabled = 0;`,
 }
+
+// rebuilds are the migrations (by index) that recreate a table others refer
+// to. SQLite needs foreign key enforcement off for that, which cannot be
+// switched inside a transaction: they run on a connection of their own, and
+// the result is checked with foreign_key_check before it is committed.
+var rebuilds = map[int]bool{3: true}
 
 // Store is the state database.
 type Store struct {
@@ -193,19 +238,7 @@ func (s *Store) migrate(file string) error {
 		s.log.Info("state backed up before migration", "file", backup)
 	}
 	for v := version; v < len(migrations); v++ {
-		tx, err := s.db.Begin()
-		if err != nil {
-			return err
-		}
-		if _, err := tx.Exec(migrations[v]); err != nil {
-			tx.Rollback()
-			return fmt.Errorf("migrate state to version %d: %w", v+1, err)
-		}
-		if _, err := tx.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, v+1)); err != nil {
-			tx.Rollback()
-			return err
-		}
-		if err := tx.Commit(); err != nil {
+		if err := s.migrateTo(v); err != nil {
 			return err
 		}
 	}
@@ -225,6 +258,45 @@ func fromUnix(v int64) time.Time {
 }
 
 // isUnique reports whether err is a UNIQUE constraint violation.
+// migrateTo applies migration v (to version v+1) in one transaction.
+func (s *Store) migrateTo(v int) error {
+	ctx := context.Background()
+	conn, err := s.db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	if rebuilds[v] {
+		if _, err := conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); err != nil {
+			return err
+		}
+		defer conn.ExecContext(ctx, `PRAGMA foreign_keys = ON`)
+	}
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, migrations[v]); err != nil {
+		return fmt.Errorf("migrate state to version %d: %w", v+1, err)
+	}
+	if rebuilds[v] {
+		rows, err := tx.QueryContext(ctx, `PRAGMA foreign_key_check`)
+		if err != nil {
+			return err
+		}
+		broken := rows.Next()
+		rows.Close()
+		if broken {
+			return fmt.Errorf("migrate state to version %d: foreign keys broken", v+1)
+		}
+	}
+	if _, err := tx.ExecContext(ctx, fmt.Sprintf(`PRAGMA user_version = %d`, v+1)); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func isUnique(err error) bool {
 	var e *sqlite3.Error
 	return errors.As(err, &e) && e.ExtendedCode() == sqlite3.CONSTRAINT_UNIQUE

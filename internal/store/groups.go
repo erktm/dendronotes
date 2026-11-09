@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -14,6 +15,9 @@ type Group struct {
 	ID       int64  `json:"id"`
 	Name     string `json:"name"`
 	Everyone bool   `json:"everyone"`
+	// Source is "local" or "ldap": groups from the directory get their name
+	// and members from there.
+	Source string `json:"source"`
 	// Members counts the accounts in the group (for Everyone: all enabled ones).
 	Members   int       `json:"members"`
 	CreatedAt time.Time `json:"createdAt"`
@@ -28,7 +32,11 @@ type GroupGrant struct {
 // ErrBuiltinGroup refuses changes to the Everyone group.
 var ErrBuiltinGroup = errors.New("the Everyone group cannot be changed")
 
-const groupCols = `g.id, g.name, g.everyone, g.created_at,
+// ErrDirectoryGroup refuses changes to name or members of a group that comes
+// from Active Directory / LDAP.
+var ErrDirectoryGroup = errors.New("the group is managed in the directory")
+
+const groupCols = `g.id, g.name, g.everyone, g.source, g.created_at,
 	CASE WHEN g.everyone = 1 THEN (SELECT COUNT(*) FROM users WHERE disabled = 0)
 	ELSE (SELECT COUNT(*) FROM group_members m WHERE m.group_id = g.id) END`
 
@@ -37,7 +45,7 @@ func scanGroup(row interface{ Scan(...any) error }, extra ...any) (Group, error)
 		g       Group
 		created int64
 	)
-	err := row.Scan(append([]any{&g.ID, &g.Name, &g.Everyone, &created, &g.Members}, extra...)...)
+	err := row.Scan(append([]any{&g.ID, &g.Name, &g.Everyone, &g.Source, &created, &g.Members}, extra...)...)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Group{}, ErrNotFound
 	}
@@ -92,13 +100,17 @@ func (s *Store) CreateGroup(ctx context.Context, name string) (Group, error) {
 	return s.GroupByID(ctx, id)
 }
 
-// changeable returns ErrNotFound for unknown groups and ErrBuiltinGroup for
-// Everyone.
+// changeable returns ErrNotFound for unknown groups, ErrBuiltinGroup for
+// Everyone and – unless directory groups are fine – ErrDirectoryGroup for
+// groups from LDAP.
 func (s *Store) changeable(ctx context.Context, q interface {
 	QueryRowContext(context.Context, string, ...any) *sql.Row
-}, id int64) error {
-	var everyone bool
-	err := q.QueryRowContext(ctx, `SELECT everyone FROM groups WHERE id = ?`, id).Scan(&everyone)
+}, id int64, directoryOK bool) error {
+	var (
+		everyone bool
+		source   string
+	)
+	err := q.QueryRowContext(ctx, `SELECT everyone, source FROM groups WHERE id = ?`, id).Scan(&everyone, &source)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound
 	}
@@ -108,12 +120,15 @@ func (s *Store) changeable(ctx context.Context, q interface {
 	if everyone {
 		return ErrBuiltinGroup
 	}
+	if source == "ldap" && !directoryOK {
+		return ErrDirectoryGroup
+	}
 	return nil
 }
 
 // RenameGroup changes a group's name.
 func (s *Store) RenameGroup(ctx context.Context, id int64, name string) (Group, error) {
-	if err := s.changeable(ctx, s.db, id); err != nil {
+	if err := s.changeable(ctx, s.db, id, false); err != nil {
 		return Group{}, err
 	}
 	_, err := s.db.ExecContext(ctx, `UPDATE groups SET name = ? WHERE id = ?`, name, id)
@@ -128,7 +143,7 @@ func (s *Store) RenameGroup(ctx context.Context, id int64, name string) (Group, 
 
 // DeleteGroup removes a group, its members and the somas shared with it.
 func (s *Store) DeleteGroup(ctx context.Context, id int64) error {
-	if err := s.changeable(ctx, s.db, id); err != nil {
+	if err := s.changeable(ctx, s.db, id, true); err != nil {
 		return err
 	}
 	_, err := s.db.ExecContext(ctx, `DELETE FROM groups WHERE id = ?`, id)
@@ -137,7 +152,7 @@ func (s *Store) DeleteGroup(ctx context.Context, id int64) error {
 
 // GroupMembers lists the accounts in a group (not for Everyone).
 func (s *Store) GroupMembers(ctx context.Context, id int64) ([]Person, error) {
-	if err := s.changeable(ctx, s.db, id); err != nil {
+	if err := s.changeable(ctx, s.db, id, true); err != nil {
 		return nil, err
 	}
 	rows, err := s.db.QueryContext(ctx, `SELECT u.id, u.username, u.display_name, u.avatar_style, u.avatar_photo
@@ -167,7 +182,7 @@ func (s *Store) GroupMembers(ctx context.Context, id int64) ([]Person, error) {
 // AddGroupMember puts an account into a group (nothing happens if it is in
 // already); ErrNotFound for an unknown account.
 func (s *Store) AddGroupMember(ctx context.Context, groupID, userID int64) error {
-	if err := s.changeable(ctx, s.db, groupID); err != nil {
+	if err := s.changeable(ctx, s.db, groupID, false); err != nil {
 		return err
 	}
 	if _, err := s.UserByID(ctx, userID); err != nil {
@@ -180,7 +195,7 @@ func (s *Store) AddGroupMember(ctx context.Context, groupID, userID int64) error
 
 // RemoveGroupMember takes an account out of a group.
 func (s *Store) RemoveGroupMember(ctx context.Context, groupID, userID int64) error {
-	if err := s.changeable(ctx, s.db, groupID); err != nil {
+	if err := s.changeable(ctx, s.db, groupID, false); err != nil {
 		return err
 	}
 	_, err := s.db.ExecContext(ctx, `DELETE FROM group_members WHERE group_id = ? AND user_id = ?`, groupID, userID)
@@ -246,4 +261,106 @@ func (s *Store) GroupSomas(ctx context.Context, groupID int64) ([]string, error)
 		out = append(out, id)
 	}
 	return out, rows.Err()
+}
+
+// DirectoryGroup is a group of an account in Active Directory / LDAP.
+type DirectoryGroup struct {
+	ID   string // stable id (objectGUID), else the DN
+	Name string
+}
+
+// SyncDirectoryGroups makes the account a member of exactly these directory
+// groups: missing groups are created (with " (AD)" when a local group has
+// the name), renamed ones follow, and memberships in other directory groups
+// end. Local groups are not touched. It returns the groups whose members
+// changed.
+func (s *Store) SyncDirectoryGroups(ctx context.Context, userID int64, groups []DirectoryGroup) ([]int64, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	keep := map[int64]bool{}
+	var changed []int64
+	for _, dg := range groups {
+		id, err := s.directoryGroup(ctx, tx, dg)
+		if err != nil {
+			return nil, err
+		}
+		keep[id] = true
+		res, err := tx.ExecContext(ctx, `INSERT INTO group_members (group_id, user_id) VALUES (?, ?)
+			ON CONFLICT(group_id, user_id) DO NOTHING`, id, userID)
+		if err != nil {
+			return nil, err
+		}
+		if n, _ := res.RowsAffected(); n > 0 {
+			changed = append(changed, id)
+		}
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT m.group_id FROM group_members m JOIN groups g ON g.id = m.group_id
+		WHERE m.user_id = ? AND g.source = 'ldap'`, userID)
+	if err != nil {
+		return nil, err
+	}
+	var leave []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if !keep[id] {
+			leave = append(leave, id)
+		}
+	}
+	rows.Close()
+	for _, id := range leave {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM group_members WHERE group_id = ? AND user_id = ?`, id, userID); err != nil {
+			return nil, err
+		}
+		changed = append(changed, id)
+	}
+	return changed, tx.Commit()
+}
+
+// directoryGroup finds or creates the group of a directory group and keeps
+// its name in step.
+func (s *Store) directoryGroup(ctx context.Context, tx *sql.Tx, dg DirectoryGroup) (int64, error) {
+	var (
+		id   int64
+		name string
+	)
+	err := tx.QueryRowContext(ctx, `SELECT id, name FROM groups WHERE source = 'ldap' AND ldap_id = ?`, dg.ID).Scan(&id, &name)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return 0, err
+	}
+	exists := err == nil
+	if exists && strings.EqualFold(name, dg.Name) {
+		return id, nil
+	}
+	for i := 1; i <= 50; i++ {
+		candidate := dg.Name
+		if i == 2 {
+			candidate += " (AD)"
+		} else if i > 2 {
+			candidate += fmt.Sprintf(" (AD %d)", i-1)
+		}
+		if exists {
+			if strings.EqualFold(candidate, name) {
+				return id, nil // renamed to a taken name: keep the current one
+			}
+			_, err = tx.ExecContext(ctx, `UPDATE groups SET name = ? WHERE id = ?`, candidate, id)
+		} else {
+			var res sql.Result
+			res, err = tx.ExecContext(ctx, `INSERT INTO groups (name, source, ldap_id, created_at) VALUES (?, 'ldap', ?, ?)`,
+				candidate, dg.ID, s.unixNow())
+			if err == nil {
+				id, _ = res.LastInsertId()
+			}
+		}
+		if !isUnique(err) {
+			return id, err
+		}
+	}
+	return 0, fmt.Errorf("no free name for directory group %q", dg.Name)
 }

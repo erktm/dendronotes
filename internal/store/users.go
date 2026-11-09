@@ -27,6 +27,7 @@ const (
 	SourceLocal Source = "local" // password stored here
 	SourceOIDC  Source = "oidc"  // OpenID Connect provider (Keycloak)
 	SourceProxy Source = "proxy" // header from an authenticating proxy
+	SourceLDAP  Source = "ldap"  // Active Directory / LDAP (password checked there)
 )
 
 // User is an account.
@@ -40,6 +41,7 @@ type User struct {
 	PasswordHash string    `json:"-"`
 	OIDCIssuer   string    `json:"-"`
 	OIDCSubject  string    `json:"-"`
+	LDAPID       string    `json:"-"` // the directory's id (objectGUID) for SourceLDAP
 	Disabled     bool      `json:"disabled"`
 	CreatedAt    time.Time `json:"createdAt"`
 	LastLoginAt  time.Time `json:"lastLoginAt"`
@@ -54,7 +56,7 @@ func (u User) Name() string {
 	return u.Username
 }
 
-const userCols = `id, username, display_name, email, role, source, password_hash, oidc_issuer, oidc_subject, disabled, created_at, last_login_at, avatar_style, avatar_photo`
+const userCols = `id, username, display_name, email, role, source, password_hash, oidc_issuer, oidc_subject, ldap_id, disabled, created_at, last_login_at, avatar_style, avatar_photo`
 
 func scanUser(row interface{ Scan(...any) error }) (User, error) {
 	var (
@@ -64,7 +66,7 @@ func scanUser(row interface{ Scan(...any) error }) (User, error) {
 		photo          int64
 	)
 	err := row.Scan(&u.ID, &u.Username, &u.DisplayName, &u.Email, &u.Role, &u.Source, &u.PasswordHash,
-		&u.OIDCIssuer, &u.OIDCSubject, &u.Disabled, &created, &login, &style, &photo)
+		&u.OIDCIssuer, &u.OIDCSubject, &u.LDAPID, &u.Disabled, &created, &login, &style, &photo)
 	if errors.Is(err, sql.ErrNoRows) {
 		return User{}, ErrNotFound
 	}
@@ -77,9 +79,9 @@ func scanUser(row interface{ Scan(...any) error }) (User, error) {
 // or the OIDC identity exists already.
 func (s *Store) CreateUser(ctx context.Context, u User) (User, error) {
 	res, err := s.db.ExecContext(ctx, `INSERT INTO users
-		(username, display_name, email, role, source, password_hash, oidc_issuer, oidc_subject, disabled, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		u.Username, u.DisplayName, u.Email, u.Role, u.Source, u.PasswordHash, u.OIDCIssuer, u.OIDCSubject, u.Disabled, s.unixNow())
+		(username, display_name, email, role, source, password_hash, oidc_issuer, oidc_subject, ldap_id, disabled, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		u.Username, u.DisplayName, u.Email, u.Role, u.Source, u.PasswordHash, u.OIDCIssuer, u.OIDCSubject, u.LDAPID, u.Disabled, s.unixNow())
 	if isUnique(err) {
 		return User{}, ErrTaken
 	}
@@ -118,6 +120,11 @@ func (s *Store) UserByLogin(ctx context.Context, login string) (User, error) {
 		return User{}, ErrNotFound
 	}
 	return found[0], nil
+}
+
+// UserByLDAP returns the account of a directory id (objectGUID).
+func (s *Store) UserByLDAP(ctx context.Context, id string) (User, error) {
+	return scanUser(s.db.QueryRowContext(ctx, `SELECT `+userCols+` FROM users WHERE source = 'ldap' AND ldap_id = ?`, id))
 }
 
 // UserByOIDC returns the account of an OpenID Connect identity.
@@ -308,7 +315,7 @@ func (s *Store) LookupSession(ctx context.Context, token string, ttl time.Durati
 		photo          int64
 	)
 	err := row.Scan(&sid, &expires, &seen, &u.ID, &u.Username, &u.DisplayName, &u.Email, &u.Role, &u.Source,
-		&u.PasswordHash, &u.OIDCIssuer, &u.OIDCSubject, &u.Disabled, &created, &login, &style, &photo)
+		&u.PasswordHash, &u.OIDCIssuer, &u.OIDCSubject, &u.LDAPID, &u.Disabled, &created, &login, &style, &photo)
 	if err != nil {
 		return User{}, 0, false
 	}
