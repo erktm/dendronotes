@@ -165,6 +165,18 @@
   /** An editable note is open (not loading, missing or an attachment). */
   const noteReady = $derived(app.note?.status === 'ready')
 
+  // One panel beside the note at a time: comments take the place of the
+  // details (outline, synapses) while they are open.
+  const detailsShown = $derived(settings.showDetails && !app.commentsOpen)
+  function toggleDetails() {
+    if (app.commentsOpen) {
+      app.commentsOpen = false
+      settings.showDetails = true
+    } else {
+      settings.showDetails = !settings.showDetails
+    }
+  }
+
   // The comments of the open note (also for the count in the top bar),
   // again when someone changed them or the connection came back.
   $effect(() => {
@@ -314,11 +326,11 @@
           <button
             type="button"
             class="icon-btn"
-            class:on={settings.showDetails}
-            aria-pressed={settings.showDetails}
-            aria-label={settings.showDetails ? strings.view.hideDetails : strings.view.showDetails}
-            title={settings.showDetails ? strings.view.hideDetails : strings.view.showDetails}
-            onclick={() => (settings.showDetails = !settings.showDetails)}
+            class:on={detailsShown}
+            aria-pressed={detailsShown}
+            aria-label={detailsShown ? strings.view.hideDetails : strings.view.showDetails}
+            title={detailsShown ? strings.view.hideDetails : strings.view.showDetails}
+            onclick={toggleDetails}
           >
             <Icon name="panel" size={18} />
           </button>
