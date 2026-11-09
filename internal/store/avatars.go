@@ -165,10 +165,11 @@ func (s *Store) AvatarPhoto(ctx context.Context, id int64) ([]byte, int64, error
 	return image, version, err
 }
 
-// SharesSoma reports whether two accounts are members of a common soma.
+// SharesSoma reports whether two accounts both have access to a common soma
+// (personally, through a group or because it is shared with everyone).
 func (s *Store) SharesSoma(ctx context.Context, a, b int64) (bool, error) {
 	var n int
-	err := s.db.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM soma_members x
-		JOIN soma_members y ON y.soma_id = x.soma_id WHERE x.user_id = ? AND y.user_id = ?)`, a, b).Scan(&n)
+	err := s.db.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM soma_access x
+		JOIN soma_access y ON y.soma_id = x.soma_id WHERE x.user_id = ? AND y.user_id = ?)`, a, b).Scan(&n)
 	return n == 1, err
 }

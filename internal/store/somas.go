@@ -8,24 +8,46 @@ import (
 	"time"
 )
 
-// Member roles in a soma.
+// Member roles in a soma, from most to least; each includes the ones below.
 const (
-	MemberOwner  = "owner"  // everything, including sharing and deleting
-	MemberEditor = "editor" // read and write notes and attachments
-	MemberViewer = "viewer" // read only
+	MemberOwner       = "owner"       // everything, including sharing, renaming and deleting the soma
+	MemberEditor      = "editor"      // also rename, move and delete notes, folders and files
+	MemberContributor = "contributor" // also create notes, folders and files
+	MemberWriter      = "writer"      // change existing notes
+	MemberViewer      = "viewer"      // read only
 )
 
-// RoleRank orders member roles: a role satisfies every role of lower rank.
+var roleOrder = []string{MemberViewer, MemberWriter, MemberContributor, MemberEditor, MemberOwner}
+
+// RoleRank orders member roles: a role satisfies every role of lower rank;
+// 0 means no access.
 func RoleRank(role string) int {
-	switch role {
-	case MemberOwner:
-		return 3
-	case MemberEditor:
-		return 2
-	case MemberViewer:
-		return 1
+	for i, r := range roleOrder {
+		if r == role {
+			return i + 1
+		}
 	}
 	return 0
+}
+
+// roleOfRank is the inverse of RoleRank ("" for 0).
+func roleOfRank(rank int) string {
+	if rank < 1 || rank > len(roleOrder) {
+		return ""
+	}
+	return roleOrder[rank-1]
+}
+
+// IsShareRole reports whether a role can be given to people and groups (all
+// but owner, which belongs to exactly one account).
+func IsShareRole(role string) bool {
+	return role != MemberOwner && RoleRank(role) > 0
+}
+
+// rankSQL turns a role column into its RoleRank in SQL.
+func rankSQL(col string) string {
+	return `CASE ` + col + ` WHEN 'owner' THEN 5 WHEN 'editor' THEN 4 WHEN 'contributor' THEN 3
+		WHEN 'writer' THEN 2 WHEN 'viewer' THEN 1 ELSE 0 END`
 }
 
 // Soma is a registered soma: a folder of notes with an owner.
@@ -50,8 +72,13 @@ type Person struct {
 // Membership is a soma as one user sees it.
 type Membership struct {
 	Soma
-	Role  string `json:"role"`
-	Owner Person `json:"owner"`
+	// Role is the effective role: the highest of the direct share and the
+	// groups the user is in.
+	Role string `json:"role"`
+	// Direct is true when the soma is shared with the user personally (only
+	// then can they leave it).
+	Direct bool   `json:"direct"`
+	Owner  Person `json:"owner"`
 }
 
 // SomaInfo is a soma for the admin area.
@@ -59,6 +86,7 @@ type SomaInfo struct {
 	Soma
 	Owner   Person `json:"owner"`
 	Members int    `json:"members"`
+	Groups  int    `json:"groups"`
 }
 
 // Member is a person with access to a soma.
@@ -129,23 +157,30 @@ func (s *Store) CountSomas(ctx context.Context) (int, error) {
 	return n, err
 }
 
-// SomasOf lists the somas a user can open, by name.
+// SomasOf lists the somas a user can open – shared personally, with one of
+// their groups or with everyone – by name.
 func (s *Store) SomasOf(ctx context.Context, userID int64) ([]Membership, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT `+somaCols+`, m.role, o.id, o.username, o.display_name
-		FROM soma_members m JOIN somas s ON s.id = m.soma_id JOIN users o ON o.id = s.owner_id
-		WHERE m.user_id = ? ORDER BY s.name COLLATE NOCASE, s.id`, userID)
+	rows, err := s.db.QueryContext(ctx, `SELECT `+somaCols+`, a.rank,
+		EXISTS (SELECT 1 FROM soma_members d WHERE d.soma_id = s.id AND d.user_id = ?),
+		o.id, o.username, o.display_name
+		FROM (SELECT soma_id, MAX(`+rankSQL("role")+`) AS rank FROM soma_access WHERE user_id = ? GROUP BY soma_id) a
+		JOIN somas s ON s.id = a.soma_id JOIN users o ON o.id = s.owner_id
+		ORDER BY s.name COLLATE NOCASE, s.id`, userID, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	out := []Membership{}
 	for rows.Next() {
-		var m Membership
-		soma, err := scanSoma(rows, &m.Role, &m.Owner.ID, &m.Owner.Username, &m.Owner.DisplayName)
+		var (
+			m    Membership
+			rank int
+		)
+		soma, err := scanSoma(rows, &rank, &m.Direct, &m.Owner.ID, &m.Owner.Username, &m.Owner.DisplayName)
 		if err != nil {
 			return nil, err
 		}
-		m.Soma = soma
+		m.Soma, m.Role = soma, roleOfRank(rank)
 		out = append(out, m)
 	}
 	return out, rows.Err()
@@ -154,7 +189,8 @@ func (s *Store) SomasOf(ctx context.Context, userID int64) ([]Membership, error)
 // AllSomas lists every soma (admin area).
 func (s *Store) AllSomas(ctx context.Context) ([]SomaInfo, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT `+somaCols+`, o.id, o.username, o.display_name,
-		(SELECT COUNT(*) FROM soma_members m WHERE m.soma_id = s.id)
+		(SELECT COUNT(*) FROM soma_members m WHERE m.soma_id = s.id),
+		(SELECT COUNT(*) FROM soma_groups g WHERE g.soma_id = s.id)
 		FROM somas s JOIN users o ON o.id = s.owner_id ORDER BY s.name COLLATE NOCASE, s.id`)
 	if err != nil {
 		return nil, err
@@ -163,7 +199,7 @@ func (s *Store) AllSomas(ctx context.Context) ([]SomaInfo, error) {
 	out := []SomaInfo{}
 	for rows.Next() {
 		var x SomaInfo
-		soma, err := scanSoma(rows, &x.Owner.ID, &x.Owner.Username, &x.Owner.DisplayName, &x.Members)
+		soma, err := scanSoma(rows, &x.Owner.ID, &x.Owner.Username, &x.Owner.DisplayName, &x.Members, &x.Groups)
 		if err != nil {
 			return nil, err
 		}
@@ -245,7 +281,18 @@ func (s *Store) TransferSoma(ctx context.Context, id string, newOwner int64) err
 	return tx.Commit()
 }
 
-// MemberRole returns the role of a user in a soma ("" if none).
+// EffectiveRole returns what a user may do in a soma: the highest role of the
+// personal share and the shares with their groups and with everyone ("" if
+// none).
+func (s *Store) EffectiveRole(ctx context.Context, somaID string, userID int64) (string, error) {
+	var rank int
+	err := s.db.QueryRowContext(ctx, `SELECT COALESCE(MAX(`+rankSQL("role")+`), 0) FROM soma_access
+		WHERE soma_id = ? AND user_id = ?`, somaID, userID).Scan(&rank)
+	return roleOfRank(rank), err
+}
+
+// MemberRole returns the role a soma is shared with a user personally ("" if
+// none); EffectiveRole includes groups.
 func (s *Store) MemberRole(ctx context.Context, somaID string, userID int64) (string, error) {
 	var role string
 	err := s.db.QueryRowContext(ctx, `SELECT role FROM soma_members WHERE soma_id = ? AND user_id = ?`, somaID, userID).Scan(&role)
@@ -259,7 +306,7 @@ func (s *Store) MemberRole(ctx context.Context, somaID string, userID int64) (st
 func (s *Store) Members(ctx context.Context, somaID string) ([]Member, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT u.id, u.username, u.display_name, u.avatar_style, u.avatar_photo, m.role
 		FROM soma_members m JOIN users u ON u.id = m.user_id WHERE m.soma_id = ?
-		ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'editor' THEN 1 ELSE 2 END, u.username COLLATE NOCASE`, somaID)
+		ORDER BY `+rankSQL("m.role")+` DESC, u.username COLLATE NOCASE`, somaID)
 	if err != nil {
 		return nil, err
 	}
@@ -283,7 +330,7 @@ func (s *Store) Members(ctx context.Context, somaID string) ([]Member, error) {
 
 // SetMember gives a user a role in a soma (not the owner role: see TransferSoma).
 func (s *Store) SetMember(ctx context.Context, somaID string, userID int64, role string) error {
-	if role != MemberEditor && role != MemberViewer {
+	if !IsShareRole(role) {
 		return errors.New("invalid member role")
 	}
 	_, err := s.db.ExecContext(ctx, `INSERT INTO soma_members (soma_id, user_id, role) VALUES (?, ?, ?)

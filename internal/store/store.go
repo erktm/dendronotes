@@ -90,6 +90,46 @@ var migrations = []string{
 		user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
 		image   BLOB NOT NULL
 	);`,
+	// 3: finer roles (writer, contributor), groups with the built-in Everyone,
+	// somas shared with groups; soma_access is every way to a soma.
+	`CREATE TABLE groups (
+		id         INTEGER PRIMARY KEY,
+		name       TEXT NOT NULL UNIQUE COLLATE NOCASE,
+		everyone   INTEGER NOT NULL DEFAULT 0,
+		created_at INTEGER NOT NULL
+	);
+	CREATE UNIQUE INDEX groups_everyone ON groups(everyone) WHERE everyone = 1;
+	INSERT INTO groups (name, everyone, created_at) VALUES ('Everyone', 1, CAST(strftime('%s', 'now') AS INTEGER));
+	CREATE TABLE group_members (
+		group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+		user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		PRIMARY KEY (group_id, user_id)
+	);
+	CREATE INDEX group_members_user ON group_members(user_id);
+	CREATE TABLE soma_groups (
+		soma_id  TEXT NOT NULL REFERENCES somas(id) ON DELETE CASCADE,
+		group_id INTEGER NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+		role     TEXT NOT NULL CHECK (role IN ('editor', 'contributor', 'writer', 'viewer')),
+		PRIMARY KEY (soma_id, group_id)
+	);
+	CREATE INDEX soma_groups_group ON soma_groups(group_id);
+	CREATE TABLE soma_members_v3 (
+		soma_id TEXT NOT NULL REFERENCES somas(id) ON DELETE CASCADE,
+		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		role    TEXT NOT NULL CHECK (role IN ('owner', 'editor', 'contributor', 'writer', 'viewer')),
+		PRIMARY KEY (soma_id, user_id)
+	);
+	INSERT INTO soma_members_v3 (soma_id, user_id, role) SELECT soma_id, user_id, role FROM soma_members;
+	DROP TABLE soma_members;
+	ALTER TABLE soma_members_v3 RENAME TO soma_members;
+	CREATE INDEX soma_members_user ON soma_members(user_id);
+	CREATE VIEW soma_access (soma_id, user_id, role) AS
+		SELECT soma_id, user_id, role FROM soma_members
+		UNION ALL
+		SELECT g.soma_id, m.user_id, g.role FROM soma_groups g JOIN group_members m ON m.group_id = g.group_id
+		UNION ALL
+		SELECT g.soma_id, u.id, g.role FROM soma_groups g JOIN groups e ON e.id = g.group_id AND e.everyone = 1
+			CROSS JOIN users u WHERE u.disabled = 0;`,
 }
 
 // Store is the state database.
