@@ -1,3 +1,7 @@
+# github.com/Azure/go-ntlmssp v0.1.1
+## explicit; go 1.24
+github.com/Azure/go-ntlmssp
+github.com/Azure/go-ntlmssp/internal/md4
 # github.com/coreos/go-oidc/v3 v3.21.0
 ## explicit; go 1.25.0
 github.com/coreos/go-oidc/v3/oidc
@@ -5,11 +9,20 @@ github.com/coreos/go-oidc/v3/oidc
 ## explicit; go 1.23
 github.com/fsnotify/fsnotify
 github.com/fsnotify/fsnotify/internal
+# github.com/go-asn1-ber/asn1-ber v1.5.8
+## explicit; go 1.13
+github.com/go-asn1-ber/asn1-ber
 # github.com/go-jose/go-jose/v4 v4.1.4
 ## explicit; go 1.24.0
 github.com/go-jose/go-jose/v4
 github.com/go-jose/go-jose/v4/cipher
 github.com/go-jose/go-jose/v4/json
+# github.com/go-ldap/ldap/v3 v3.4.15
+## explicit; go 1.26.0
+github.com/go-ldap/ldap/v3
+# github.com/google/uuid v1.6.0
+## explicit
+github.com/google/uuid
 # github.com/ncruces/go-sqlite3 v0.36.0
 ## explicit; go 1.26.0
 github.com/ncruces/go-sqlite3
@@ -34,6 +47,7 @@ github.com/ncruces/julianday
 ## explicit; go 1.26.0
 golang.org/x/crypto/argon2
 golang.org/x/crypto/blake2b
+golang.org/x/crypto/md4
 # golang.org/x/oauth2 v0.37.0
 ## explicit; go 1.26.0
 golang.org/x/oauth2
