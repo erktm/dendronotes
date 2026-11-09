@@ -2,8 +2,8 @@ package auth
 
 import (
 	"context"
-	"errors"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http/httptest"
