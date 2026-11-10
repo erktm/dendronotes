@@ -1,0 +1,49 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://github.com/erktm/dendronotes/security/vex/2026-11-10",
+  "author": "Erik Haeger",
+  "role": "Project maintainer",
+  "timestamp": "2026-11-10T09:30:00Z",
+  "version": 1,
+  "tooling": "govulncheck v1.9.0 (vulndb 2026-11-05), npm audit",
+  "statements": [
+    {
+      "vulnerability": {
+        "name": "GO-2026-5932",
+        "description": "The golang.org/x/crypto/openpgp package is unmaintained and unsafe by design."
+      },
+      "products": [
+        {
+          "@id": "pkg:github/erktm/dendronotes@v0.1.0",
+          "subcomponents": [
+            {
+              "@id": "pkg:golang/golang.org/x/crypto@v0.58.0"
+            }
+          ]
+        }
+      ],
+      "status": "not_affected",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "Only the packages argon2 and blake2b (password hashing) and md4 (NTLM sign-in of the LDAP client) of golang.org/x/crypto are compiled in, as vendor/modules.txt shows. The openpgp package is not imported, so its code is not part of dendronotes. govulncheck reports the finding at module level only."
+    },
+    {
+      "vulnerability": {
+        "name": "GHSA-gcqx-w48m-w2h4",
+        "description": "deepmerge mergeObject() allows prototype poisoning of returned objects."
+      },
+      "products": [
+        {
+          "@id": "pkg:github/erktm/dendronotes@v0.1.0",
+          "subcomponents": [
+            {
+              "@id": "pkg:npm/deepmerge"
+            }
+          ]
+        }
+      ],
+      "status": "not_affected",
+      "justification": "component_not_present",
+      "impact_statement": "deepmerge is used by @sveltejs/vite-plugin-svelte while the web interface is built. It is a build tool dependency and is not part of the shipped bundle, binary or image."
+    }
+  ]
+}

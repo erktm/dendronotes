@@ -4,6 +4,9 @@ module dendronotes
 // since 1.25). The container image is built with the current Go release.
 go 1.26.0
 
+// The release the binaries and the image are built with (CI, SBOM).
+toolchain go1.27.3
+
 require (
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/fsnotify/fsnotify v1.10.1

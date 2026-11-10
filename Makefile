@@ -1,4 +1,4 @@
-# dendronotes – build and development tasks. `make help` lists all targets.
+# dendronotes: build and development tasks. `make help` lists all targets.
 
 VERSION           ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 SOURCE_DATE_EPOCH ?= $(shell git log -1 --format=%ct 2>/dev/null || echo 0)
@@ -17,7 +17,7 @@ DEV_ENV       = DENDRONOTES_SOMAS_DIR=$(DEV_SOMAS) DENDRONOTES_SOMA_DIR=$(DEV_SO
 NPM_DEPS := web/node_modules/.package-lock.json
 
 .PHONY: help dev dev-ports dev-setup dev-api dev-web web build test test-go test-web fuzz \
-        vendor vendor-go vendor-npm image image-offline run-image audit clean
+        vendor vendor-go vendor-npm image image-offline run-image audit vulncheck sbom clean
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*## "}{printf "  \033[1m%-14s\033[0m %s\n", $$1, $$2}'
@@ -88,6 +88,17 @@ fuzz: ## Fuzz the soma path validation for 60 seconds
 
 audit: $(NPM_DEPS) ## Check npm dependencies for known vulnerabilities (needs network)
 	cd web && npm audit --audit-level=moderate
+
+GOVULNCHECK ?= go run golang.org/x/vuln/cmd/govulncheck@v1.9.0
+
+vulncheck: $(NPM_DEPS) ## Scan Go and npm dependencies; fail on findings without a VEX statement (needs network)
+	@mkdir -p bin
+	$(GOVULNCHECK) -format json ./... > bin/govulncheck.json
+	cd web && npm audit --json > ../bin/npm-audit.json || true
+	node scripts/vex-check.mjs bin/govulncheck.json bin/npm-audit.json
+
+sbom: ## Write the software bill of materials (security/sbom.cdx.json)
+	node scripts/sbom.mjs $(VERSION) > security/sbom.cdx.json
 
 # --- Air gap / vendoring -------------------------------------------------------------
 

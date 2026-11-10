@@ -1,0 +1,1463 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "serialNumber": "urn:uuid:6d7644f8-87bb-51a9-bc00-a31bb2bd7d05",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-11-10T09:29:17Z",
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "name": "dendronotes scripts/sbom.mjs"
+        }
+      ]
+    },
+    "component": {
+      "type": "application",
+      "bom-ref": "pkg:github/erktm/dendronotes@v0.1.0",
+      "name": "dendronotes",
+      "version": "0.1.0",
+      "description": "Self-hosted Markdown notes",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ],
+      "purl": "pkg:github/erktm/dendronotes@v0.1.0",
+      "externalReferences": [
+        {
+          "type": "vcs",
+          "url": "https://github.com/erktm/dendronotes"
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/github.com/Azure/go-ntlmssp@v0.1.1",
+      "name": "github.com/Azure/go-ntlmssp",
+      "version": "v0.1.1",
+      "purl": "pkg:golang/github.com/Azure/go-ntlmssp@v0.1.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/github.com/coreos/go-oidc/v3@v3.21.0",
+      "name": "github.com/coreos/go-oidc/v3",
+      "version": "v3.21.0",
+      "purl": "pkg:golang/github.com/coreos/go-oidc/v3@v3.21.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/github.com/fsnotify/fsnotify@v1.10.1",
+      "name": "github.com/fsnotify/fsnotify",
+      "version": "v1.10.1",
+      "purl": "pkg:golang/github.com/fsnotify/fsnotify@v1.10.1",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/github.com/go-asn1-ber/asn1-ber@v1.5.8",
+      "name": "github.com/go-asn1-ber/asn1-ber",
+      "version": "v1.5.8",
+      "purl": "pkg:golang/github.com/go-asn1-ber/asn1-ber@v1.5.8",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/github.com/go-jose/go-jose/v4@v4.1.4",
+      "name": "github.com/go-jose/go-jose/v4",
+      "version": "v4.1.4",
+      "purl": "pkg:golang/github.com/go-jose/go-jose/v4@v4.1.4",
+      "licenses": [
+        {
+          "license": {
+            "id": "Apache-2.0"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/github.com/go-ldap/ldap/v3@v3.4.15",
+      "name": "github.com/go-ldap/ldap/v3",
+      "version": "v3.4.15",
+      "purl": "pkg:golang/github.com/go-ldap/ldap/v3@v3.4.15",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/github.com/google/uuid@v1.6.0",
+      "name": "github.com/google/uuid",
+      "version": "v1.6.0",
+      "purl": "pkg:golang/github.com/google/uuid@v1.6.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/github.com/ncruces/go-sqlite3-wasm/v6@v6.4.35401",
+      "name": "github.com/ncruces/go-sqlite3-wasm/v6",
+      "version": "v6.4.35401",
+      "purl": "pkg:golang/github.com/ncruces/go-sqlite3-wasm/v6@v6.4.35401",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/github.com/ncruces/go-sqlite3@v0.36.0",
+      "name": "github.com/ncruces/go-sqlite3",
+      "version": "v0.36.0",
+      "purl": "pkg:golang/github.com/ncruces/go-sqlite3@v0.36.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/github.com/ncruces/julianday@v1.0.0",
+      "name": "github.com/ncruces/julianday",
+      "version": "v1.0.0",
+      "purl": "pkg:golang/github.com/ncruces/julianday@v1.0.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/golang.org/x/crypto@v0.58.0",
+      "name": "golang.org/x/crypto",
+      "version": "v0.58.0",
+      "purl": "pkg:golang/golang.org/x/crypto@v0.58.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/golang.org/x/oauth2@v0.37.0",
+      "name": "golang.org/x/oauth2",
+      "version": "v0.37.0",
+      "purl": "pkg:golang/golang.org/x/oauth2@v0.37.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/golang.org/x/sys@v0.49.0",
+      "name": "golang.org/x/sys",
+      "version": "v0.49.0",
+      "purl": "pkg:golang/golang.org/x/sys@v0.49.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/golang.org/x/term@v0.47.0",
+      "name": "golang.org/x/term",
+      "version": "v0.47.0",
+      "purl": "pkg:golang/golang.org/x/term@v0.47.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/golang.org/x/text@v0.43.0",
+      "name": "golang.org/x/text",
+      "version": "v0.43.0",
+      "purl": "pkg:golang/golang.org/x/text@v0.43.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/golang.org/x/time@v0.16.0",
+      "name": "golang.org/x/time",
+      "version": "v0.16.0",
+      "purl": "pkg:golang/golang.org/x/time@v0.16.0",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:golang/stdlib@v1.27.3",
+      "name": "stdlib",
+      "group": "go",
+      "version": "v1.27.3",
+      "description": "The Go standard library and runtime compiled into the binary",
+      "purl": "pkg:golang/stdlib@v1.27.3",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40codemirror/autocomplete@6.20.4",
+      "name": "@codemirror/autocomplete",
+      "version": "6.20.4",
+      "purl": "pkg:npm/%40codemirror/autocomplete@6.20.4",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "c85f1184e7f6497960d34faab6ea732e1ae095c6aceb56e8a9a38d88d71b3c879b1c2a49a1ca6a4c103a772aed52b40ee3b86ac9375ea1bff75e7622953ed369"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40codemirror/collab@6.1.1",
+      "name": "@codemirror/collab",
+      "version": "6.1.1",
+      "purl": "pkg:npm/%40codemirror/collab@6.1.1",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "b64227f4982e87df227b5d9d6c1b9b6b7944f0b1d491a32b205b8255e54686771273315d2a65f6e6f0b5dbee7cfb2a905b90178b7a72ea3598d16fa37a5ca094"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40codemirror/commands@6.11.1",
+      "name": "@codemirror/commands",
+      "version": "6.11.1",
+      "purl": "pkg:npm/%40codemirror/commands@6.11.1",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "3bfe211b7482d58c1c990d1dd9454d0ecf80b1a3567758875716d378406ea87fba6c4c4088f2b7892fc1be963aad91944402efe190f7b0881c0a646fc377a106"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40codemirror/lang-css@6.3.1",
+      "name": "@codemirror/lang-css",
+      "version": "6.3.1",
+      "purl": "pkg:npm/%40codemirror/lang-css@6.3.1",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "92be5fc011a21ad9b3ea5d0b48921b9e8f50ae27cd314bac8af1db9c0d47e839aacb81d916d7b75002028b1d55b8aa3494c3ca42bdaba81fb40642a2fd2dc48e"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40codemirror/lang-html@6.4.12",
+      "name": "@codemirror/lang-html",
+      "version": "6.4.12",
+      "purl": "pkg:npm/%40codemirror/lang-html@6.4.12",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "a70d91796294a9291bbe1efa4404f8358c62a2046ef8f5a4476ba40303bdb8e82b9bcba2a64ce3b4a2ad369c9e010c073aac44792bc05d9eafaf701fc81f72ff"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40codemirror/lang-javascript@6.2.5",
+      "name": "@codemirror/lang-javascript",
+      "version": "6.2.5",
+      "purl": "pkg:npm/%40codemirror/lang-javascript@6.2.5",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "cc3e1ee664bee7486d4bb17e4d88c13ec8881466a77d5aa0e07c94cfa58d16292038f7f60602a5c7e4d079d235c3a9ff22a4415416c15a618574b07feeec4ee0"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40codemirror/lang-markdown@6.5.2",
+      "name": "@codemirror/lang-markdown",
+      "version": "6.5.2",
+      "purl": "pkg:npm/%40codemirror/lang-markdown@6.5.2",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "03004e764598b80fff59c334c4ee4f7c73d4726cff3b68b9a3436c83553af52208fe5a02265148d51a2677dc69d8761bd64609446668b72a91821b871f99fc2b"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40codemirror/language@6.13.1",
+      "name": "@codemirror/language",
+      "version": "6.13.1",
+      "purl": "pkg:npm/%40codemirror/language@6.13.1",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "cdfbd4dabdd3cb29502cc8ffb5efb90a7434ad2a998bc075a130816d091a81c2d6e1773a8a669beaa37ea44261b2e34e2da26a891c815e9f548560350e156f0f"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40codemirror/lint@6.9.7",
+      "name": "@codemirror/lint",
+      "version": "6.9.7",
+      "purl": "pkg:npm/%40codemirror/lint@6.9.7",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "dbcffe8962d8c4ac6cbc66214982fbcda099a8bcf9f851450eaf6d56cbc6bfd92ff116387c501c849e565fd33762bad195322c1028ec5cfa9e3609d298d3f676"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40codemirror/search@6.7.2",
+      "name": "@codemirror/search",
+      "version": "6.7.2",
+      "purl": "pkg:npm/%40codemirror/search@6.7.2",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "8146246214f6fa7ffe54667ef04cc4e56164619519626d5538a0ee748b0daa1e36b915502746ba62cb3db1d293dcc78e61fb8bd4de80640e7ba336b43b2af42c"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40codemirror/state@6.7.6",
+      "name": "@codemirror/state",
+      "version": "6.7.6",
+      "purl": "pkg:npm/%40codemirror/state@6.7.6",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "900cfe027711b4ab8892779dc53d5bab85f05efe14a3085b9075359b23ebb556ff8d9b48996b95e415f3bf9bcaea2de46000ac76266240a15043932aede956f3"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40codemirror/streamparser@6.0.0",
+      "name": "@codemirror/streamparser",
+      "version": "6.0.0",
+      "purl": "pkg:npm/%40codemirror/streamparser@6.0.0",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "25314f17ac6b7e3b749a77c63e0cdc2e2330626bc8c8d6a88b3a7c058ceff0513c2ab4fa181183675f74aedb7e3bb5a47b7806fcc147ca263d60635e8a6a1fe3"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40codemirror/view@6.43.15",
+      "name": "@codemirror/view",
+      "version": "6.43.15",
+      "purl": "pkg:npm/%40codemirror/view@6.43.15",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "1c7b1fa6a15e1f25cbb3df37a5245edfc5da8ecd2f156650d81b97d26eca8bcc378d9e620fc72e477941cf6ff9fd7e770e17f7d920472a1eabb524c1ead29e1b"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40fontsource-variable/inter@5.3.0",
+      "name": "@fontsource-variable/inter",
+      "version": "5.3.0",
+      "purl": "pkg:npm/%40fontsource-variable/inter@5.3.0",
+      "licenses": [
+        {
+          "expression": "OFL-1.1"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "3aea4be3cbdae093687dbf7bc3a358785f52ed6fe41cd28cd04afc0de9b99ea8b88de38bad5243a04f2d644a673099ad92f35b0751083cfc0771d905e9bd6850"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40fontsource-variable/jetbrains-mono@5.3.0",
+      "name": "@fontsource-variable/jetbrains-mono",
+      "version": "5.3.0",
+      "purl": "pkg:npm/%40fontsource-variable/jetbrains-mono@5.3.0",
+      "licenses": [
+        {
+          "expression": "OFL-1.1"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "177db1a52d8db06628422d800d290a4e0a498fba336a3b0680327cc284e7aa398807e7710c8a889a3978a57655104c6ef14159da7761997d7c1014bf85dcf72f"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40fontsource-variable/source-serif-4@5.3.1",
+      "name": "@fontsource-variable/source-serif-4",
+      "version": "5.3.1",
+      "purl": "pkg:npm/%40fontsource-variable/source-serif-4@5.3.1",
+      "licenses": [
+        {
+          "expression": "OFL-1.1"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "e11b5acb6d920b894cbf0d75afffbd93100d07a3f73345fcb3536e7410b6bf4275294db2dc370ca0d713de506867f0aa2e2af37fe4ad94ee949498a5cabbda52"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40jridgewell/gen-mapping@0.3.13",
+      "name": "@jridgewell/gen-mapping",
+      "version": "0.3.13",
+      "purl": "pkg:npm/%40jridgewell/gen-mapping@0.3.13",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "da492dffb9e227a32010fc45d1b61d43a7ad65a03e7d0bc370b29c921cb5c8840ecdaa0a8c10634a3eb7fda2d58d8137aa146de5dbccfae5327c283a50a0816c"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40jridgewell/remapping@2.3.5",
+      "name": "@jridgewell/remapping",
+      "version": "2.3.5",
+      "purl": "pkg:npm/%40jridgewell/remapping@2.3.5",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "2c8f6effe95a606e03b354c3292256d983eb22571560ec22d9f502eb1078de5b9e0a383157895f7ce0990ad605887e9334e5feb50297c7ded3e082876e1c8711"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40jridgewell/resolve-uri@3.1.2",
+      "name": "@jridgewell/resolve-uri",
+      "version": "3.1.2",
+      "purl": "pkg:npm/%40jridgewell/resolve-uri@3.1.2",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "6d12128022233f6d3fb5b5923d63048b9e1054f45913192e0fd9492fe508c542adc15240f305b54eb6f58ccb354455e8d42053359ff98690bd42f98a59da292b"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40jridgewell/sourcemap-codec@1.6.0",
+      "name": "@jridgewell/sourcemap-codec",
+      "version": "1.6.0",
+      "purl": "pkg:npm/%40jridgewell/sourcemap-codec@1.6.0",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "4fb8dffb9ce0b191f0349e25bd0eff69ecdbca4d27357fb32555a998703b558b04c7b6bbaabe5183921bb4916a920cdee58dacaeeab545463c43cdfb39dee217"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40jridgewell/trace-mapping@0.3.31",
+      "name": "@jridgewell/trace-mapping",
+      "version": "0.3.31",
+      "purl": "pkg:npm/%40jridgewell/trace-mapping@0.3.31",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "cf3351f9275048327373c8e869e3fc410a0242bf0db98c76748232b65d507811191c9f6e5ba85e6ecad881bcfc849c1441aa374d608cb667d5f0dbb5b7038b03"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40lezer/common@1.5.5",
+      "name": "@lezer/common",
+      "version": "1.5.5",
+      "purl": "pkg:npm/%40lezer/common@1.5.5",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "3f0ecf5429ddaee175a5bdde6c2c69495a643074838f04422dc4d1c3e462cd429ca3941b5b2970ab68389671bf45837bc934d00d713d17beccc2d900ca986b8e"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40lezer/css@1.3.9",
+      "name": "@lezer/css",
+      "version": "1.3.9",
+      "purl": "pkg:npm/%40lezer/css@1.3.9",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "666ce0bd338174958622c63f22d01f37b516f0357cd36a191be8de1ba139d3c4b0133cf9621b806a3a6da563c80af232a98003dbe56331d392e341a01a4c8439"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40lezer/highlight@1.2.5",
+      "name": "@lezer/highlight",
+      "version": "1.2.5",
+      "purl": "pkg:npm/%40lezer/highlight@1.2.5",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "3b518c54a82d7f962ca45691ce99aa91580cb489361c6f6e3006c7eb074021d361dd35730ac721ffe7118beea5dbffd418329ee8d07d056ddcbee4797b3310d3"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40lezer/html@1.3.13",
+      "name": "@lezer/html",
+      "version": "1.3.13",
+      "purl": "pkg:npm/%40lezer/html@1.3.13",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "a08ee7e8d26697bdbd9bba639bd96f2ef9976dda0ca22d9ffb5a7048326497d77af331abedaf41b73f0d7474c6419b56d83036e726debaffd2c836fd0f9b6c7a"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40lezer/javascript@1.5.6",
+      "name": "@lezer/javascript",
+      "version": "1.5.6",
+      "purl": "pkg:npm/%40lezer/javascript@1.5.6",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "b04bceaa9978bc941c6b436e81240ad36bd03db7392abbe8a239d81a8aaa16014ed0cb5c621c06887295101f8bb976099dfc97a3840f03cced6eb11ae05c3934"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40lezer/lr@1.4.12",
+      "name": "@lezer/lr",
+      "version": "1.4.12",
+      "purl": "pkg:npm/%40lezer/lr@1.4.12",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "3a7f47538a0c3221cf3244038284e719a863806e67fcc90ddfc0a01bbeec32b68a2cbfb72416de40d8b515c09757d411ab017dfc15173f771a1f2242d5f04e4d"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40lezer/markdown@1.8.1",
+      "name": "@lezer/markdown",
+      "version": "1.8.1",
+      "purl": "pkg:npm/%40lezer/markdown@1.8.1",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "33962611c2963b8989e396358440b0ab2bbc70bbf6e4489738ae79e0f54ebc339638fd289707a51c74145abf6c8c5f9dd5b10d561cb49df27c139ed76544e25e"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40marijn/find-cluster-break@1.0.4",
+      "name": "@marijn/find-cluster-break",
+      "version": "1.0.4",
+      "purl": "pkg:npm/%40marijn/find-cluster-break@1.0.4",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "5b2d15efe4865239c5f7f4e488cd612950cf8fb8ca5ddb8f35ba0c56d1d303c77248c5115aa7e0fc967d1364aaf09812266925ee4ed07bd14b78c4ab4ab69699"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40replit/codemirror-vim-core@0.1.0",
+      "name": "@replit/codemirror-vim-core",
+      "version": "0.1.0",
+      "purl": "pkg:npm/%40replit/codemirror-vim-core@0.1.0",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "d62e8404aa5c35f0cabd399387a37a83d94beae743e6dfae14d878242aa8cd19d596f5063a9b3b87f4334b69dee3372f3d48ef0292a999c3fb1ab7377cd6d989"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40replit/codemirror-vim@6.4.0",
+      "name": "@replit/codemirror-vim",
+      "version": "6.4.0",
+      "purl": "pkg:npm/%40replit/codemirror-vim@6.4.0",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "b7d50c0cd86499e024974b916e2255a2dbfdedb183ea67f81b2249a046eb8d4a9afcfa2fd2cf5e2fee00688d17b68dce1ab8b5ee2f6ac08a53d096d59555edf0"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40sveltejs/acorn-typescript@1.0.13",
+      "name": "@sveltejs/acorn-typescript",
+      "version": "1.0.13",
+      "purl": "pkg:npm/%40sveltejs/acorn-typescript@1.0.13",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "c202a082785954bf417f1d4e68a293ad863d045464e82f1402440d51c22fd7e965cd8ac8ab2f91666e473cace7d0da4406f4d5853a81e24432965672c2c44145"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40types/estree@1.0.10",
+      "name": "@types/estree",
+      "version": "1.0.10",
+      "purl": "pkg:npm/%40types/estree@1.0.10",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "953c8e32739c991073742bfaff8cd4642ac4855d31aea422519059b5571b98b1c15ca2e737cabcf6fff029117f4341dbc15b2a6c81b7a391c3a0597db1db8cfa"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/%40types/trusted-types@2.0.7",
+      "name": "@types/trusted-types",
+      "version": "2.0.7",
+      "purl": "pkg:npm/%40types/trusted-types@2.0.7",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "49c68f767d5d41cce06e5d101537933a65471542eddfde17260390368c95859eabdaf2e730b25f04f779dd2079d93ff71b7e95235fe0d8c65a5f47300ee5ec7f"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/acorn@8.19.0",
+      "name": "acorn",
+      "version": "8.19.0",
+      "purl": "pkg:npm/acorn@8.19.0",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "a09940dd78919bb0b293aa850f6267f1a93d07b8d2cb4ab2d340033b7fbc7694f42d28c58a1418bf80b4d8b142498255dd0dfbc58c30472e66f88a48894cea5b"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/argparse@3.0.4",
+      "name": "argparse",
+      "version": "3.0.4",
+      "purl": "pkg:npm/argparse@3.0.4",
+      "licenses": [
+        {
+          "expression": "PSF-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "7f058add9ab6da5e172498f1e667011c68a4224fa126a3bedf674f9b426eafbfabb46e71d6c70e8d27dd4fd64a7961cfa6cc9afe5d071cae2d0c8981913aedbc"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/aria-query@5.3.1",
+      "name": "aria-query",
+      "version": "5.3.1",
+      "purl": "pkg:npm/aria-query@5.3.1",
+      "licenses": [
+        {
+          "expression": "Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "67f65e3a0565edb712619feefeb8747cea6f129abffcb66675b917c9ceecc95ce33c085f39af5e6ec7534a31010d4e2fb399c2f7c29f76e8f5b85a34ab2113de"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/axobject-query@4.1.0",
+      "name": "axobject-query",
+      "version": "4.1.0",
+      "purl": "pkg:npm/axobject-query@4.1.0",
+      "licenses": [
+        {
+          "expression": "Apache-2.0"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "a888f41bdc196cc18d2e32e68353d3eafda613d007db3967003243ff6b42e84d348609a150e7c407a82b7873c07cb452b9f1ea44e2144e4c3a13e337947d0f4d"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/clsx@2.1.1",
+      "name": "clsx",
+      "version": "2.1.1",
+      "purl": "pkg:npm/clsx@2.1.1",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "7989b441606d52b0566561b4777f3a386030d7a67df793e2395a3607b6e35926c779d1a5e5ed1959aabae6438681448d7ac1080e407d2126d383f24af5d84264"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/crelt@1.0.7",
+      "name": "crelt",
+      "version": "1.0.7",
+      "purl": "pkg:npm/crelt@1.0.7",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "68ae816d67e17f853fc0270b1ca3c997fc5ae95915b2d45a3f2c16b4c286c2e38b73fc194f2418ba8c60bd99cdb01befeca83761305061804282072f890733b8"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/d3-dispatch@3.0.2",
+      "name": "d3-dispatch",
+      "version": "3.0.2",
+      "purl": "pkg:npm/d3-dispatch@3.0.2",
+      "licenses": [
+        {
+          "expression": "ISC"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "b00cc7e18e27b0ba3c792ab0e632a266df8b536c1998bfea4be3a4c501a38706b307f0fb4d8df847f40ad5eb217c6afb71910aca6299fc769e9bb9be96ef7c4a"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/d3-force@3.0.1",
+      "name": "d3-force",
+      "version": "3.0.1",
+      "purl": "pkg:npm/d3-force@3.0.1",
+      "licenses": [
+        {
+          "expression": "ISC"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "90069a1cb15e6c1630822e5c6015c023cbcaad014c083d8c12cc23d90b8f28a6dd535c182dcf165ed4bb3bc17f6fa3ce0887b78098d8ea1903b2d1e2d723044d"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/d3-quadtree@3.0.2",
+      "name": "d3-quadtree",
+      "version": "3.0.2",
+      "purl": "pkg:npm/d3-quadtree@3.0.2",
+      "licenses": [
+        {
+          "expression": "ISC"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "f4bbbd9aa24a45b224d1dea62838e9bcf51168f7701d52b90986dc75dd3fe2f060cf895dcffed320eb1ede434446c07218d7e5779f0a11ca39d3b033b495b24d"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/d3-timer@3.0.2",
+      "name": "d3-timer",
+      "version": "3.0.2",
+      "purl": "pkg:npm/d3-timer@3.0.2",
+      "licenses": [
+        {
+          "expression": "ISC"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "d489756a58aba15484aebbf96ae951071018fbbf839daa0b21619dd42e92b014d60dea1b5a23ff57af6fc1bf2f4fa69b47590ac1a35ed75f7aa66690d5f2bdd0"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/devalue@5.9.4",
+      "name": "devalue",
+      "version": "5.9.4",
+      "purl": "pkg:npm/devalue@5.9.4",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "b0f013e29ced6eeeb9f3afe1ae13a730a4b5ec826bbe0d769978923d24b75b9a8378dd911a0bd9d1d8990a6df57416e77af7d59ae8cd3b720cdb0ad2e18d9186"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/dompurify@3.4.17",
+      "name": "dompurify",
+      "version": "3.4.17",
+      "purl": "pkg:npm/dompurify@3.4.17",
+      "licenses": [
+        {
+          "expression": "(MPL-2.0 OR Apache-2.0)"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "07fa52958547439f24a88483ff20e3b89d727f3237e26d60178940a1dd9bc1246188de0ae429771fc01fee1a81d8f9932fdd75b5d12e7679d79f9167851a33d3"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/entities@8.1.0",
+      "name": "entities",
+      "version": "8.1.0",
+      "purl": "pkg:npm/entities@8.1.0",
+      "licenses": [
+        {
+          "expression": "BSD-2-Clause"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "9312fb9ac21f7d2ba1f5a68500c0fbaf1008b9344c00731e06d8075b6c94756c3bdf664d87831e86417681d8efb5d9a29246883fd6c50c324e3e5b2f9bb6afac"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/esm-env@1.2.2",
+      "name": "esm-env",
+      "version": "1.2.2",
+      "purl": "pkg:npm/esm-env@1.2.2",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "129c6bbfe36bfc268be1970518f24860b585a26f98795d43a8c2c726811df52611c4d6da16bb81c1f117fe49075097f9e63dbe4d46e60dc9ae8a56cfd539971c"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/esrap@2.4.0",
+      "name": "esrap",
+      "version": "2.4.0",
+      "purl": "pkg:npm/esrap@2.4.0",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "0903dc9de107c3f7338f7daec100b9da76276b1f07e125eddb914233e2c8c06678f5c308c693a3ddb3fcc26cdc23e6741c8cb92a40a568f8512df0b24b3c073c"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/is-reference@3.0.3",
+      "name": "is-reference",
+      "version": "3.0.3",
+      "purl": "pkg:npm/is-reference@3.0.3",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "8b1909a2a42f00ff3c13ac0bc9d2c61aa089b2b1549eaa07e879da73307c5e60c7d6869653ec71769b6f8a44e068486d679dcacba617881b942365972cc0b08f"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/linkify-it@6.1.0",
+      "name": "linkify-it",
+      "version": "6.1.0",
+      "purl": "pkg:npm/linkify-it@6.1.0",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "c09fd3c294834cb7a90ab42861660813120a83965c85ec76367e729369859c1fba3ed7641edc8bc7be3699df5cb118e33a71a42884bf46b6d8ee5f03ea04fd57"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/locate-character@3.0.0",
+      "name": "locate-character",
+      "version": "3.0.0",
+      "purl": "pkg:npm/locate-character@3.0.0",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "496d77c2cec18da789ea9ed0e823b69dc85b6047375f727a5ab9934c3b68ef230fa954994d4c98e538db89df806fc80b9c04edca062d8832091904519f664e88"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/magic-string@0.30.21",
+      "name": "magic-string",
+      "version": "0.30.21",
+      "purl": "pkg:npm/magic-string@0.30.21",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "bddd85e1853211728670b1e8abe4c4c828f1b9e49e1e7171cb28cda7cd328345d5e2f5219c37abfe5bef96a33f6ab0796d740de4adbfde88a7c82472c7c4f609"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/markdown-it@15.0.3",
+      "name": "markdown-it",
+      "version": "15.0.3",
+      "purl": "pkg:npm/markdown-it@15.0.3",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "f80cfb3a3cf78911aef0a60cbc9eb1561bebc4fdde13ebc4b495fbe4ec3cf17069710355ff49465f96729c82017ed444a380c2da3b2f78030369e96d9a6f10bd"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/mdurl@2.1.0",
+      "name": "mdurl",
+      "version": "2.1.0",
+      "purl": "pkg:npm/mdurl@2.1.0",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "d7e1c168ec74ce2fdd41686df2b36ff4c61ff6aaa9a8bfe4c48d215c8994e98e78ef333a4a78bc05089bb7b89f80c718b50838d5aa3722f77a72748cf3a8a7a6"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/punycode.js@2.3.1",
+      "name": "punycode.js",
+      "version": "2.3.1",
+      "purl": "pkg:npm/punycode.js@2.3.1",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "bb11481d4d189476210d0b55e11f49e9ae7648bc76f010a34fee227a1ec819b83054958efa49b8df5738c9195111402c026b7fb8c8d05324073443dfd0cdfd08"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/style-mod@4.1.4",
+      "name": "style-mod",
+      "version": "4.1.4",
+      "purl": "pkg:npm/style-mod@4.1.4",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "5d758842deb7dff129005c7c6990ce4e3073ac26869a1bc4425428e8c54f7dad8ecced9c5a8fb8855f61fba5241d895719fcbe3835ca51d3fb3ed86672ee404f"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/svelte@5.57.3",
+      "name": "svelte",
+      "version": "5.57.3",
+      "purl": "pkg:npm/svelte@5.57.3",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "e6601fb4cdd2a0357d5f4cdd177f3a17da76a6ff2228ec22fca7c14b55e704091508a17354e2c75286bc886580b786eea2270b9b2595469bae0f9c29957390b2"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/uc.micro@3.0.0",
+      "name": "uc.micro",
+      "version": "3.0.0",
+      "purl": "pkg:npm/uc.micro@3.0.0",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "5373e9a449257a84e721f8bc068cccc77ca3bb7a9cfcbe92c2a5a8d92c3ee783d7f8f5f4abd23eaf5526e470a6a83ee7f550d7e7fbf7bd01ff02303a75e0ddb7"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/w3c-keyname@2.2.8",
+      "name": "w3c-keyname",
+      "version": "2.2.8",
+      "purl": "pkg:npm/w3c-keyname@2.2.8",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "769a2306136c08d37b4fcd939bb936e80e86f4c2f7364843b27c3d9ff7a8c52465541078084b4843f29308b2361707f76ad6925d1858164422dd29671703ef3d"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "pkg:npm/zimmerframe@1.1.5",
+      "name": "zimmerframe",
+      "version": "1.1.5",
+      "purl": "pkg:npm/zimmerframe@1.1.5",
+      "licenses": [
+        {
+          "expression": "MIT"
+        }
+      ],
+      "hashes": [
+        {
+          "alg": "SHA-512",
+          "content": "9ac27122f60361ca0d2fe3c9b2efbbaa6a435ac6260314d8fb64cd6175c5d21cc1cc193404c79c3aa0ce1bf11c914a0a0ae2b039b7dbba0225f10a6a1c35de14"
+        }
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:github/erktm/dendronotes@v0.1.0",
+      "dependsOn": [
+        "pkg:golang/github.com/Azure/go-ntlmssp@v0.1.1",
+        "pkg:golang/github.com/coreos/go-oidc/v3@v3.21.0",
+        "pkg:golang/github.com/fsnotify/fsnotify@v1.10.1",
+        "pkg:golang/github.com/go-asn1-ber/asn1-ber@v1.5.8",
+        "pkg:golang/github.com/go-jose/go-jose/v4@v4.1.4",
+        "pkg:golang/github.com/go-ldap/ldap/v3@v3.4.15",
+        "pkg:golang/github.com/google/uuid@v1.6.0",
+        "pkg:golang/github.com/ncruces/go-sqlite3-wasm/v6@v6.4.35401",
+        "pkg:golang/github.com/ncruces/go-sqlite3@v0.36.0",
+        "pkg:golang/github.com/ncruces/julianday@v1.0.0",
+        "pkg:golang/golang.org/x/crypto@v0.58.0",
+        "pkg:golang/golang.org/x/oauth2@v0.37.0",
+        "pkg:golang/golang.org/x/sys@v0.49.0",
+        "pkg:golang/golang.org/x/term@v0.47.0",
+        "pkg:golang/golang.org/x/text@v0.43.0",
+        "pkg:golang/golang.org/x/time@v0.16.0",
+        "pkg:golang/stdlib@v1.27.3",
+        "pkg:npm/%40codemirror/autocomplete@6.20.4",
+        "pkg:npm/%40codemirror/collab@6.1.1",
+        "pkg:npm/%40codemirror/commands@6.11.1",
+        "pkg:npm/%40codemirror/lang-css@6.3.1",
+        "pkg:npm/%40codemirror/lang-html@6.4.12",
+        "pkg:npm/%40codemirror/lang-javascript@6.2.5",
+        "pkg:npm/%40codemirror/lang-markdown@6.5.2",
+        "pkg:npm/%40codemirror/language@6.13.1",
+        "pkg:npm/%40codemirror/lint@6.9.7",
+        "pkg:npm/%40codemirror/search@6.7.2",
+        "pkg:npm/%40codemirror/state@6.7.6",
+        "pkg:npm/%40codemirror/streamparser@6.0.0",
+        "pkg:npm/%40codemirror/view@6.43.15",
+        "pkg:npm/%40fontsource-variable/inter@5.3.0",
+        "pkg:npm/%40fontsource-variable/jetbrains-mono@5.3.0",
+        "pkg:npm/%40fontsource-variable/source-serif-4@5.3.1",
+        "pkg:npm/%40jridgewell/gen-mapping@0.3.13",
+        "pkg:npm/%40jridgewell/remapping@2.3.5",
+        "pkg:npm/%40jridgewell/resolve-uri@3.1.2",
+        "pkg:npm/%40jridgewell/sourcemap-codec@1.6.0",
+        "pkg:npm/%40jridgewell/trace-mapping@0.3.31",
+        "pkg:npm/%40lezer/common@1.5.5",
+        "pkg:npm/%40lezer/css@1.3.9",
+        "pkg:npm/%40lezer/highlight@1.2.5",
+        "pkg:npm/%40lezer/html@1.3.13",
+        "pkg:npm/%40lezer/javascript@1.5.6",
+        "pkg:npm/%40lezer/lr@1.4.12",
+        "pkg:npm/%40lezer/markdown@1.8.1",
+        "pkg:npm/%40marijn/find-cluster-break@1.0.4",
+        "pkg:npm/%40replit/codemirror-vim-core@0.1.0",
+        "pkg:npm/%40replit/codemirror-vim@6.4.0",
+        "pkg:npm/%40sveltejs/acorn-typescript@1.0.13",
+        "pkg:npm/%40types/estree@1.0.10",
+        "pkg:npm/%40types/trusted-types@2.0.7",
+        "pkg:npm/acorn@8.19.0",
+        "pkg:npm/argparse@3.0.4",
+        "pkg:npm/aria-query@5.3.1",
+        "pkg:npm/axobject-query@4.1.0",
+        "pkg:npm/clsx@2.1.1",
+        "pkg:npm/crelt@1.0.7",
+        "pkg:npm/d3-dispatch@3.0.2",
+        "pkg:npm/d3-force@3.0.1",
+        "pkg:npm/d3-quadtree@3.0.2",
+        "pkg:npm/d3-timer@3.0.2",
+        "pkg:npm/devalue@5.9.4",
+        "pkg:npm/dompurify@3.4.17",
+        "pkg:npm/entities@8.1.0",
+        "pkg:npm/esm-env@1.2.2",
+        "pkg:npm/esrap@2.4.0",
+        "pkg:npm/is-reference@3.0.3",
+        "pkg:npm/linkify-it@6.1.0",
+        "pkg:npm/locate-character@3.0.0",
+        "pkg:npm/magic-string@0.30.21",
+        "pkg:npm/markdown-it@15.0.3",
+        "pkg:npm/mdurl@2.1.0",
+        "pkg:npm/punycode.js@2.3.1",
+        "pkg:npm/style-mod@4.1.4",
+        "pkg:npm/svelte@5.57.3",
+        "pkg:npm/uc.micro@3.0.0",
+        "pkg:npm/w3c-keyname@2.2.8",
+        "pkg:npm/zimmerframe@1.1.5"
+      ]
+    }
+  ]
+}
