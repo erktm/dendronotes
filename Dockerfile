@@ -1,4 +1,4 @@
-# dendronotes – reproducible multi-stage build
+# dendronotes: reproducible multi-stage build
 #
 # Deliberately without a "# syntax=…" line: Docker's built-in BuildKit
 # frontend is sufficient, so the build never pulls a frontend image from
@@ -47,9 +47,11 @@ FROM ${RUNTIME_IMAGE}
 ARG VERSION=dev
 LABEL org.opencontainers.image.title="dendronotes" \
       org.opencontainers.image.description="Self-hosted Markdown notes" \
-      org.opencontainers.image.version="${VERSION}"
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.source="https://github.com/erktm/dendronotes" \
+      org.opencontainers.image.licenses="Apache-2.0"
 COPY --from=build /out/dendronotes /usr/local/bin/dendronotes
-# /somas holds the notes, one folder per soma; /data the accounts (state.db –
+# /somas holds the notes, one folder per soma; /data the accounts (state.db,
 # back it up) and the rebuildable search indexes.
 COPY --from=build --chown=65532:65532 /out/somas /somas
 COPY --from=build --chown=65532:65532 /out/data /data

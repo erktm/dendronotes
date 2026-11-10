@@ -1,0 +1,83 @@
+name: Release
+
+# A tag v<major>.<minor>.<patch> publishes binaries, the container image and
+# the Helm chart.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write # the GitHub release
+  packages: write # ghcr.io: image and chart
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      PLATFORMS: linux/amd64 linux/arm64 darwin/amd64 darwin/arm64
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Version and names
+        run: |
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+          echo "CHARTS=oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts" >> "$GITHUB_ENV"
+
+      - name: Tests
+        run: |
+          (cd web && npm ci)
+          make test
+
+      - name: Binaries
+        run: |
+          (cd web && npm run build)
+          mkdir -p dist
+          for target in $PLATFORMS; do
+            os=${target%/*}; arch=${target#*/}
+            name="dendronotes_${VERSION}_${os}_${arch}"
+            mkdir -p "dist/$name"
+            CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -trimpath -buildvcs=false \
+              -ldflags "-s -w -X main.version=${VERSION}" -o "dist/$name/dendronotes" ./cmd/dendronotes
+            cp LICENSE NOTICE README.md "dist/$name/"
+            tar -C dist --sort=name --owner=0 --group=0 --mtime="@${SOURCE_DATE_EPOCH}" -czf "dist/$name.tar.gz" "$name"
+          done
+          node scripts/sbom.mjs "$VERSION" > dist/sbom.cdx.json
+          cp security/vex.openvex.json dist/
+
+      - name: Container image (linux/amd64, linux/arm64)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker buildx create --use
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            --build-arg VERSION="$VERSION" --build-arg SOURCE_DATE_EPOCH="$SOURCE_DATE_EPOCH" \
+            --sbom=true --provenance=mode=max \
+            --tag "$IMAGE:$VERSION" --tag "$IMAGE:latest" \
+            --push .
+
+      - name: Helm chart
+        run: |
+          helm package deploy/helm/dendronotes --version "$VERSION" --app-version "$VERSION" --destination dist
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          helm push "dist/dendronotes-$VERSION.tgz" "$CHARTS"
+
+      - name: GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          (cd dist && sha256sum *.tar.gz *.tgz sbom.cdx.json vex.openvex.json > checksums.txt)
+          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes \
+            --title "dendronotes $VERSION" \
+            dist/*.tar.gz dist/*.tgz dist/sbom.cdx.json dist/vex.openvex.json dist/checksums.txt

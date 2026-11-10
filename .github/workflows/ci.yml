@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Every Monday: new vulnerabilities may concern old code.
+    - cron: "23 4 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false # modules are vendored
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install web dependencies
+        run: cd web && npm ci
+      - name: Tests (go vet, Go tests with -race, type check, Vitest)
+        run: make test
+      - name: Build
+        run: make build
+      - name: Helm chart
+        run: |
+          helm lint deploy/helm/dendronotes
+          helm template dendronotes deploy/helm/dendronotes > /dev/null
+      - name: SBOM is current
+        run: |
+          node scripts/sbom.mjs "$(git describe --tags --always)" > /tmp/sbom.cdx.json
+          node -e 'const a=require("/tmp/sbom.cdx.json").components.map(c=>c.purl).join(), b=require("./security/sbom.cdx.json").components.map(c=>c.purl).join(); if (a!==b) { console.error("security/sbom.cdx.json is out of date: run make sbom"); process.exit(1) }'
+
+  vulnerabilities:
+    name: Vulnerabilities (VEX)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26
+      - name: Install web dependencies
+        run: cd web && npm ci
+      - name: govulncheck and npm audit against security/vex.openvex.json
+        run: make vulncheck
