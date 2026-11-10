@@ -12,6 +12,10 @@ drawings, comments, a history of every note, and sharing with people and groups.
 One program, no database server, no external requests: it runs as a binary, a container or in
 Kubernetes, also in an air gap.
 
+<p align="center">
+  <img src="docs/assets/screenshots/editor.png" width="900" alt="A note in the editor with live preview: synapses, an embedded drawing, tasks, and the outline, synapses and incoming synapses in the details panel">
+</p>
+
 ## Features
 
 - **Editor** with live preview, optional Vim key bindings and a reading view; tasks, tables,
@@ -30,6 +34,27 @@ Kubernetes, also in an air gap.
   Directory / LDAP, or an authenticating proxy; personal API tokens.
 - **Operation**: administration area, audit log, backups while running, Prometheus metrics,
   reproducible images, SBOM and vulnerability statements with every release.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td><img src="docs/assets/screenshots/drawing.png" width="430" alt="The drawing editor with tools, a selected shape and its colors, line styles and fonts"></td>
+    <td><img src="docs/assets/screenshots/graph.png" width="430" alt="The graph of all notes and drawings in a soma, dark mode"></td>
+  </tr>
+  <tr>
+    <td align="center">Drawings: shapes, arrows that stick to them, built-in icons</td>
+    <td align="center">The graph of a soma (dark mode, Confocal palette)</td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/screenshots/reading-dark.png" width="430" alt="A note in the reading view, dark mode, with the embedded drawing in dark colors"></td>
+    <td><img src="docs/assets/screenshots/search.png" width="430" alt="Full-text search with highlighted matches and tags"></td>
+  </tr>
+  <tr>
+    <td align="center">Reading view; drawings follow light and dark mode</td>
+    <td align="center">Full-text search across all notes</td>
+  </tr>
+</table>
 
 ## Vocabulary
 
