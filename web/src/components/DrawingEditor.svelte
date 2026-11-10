@@ -19,7 +19,7 @@
   import IconLibrary from './IconLibrary.svelte'
   import { DrawingDoc } from '../lib/drawing/doc.svelte'
   import { SceneLayer, measureText } from '../lib/drawing/dom'
-  import { newImage, newLine, newPen, newShape, newText } from '../lib/drawing/create'
+  import { newIcon, newImage, newLine, newPen, newShape, newText } from '../lib/drawing/create'
   import { type Box, type Pt, boxFrom, center, dist, grow, simplify, snap } from '../lib/drawing/geometry'
   import { ALL_HANDLES, CORNERS, type Handle, bindTargetAt, elementsIn, handlePoint, hitTest, resizeBox, shapeAt } from '../lib/drawing/hit'
   import { LINE_HEIGHT, midpoint, textBox } from '../lib/drawing/render'
@@ -533,7 +533,7 @@
   function resizeTo(g: Extract<Gesture, { kind: 'resize' }>, p: Pt, shift: boolean) {
     const els = g.before.elements.filter((x) => g.ids.has(x.id))
     const one = els.length === 1 ? els[0]! : null
-    const keepRatio = shift || !one || one.type === 'image' || one.type === 'text'
+    const keepRatio = shift || !one || one.type === 'image' || one.type === 'icon' || one.type === 'text'
     const nb = resizeBox(g.frame, g.handle, p, keepRatio, 8)
     if (one?.type === 'text') {
       const size = Math.min(200, Math.max(6, (one.size * nb.h) / Math.max(g.frame.h, 1)))
@@ -711,6 +711,18 @@
     const key = newId()
     const el = newImage(key, { x: c[0] - w / 2, y: c[1] - h / 2, w, h })
     doc.commit(add({ ...scene, files: { ...scene.files, [key]: file } }, el))
+    selected = new Set([el.id])
+    tool = 'select'
+  }
+
+  /** Puts a built-in icon in the middle of the view, in the current color and width. */
+  function insertIcon(name: string) {
+    if (!mayEdit) return
+    const r = stageRect()
+    const c = toScene(r.left + r.width / 2, r.top + r.height / 2)
+    const size = 64
+    const el = newIcon(name, { x: c[0] - size / 2, y: c[1] - size / 2, w: size, h: size }, style)
+    doc.commit(add(scene, el))
     selected = new Set([el.id])
     tool = 'select'
   }
@@ -1045,7 +1057,7 @@
 
       <!-- One panel at a time, so the canvas keeps its room. -->
       {#if mayEdit && iconsOpen}
-        <IconLibrary onpick={insertPicture} onclose={() => (iconsOpen = false)} />
+        <IconLibrary onpick={insertPicture} onbuiltin={insertIcon} onclose={() => (iconsOpen = false)} />
       {:else if mayEdit && propsOpen}
         <DrawingProps
           style={panelStyle}

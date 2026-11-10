@@ -27,6 +27,7 @@ function sample(sketchy: boolean): Scene {
     { ...common, ...type, id: 'note', type: 'text', x: 0, y: 320, w: 120, h: 50, stroke: 'violet', text: 'Plant in\nMay', align: 'left', font: 'serif' },
     { ...common, id: 'tree', type: 'image', x: 340, y: 220, w: 48, h: 48, stroke: 'ink', file: 'f1' },
     { ...common, id: 'twig', type: 'pen', points: [[20, 420], [30, 425], [45, 418], [60, 430]], stroke: 'orange' },
+    { ...common, id: 'db', type: 'icon', icon: 'database', x: 200, y: 360, w: 48, h: 48, stroke: 'teal' },
   ]
   const s = add({ ...emptyScene(), sketchy, files: { f1: { src: PNG, w: 1, h: 1 } } }, ...els)
   return s

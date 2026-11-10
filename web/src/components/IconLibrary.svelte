@@ -1,7 +1,8 @@
 <script lang="ts">
-  // The icon library of the soma, next to the drawing editor: pick an icon to
-  // put it into the drawing, upload new ones (contributors), delete own ones
-  // (editors any).
+  // Icons next to the drawing editor: the soma's uploaded pictures (upload
+  // new ones as contributor, delete your own, editors any) and the built-in
+  // line icons, which take the drawing's colors.
+  import { ICON_GROUPS } from '../lib/drawing/icons'
   import { onMount } from 'svelte'
   import Icon from './Icon.svelte'
   import * as api from '../lib/api/drawings'
@@ -12,9 +13,22 @@
   import type { FileData } from '../lib/drawing/scene'
   import { strings } from '../lib/strings'
 
-  let { onpick, onclose }: { onpick: (file: FileData) => void; onclose: () => void } = $props()
+  let {
+    onpick,
+    onbuiltin,
+    onclose,
+  }: { onpick: (file: FileData) => void; onbuiltin: (name: string) => void; onclose: () => void } = $props()
+
+  const b = strings.drawing.builtin
+  let query = $state('')
+  const q = $derived(query.trim().toLowerCase())
+  const matches = (label: string) => !q || label.toLowerCase().includes(q)
+  const groups = $derived(
+    ICON_GROUPS.map((g) => ({ id: g.id, icons: g.icons.filter((i) => matches(b.names[i.name] ?? i.name)) })).filter((g) => g.icons.length > 0),
+  )
 
   let list = $state.raw<IconInfo[]>([])
+  const uploaded = $derived(list.filter((i) => matches(i.name)))
   let loaded = $state(false)
   let busy = $state(false)
   let input = $state<HTMLInputElement>()
@@ -101,11 +115,15 @@
       onchange={(e) => void upload(e.currentTarget.files)}
     />
   {/if}
-  {#if loaded && list.length === 0}
+  <input class="filter" type="search" placeholder={b.filter} aria-label={b.filter} bind:value={query} />
+
+  {#if uploaded.length > 0}
+    <h3>{b.uploaded}</h3>
+  {:else if loaded && list.length === 0 && !q}
     <p class="empty">{strings.drawing.icons.empty}</p>
   {/if}
   <ul>
-    {#each list as icon (icon.id)}
+    {#each uploaded as icon (icon.id)}
       <li>
         <button type="button" class="pick" title={icon.name} aria-label={strings.drawing.icons.insert(icon.name)} onclick={() => void pick(icon)}>
           <img src={api.iconURL(icon.id)} alt="" loading="lazy" />
@@ -118,6 +136,28 @@
       </li>
     {/each}
   </ul>
+
+  {#each groups as g (g.id)}
+    <h3>{b.groups[g.id]}</h3>
+    <ul class="builtin">
+      {#each g.icons as icon (icon.name)}
+        <li>
+          <button
+            type="button"
+            class="pick"
+            title={b.names[icon.name]}
+            aria-label={strings.drawing.icons.insert(b.names[icon.name] ?? icon.name)}
+            onclick={() => onbuiltin(icon.name)}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d={icon.d} /></svg>
+          </button>
+        </li>
+      {/each}
+    </ul>
+  {/each}
+  {#if q && groups.length === 0 && uploaded.length === 0}
+    <p class="empty">{b.none}</p>
+  {/if}
 </aside>
 
 <style>
@@ -131,10 +171,17 @@
     border-left: 1px solid var(--line);
     background: var(--bg-raised);
   }
+  /* Stays in view while the icons scroll. */
   header {
+    position: sticky;
+    z-index: 1;
+    top: calc(var(--space-3) * -1);
     display: flex;
     align-items: center;
     justify-content: space-between;
+    margin: calc(var(--space-3) * -1) calc(var(--space-3) * -1) 0;
+    padding: var(--space-3);
+    background: var(--bg-raised);
   }
   h2 {
     font-size: var(--text-sm);
@@ -177,6 +224,8 @@
   }
   ul {
     display: grid;
+    margin: 0;
+    padding: 0;
     grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
     gap: var(--space-2);
     list-style: none;
@@ -201,6 +250,37 @@
   .pick img {
     max-width: 100%;
     max-height: 100%;
+  }
+  h3 {
+    margin-top: var(--space-1);
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    font-weight: 600;
+  }
+  .filter {
+    height: 30px;
+    padding: 0 var(--space-2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--bg);
+    color: var(--text);
+    font-size: var(--text-sm);
+  }
+  .builtin {
+    grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+    gap: var(--space-1);
+  }
+  .builtin .pick {
+    color: var(--text);
+  }
+  .builtin svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
   .remove {
     position: absolute;

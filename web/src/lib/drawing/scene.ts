@@ -8,6 +8,7 @@
 // data:image URLs.
 
 import { type Color, type Fill, isColor } from './colors'
+import { builtinIcon } from './icons'
 import {
   type Box,
   type Outline,
@@ -23,7 +24,7 @@ import {
 
 export type ShapeType = 'rect' | 'ellipse' | 'diamond'
 export type LinearType = 'line' | 'arrow'
-export type ElementType = ShapeType | LinearType | 'pen' | 'text' | 'image'
+export type ElementType = ShapeType | LinearType | 'pen' | 'text' | 'image' | 'icon'
 export type FontFamily = 'sans' | 'serif' | 'mono'
 export type Align = 'left' | 'center' | 'right'
 export type Dash = 'solid' | 'dashed' | 'dotted'
@@ -68,6 +69,13 @@ export interface ImageEl extends Common, Box {
   file: string
 }
 
+/** A built-in icon (lib/drawing/icons.ts), drawn in the stroke color. */
+export interface IconEl extends Common, Box {
+  type: 'icon'
+  /** Name of the built-in icon. */
+  icon: string
+}
+
 /** An end of a line that sticks to an element. */
 export interface Binding {
   id: string
@@ -89,7 +97,7 @@ export interface PenEl extends Common {
   points: Pt[]
 }
 
-export type BoxEl = ShapeEl | TextEl | ImageEl
+export type BoxEl = ShapeEl | TextEl | ImageEl | IconEl
 export type Element = BoxEl | LinearEl | PenEl
 
 /** A picture used by image elements (a data:image URL and its size). */
@@ -115,7 +123,7 @@ export function emptyScene(): Scene {
 
 export const isShape = (e: Element): e is ShapeEl => e.type === 'rect' || e.type === 'ellipse' || e.type === 'diamond'
 export const isLinear = (e: Element): e is LinearEl => e.type === 'line' || e.type === 'arrow'
-export const isBox = (e: Element): e is BoxEl => isShape(e) || e.type === 'text' || e.type === 'image'
+export const isBox = (e: Element): e is BoxEl => isShape(e) || e.type === 'text' || e.type === 'image' || e.type === 'icon'
 /** Elements with a label or text. */
 export const hasText = (e: Element): e is ShapeEl | TextEl | LinearEl => isShape(e) || e.type === 'text' || isLinear(e)
 
@@ -412,6 +420,10 @@ function sanitizeElement(v: unknown, files: Record<string, FileData>): Element |
     case 'image':
       if (typeof o.file !== 'string' || !files[o.file]) return null
       return { ...base, ...box(o), type: 'image', file: o.file }
+    case 'icon':
+      // Only icons dendronotes knows: the picture comes from it, never from the file.
+      if (typeof o.icon !== 'string' || !builtinIcon(o.icon)) return null
+      return { ...base, ...box(o), type: 'icon', icon: o.icon }
     case 'line':
     case 'arrow': {
       const pts = Array.isArray(o.points) ? o.points.map(point) : []

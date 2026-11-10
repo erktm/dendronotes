@@ -41,7 +41,7 @@ export function keysOf(el: Element): StyleKey[] {
   if (el.type !== 'image') keys.push('stroke')
   if (isShape(el)) keys.push('fill')
   if (el.type === 'rect') keys.push('rounded')
-  if (isShape(el) || isLinear(el) || el.type === 'pen') keys.push('width')
+  if (isShape(el) || isLinear(el) || el.type === 'pen' || el.type === 'icon') keys.push('width')
   if (isShape(el) || isLinear(el)) keys.push('dash')
   if (hasText(el)) keys.push('font', 'size')
   if (isShape(el) || el.type === 'text') keys.push('align')

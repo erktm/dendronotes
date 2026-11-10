@@ -5,6 +5,7 @@ import { round } from './geometry'
 import { type Measure, textBox } from './render'
 import {
   type Binding,
+  type IconEl,
   type ImageEl,
   type LinearEl,
   type LinearType,
@@ -44,6 +45,13 @@ export function newText(p: Pt, s: Style, measure: Measure): TextEl {
   const style = { text: '', font: s.font, size: s.size, align: s.align }
   const { w, h } = textBox(style, measure)
   return { id: newId(), type: 'text', x: round(p[0]), y: round(p[1] - h / 2), w, h, stroke: s.stroke, width: 1, dash: 'solid', seed: newSeed(), ...style }
+}
+
+export function newIcon(icon: string, box: Box, s: Style): IconEl {
+  return {
+    id: newId(), type: 'icon', icon, x: round(box.x), y: round(box.y), w: round(box.w), h: round(box.h),
+    stroke: s.stroke, width: s.width, dash: 'solid', seed: newSeed(),
+  }
 }
 
 export function newImage(file: string, box: Box): ImageEl {

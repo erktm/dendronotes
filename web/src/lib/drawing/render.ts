@@ -17,6 +17,7 @@ import {
   route,
 } from './scene'
 import { sketchEllipse, sketchLines, sketchRoundRect, smooth } from './sketch'
+import { builtinIcon } from './icons'
 
 export interface TextLine {
   x: number
@@ -50,6 +51,7 @@ export const LINE_HEIGHT = 1.25
 const PADDING = 8
 
 const f = (n: number) => String(round(n))
+const fine = (n: number) => String(Math.round(n * 10000) / 10000)
 
 // ---------------------------------------------------------------------------
 // Text
@@ -271,6 +273,28 @@ export function primitives(el: Element, scene: Scene, measure: Measure): Prim[] 
       return textElPrims(el)
     case 'image':
       return [{ tag: 'image', file: el.file, attrs: { x: f(el.x), y: f(el.y), width: f(el.w), height: f(el.h) } }]
+    case 'icon': {
+      const icon = builtinIcon(el.icon)
+      if (!icon) return []
+      // Drawn on its 24-unit grid, scaled to the box; the line keeps its width.
+      const sx = el.w / 24
+      const sy = el.h / 24
+      const scale = Math.max(Math.min(sx, sy), 0.01)
+      return [
+        {
+          tag: 'path',
+          attrs: {
+            class: strokeClass(el.stroke),
+            fill: 'none',
+            'stroke-width': f(el.width / scale),
+            'stroke-linecap': 'round',
+            'stroke-linejoin': 'round',
+            transform: `translate(${f(el.x)} ${f(el.y)}) scale(${fine(sx)} ${fine(sy)})`,
+            d: icon.d,
+          },
+        },
+      ]
+    }
     case 'pen': {
       const attrs = { class: strokeClass(el.stroke), 'stroke-width': f(el.width), fill: 'none', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }
       if (el.points.length === 1) {
