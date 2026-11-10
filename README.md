@@ -1,4 +1,8 @@
-# dendronotes
+<p align="center">
+  <img src="docs/assets/logo.svg" width="96" height="96" alt="dendronotes logo">
+</p>
+
+<h1 align="center">dendronotes</h1>
 
 Self-hosted Markdown notes for one person or a team. Your notes stay plain `.md` files in
 folders, the **somas**, readable and editable with any other tool; dendronotes adds editing

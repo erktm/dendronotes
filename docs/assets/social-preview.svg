@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <rect width="1280" height="640" fill="#121212"/>
+  <g transform="translate(150 200)">
+    <rect width="240" height="240" rx="52" fill="#3d3d3a"/>
+    <g transform="scale(7.5)">
+      <path d="M16 26V12.6L8.6 6.2M16 12.6l7.4-6.4M16 21l-5.6-4.8M16 17.4l5.4-4.4" fill="none" stroke="#f4f4f3" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+  <text x="460" y="318" font-family="Inter, -apple-system, 'Helvetica Neue', Arial, sans-serif" font-size="104" font-weight="700" fill="#ededed" letter-spacing="-2">dendronotes</text>
+  <text x="464" y="388" font-family="Inter, -apple-system, 'Helvetica Neue', Arial, sans-serif" font-size="34" fill="#a8a8a8">Self-hosted Markdown notes</text>
+  <text x="464" y="436" font-family="Inter, -apple-system, 'Helvetica Neue', Arial, sans-serif" font-size="28" fill="#8e8e8e">Editing together · synapses and a graph · drawings</text>
+</svg>

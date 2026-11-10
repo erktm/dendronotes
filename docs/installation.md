@@ -151,9 +151,6 @@ volumes:
   data:
 ```
 
-While the GitHub repository is private, the image is private too: sign in first with
-`docker login ghcr.io` (user name and a personal access token with `read:packages`).
-
 ## Kubernetes with Helm
 
 The chart lives in [`deploy/helm/dendronotes`](../deploy/helm/dendronotes) and is published
@@ -217,8 +214,8 @@ annotations in [`values.yaml`](../deploy/helm/dendronotes/values.yaml)). `metric
 adds the Prometheus port and a Service `dendronotes-metrics`. All values are documented in
 `values.yaml`; `helm show values oci://ghcr.io/erktm/charts/dendronotes` prints them.
 
-While the repository is private, give the cluster a pull secret for `ghcr.io` and name it in
-`imagePullSecrets`.
+Behind a registry mirror or with an image of your own, set `image.repository` and, if it needs
+credentials, `imagePullSecrets`.
 
 ## Reverse proxy
 
