@@ -39,4 +39,11 @@ describe('drawing colors', () => {
     expect(css).toContain(`@media (prefers-color-scheme: dark){.s-blue{stroke:${COLOR_VALUES.blue.stroke.dark}}`)
     expect(css).not.toMatch(/url\(|@import|\\|</)
   })
+
+  it('come in one scheme for exported pictures', () => {
+    const dark = styleSheet(['blue'], 'dark')
+    expect(dark).toContain(`.s-blue{stroke:${COLOR_VALUES.blue.stroke.dark}}`)
+    expect(dark).not.toContain('@media')
+    expect(dark).not.toContain(COLOR_VALUES.blue.stroke.light)
+  })
 })

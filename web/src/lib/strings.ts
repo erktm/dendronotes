@@ -854,6 +854,10 @@ export const strings = {
     closeViewer: 'Close',
     openDrawing: (name: string) => `Open drawing ${name}`,
     resize: 'Drag to change the width',
+    download: 'Download',
+    downloadSVG: 'SVG – the drawing file',
+    downloadPNG: 'PNG picture',
+    downloadFailed: 'Couldn’t create the picture.',
     embed: {
       button: 'Embed in a note',
       title: 'Show this drawing in a note',

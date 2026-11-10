@@ -53,6 +53,8 @@
   import { ApiError } from '../lib/api/client'
   import { strings } from '../lib/strings'
   import { basename } from '../lib/paths'
+  import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
+  import { pngBlob, saveFile, svgBlob } from '../lib/drawing/export'
 
   let {
     path,
@@ -114,6 +116,33 @@
     const same = app.filePaths.filter((p) => basename(p).toLowerCase() === file.toLowerCase()).length
     return `![[${same <= 1 ? file : path}]]`
   })
+
+  // --- Download -------------------------------------------------------------
+
+  let downloadMenu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null)
+
+  function openDownload(e: MouseEvent) {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    downloadMenu = {
+      x: r.left,
+      y: r.bottom + 4,
+      items: [
+        { label: s.downloadSVG, icon: 'drawing', action: () => saveFile(svgBlob(doc.scene), basename(path)) },
+        { label: s.downloadPNG, icon: 'image', action: () => void downloadPNG() },
+      ],
+    }
+  }
+
+  /** A picture as the app shows the drawing now: light or dark. */
+  async function downloadPNG() {
+    const theme = document.documentElement.dataset.theme
+    const dark = theme === 'dark' || (theme !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+    try {
+      saveFile(await pngBlob(doc.scene, dark ? 'dark' : 'light'), `${name}.png`)
+    } catch {
+      app.toast(s.downloadFailed)
+    }
+  }
 
   async function copyEmbed() {
     try {
@@ -906,6 +935,10 @@
         <button type="button" class="button" onclick={() => void doc.takeTheirs()}>{s.takeTheirs}</button>
         <button type="button" class="button" onclick={() => void doc.keepMine()}>{s.keepMine}</button>
       {/if}
+      <button type="button" class="button" title={s.download} aria-haspopup="menu" aria-expanded={downloadMenu !== null} onclick={openDownload}>
+        <Icon name="download" size={16} />
+        <span class="label">{s.download}</span>
+      </button>
       {#if !readonly}
         <div class="embed-wrap" bind:this={embedWrap}>
           <button type="button" class="button" aria-expanded={embedOpen} title={s.embed.button} onclick={() => (embedOpen = !embedOpen)}>
@@ -1074,6 +1107,9 @@
         />
       {/if}
     </div>
+    {#if downloadMenu}
+      <ContextMenu x={downloadMenu.x} y={downloadMenu.y} items={downloadMenu.items} onclose={() => (downloadMenu = null)} />
+    {/if}
   </section>
 {/if}
 
@@ -1367,7 +1403,7 @@
     header {
       padding: var(--space-2) var(--space-3);
     }
-    .embed-wrap .label {
+    header .label {
       display: none;
     }
     .workspace {

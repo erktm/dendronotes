@@ -41,8 +41,11 @@ export const tintClass = (c: Color) => `f-${c}`
 export const solidClass = (c: Color) => `t-${c}`
 export const PAPER_CLASS = 'paper'
 
+/** Light or dark only (an exported picture), or both, switching with the system (a file). */
+export type Scheme = 'light' | 'dark' | 'both'
+
 /** The style sheet of a saved drawing, for the colors it uses. */
-export function styleSheet(used: Iterable<Color>): string {
+export function styleSheet(used: Iterable<Color>, scheme: Scheme = 'both'): string {
   const colors = [...new Set(used)].sort()
   const rules = (mode: 'light' | 'dark') =>
     colors
@@ -51,5 +54,6 @@ export function styleSheet(used: Iterable<Color>): string {
         return `.s-${c}{stroke:${v.stroke[mode]}}.t-${c}{fill:${v.stroke[mode]}}.f-${c}{fill:${v.fill[mode]}}`
       })
       .join('') + `.${PAPER_CLASS}{fill:${PAPER[mode]}}`
+  if (scheme !== 'both') return rules(scheme)
   return `${rules('light')}@media (prefers-color-scheme: dark){${rules('dark')}}`
 }

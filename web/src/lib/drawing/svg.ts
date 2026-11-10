@@ -4,7 +4,7 @@
 // The server checks every saved file (internal/drawing); what is written
 // here must pass that check (testdata/drawing.svg is shared with its tests).
 
-import { PAPER_CLASS, styleSheet } from './colors'
+import { PAPER_CLASS, type Scheme, styleSheet } from './colors'
 import { type Box, grow, union } from './geometry'
 import { type Measure, type Prim, lineLabelBox, primitives, usedColors } from './render'
 import { type FileData, type Scene, bounds, isLinear, pruneFiles, sanitizeScene } from './scene'
@@ -53,8 +53,8 @@ export function canvasBox(scene: Scene, measure: Measure): Box {
   return { x, y, w: Math.ceil(box.x + box.w + MARGIN) - x, h: Math.ceil(box.y + box.h + MARGIN) - y }
 }
 
-/** The file of a drawing. */
-export function toSVG(input: Scene, measure: Measure): string {
+/** The file of a drawing (with scheme, only those colors: for a picture to export). */
+export function toSVG(input: Scene, measure: Measure, scheme: Scheme = 'both'): string {
   const scene = pruneFiles(input)
   const { x, y, w, h } = canvasBox(scene, measure)
   const json = JSON.stringify({ version: 1, sketchy: scene.sketchy, elements: scene.elements })
@@ -71,7 +71,7 @@ export function toSVG(input: Scene, measure: Measure): string {
   const paper = `<rect class="${PAPER_CLASS}" x="${x}" y="${y}" width="${w}" height="${h}"/>`
   return (
     `<svg xmlns="${SVG_NS}" viewBox="${x} ${y} ${w} ${h}" width="${w}" height="${h}">\n` +
-    `<style>${styleSheet(usedColors(scene))}</style>\n` +
+    `<style>${styleSheet(usedColors(scene), scheme)}</style>\n` +
     `<metadata id="${METADATA_ID}">${escapeText(json)}</metadata>\n` +
     (defs ? `<defs>${defs}</defs>\n` : '') +
     paper +
