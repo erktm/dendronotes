@@ -69,9 +69,12 @@ admin's first soma.
   Standard Markdown works too: `![alt](photo.png)`, `[report](report.pdf)`. Clicking a file in
   the tree shows it with its size and a download button. Images from other hosts are never
   loaded.
-- **Drawings.** Simple diagrams and sketches: "New drawing" in the file tree, or the drawing
-  button in the top bar while editing, which puts a new drawing next to the note, embeds it at
-  the cursor (`![[Drawing 2026-11-10 1530.drawing.svg]]`) and opens it. The editor has
+- **Drawings.** Simple diagrams and sketches: "New drawing" behind the arrow next to the `+` at
+  the top of the file tree (or in the tree's context menu), or the drawing button in the top bar
+  while editing, which puts a new drawing next to the note, embeds it at the cursor
+  (`![[Drawing 2026-11-10 1530.drawing.svg]]`) and opens it. To show an existing drawing in a
+  note, type `![[` and pick it from the suggestions (they list drawings and images), or copy the
+  line from "Embed in a note" in the drawing editor. The editor has
   rectangles, ellipses, diamonds, lines and arrows, a pen, text, and icons; double-click a shape
   to write in it. The ends of lines and arrows stick to shapes, text and icons and follow them
   when they move; arrows can bend at right angles. Colors come from fixed slots that suit every
@@ -81,7 +84,9 @@ admin's first soma.
   opens the editor (readers get a large view, everyone has the button in the corner), and in
   the editor the handle at the corner sets the width (`|600`). A drawing is a plain SVG file
   that any image viewer shows, with the editable drawing stored inside it – so it is also an
-  ordinary attachment for Obsidian, git or a sync tool.
+  ordinary attachment for Obsidian, git or a sync tool. The graph shows drawings as small
+  squares, joined by dotted lines to the notes that embed them (embeds are not synapses; the
+  "Drawings" switch hides them).
 - **Icons for drawings.** Each soma has an icon library (the picture button in the drawing
   editor): everyone with access uses it, everyone who may create files adds PNG, JPEG, WebP,
   GIF or SVG pictures (scaled to at most 512 pixels; SVG only without scripts or external
