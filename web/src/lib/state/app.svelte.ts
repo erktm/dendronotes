@@ -666,8 +666,8 @@ class App {
   drawingReturn: string | null = null
 
   /**
-   * Creates a drawing next to the open note, embeds it at the cursor and
-   * opens it in the editor.
+   * Asks for a name (a dated one filled in), creates the drawing next to the
+   * open note, embeds it at the cursor and opens it in the editor.
    */
   async insertDrawing(): Promise<void> {
     const n = this.note
@@ -675,9 +675,23 @@ class App {
     const now = new Date()
     const p = (v: number) => String(v).padStart(2, '0')
     const stamp = `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())} ${p(now.getHours())}${p(now.getMinutes())}`
+    const raw = await this.prompt({
+      title: strings.drawing.nameTitle,
+      text: strings.drawing.nameText,
+      label: strings.tree.drawingName,
+      value: strings.drawing.defaultName(stamp),
+      confirmLabel: strings.drawing.create,
+    })
+    if (raw === null || this.note !== n) return
+    const name = withDrawingExtension(raw.trim().normalize('NFC'))
+    const problem = nameProblem(name)
+    if (problem) {
+      this.toast(problem)
+      return
+    }
     let path: string
     try {
-      path = (await drawingsApi.createDrawing(join(dirname(n.path), withDrawingExtension(strings.drawing.defaultName(stamp))))).path
+      path = (await drawingsApi.createDrawing(join(dirname(n.path), name))).path
     } catch (err) {
       this.toast(errorMessage(err))
       return

@@ -179,11 +179,19 @@
   .split:hover {
     background: var(--bg-hover);
   }
+  /* One control: the arrow sits right next to the plus. */
   .split button {
-    width: 26px;
+    width: 22px;
+    padding: 0;
+    place-items: center end;
+  }
+  .split button:hover {
+    background: transparent;
   }
   .split .more {
-    width: 16px;
+    width: 14px;
+    margin-left: -2px;
+    place-items: center start;
   }
   .foot {
     display: flex;
