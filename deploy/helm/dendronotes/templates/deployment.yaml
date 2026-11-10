@@ -1,0 +1,141 @@
+{{- $adminKey := include "dendronotes.adminKey" . }}
+{{- $oidcKey := include "dendronotes.oidcKey" . }}
+{{- $ldapKey := include "dendronotes.ldapKey" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dendronotes.fullname" . }}
+  labels:
+    {{- include "dendronotes.labels" . | nindent 4 }}
+spec:
+  # One writer for the somas and state.db: never two pods at once.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "dendronotes.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "dendronotes.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        # Restart when the secrets change.
+        checksum/auth: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "dendronotes.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      # Kubernetes would inject DENDRONOTES_PORT and DENDRONOTES_SERVICE_* otherwise.
+      enableServiceLinks: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: dendronotes
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: [serve]
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          env:
+            - name: DENDRONOTES_SOMAS_DIR
+              value: /somas
+            - name: DENDRONOTES_DATA_DIR
+              value: /data
+            - name: DENDRONOTES_HTTP_PORT
+              value: "8080"
+            - name: DENDRONOTES_ADMIN_USERNAME
+              value: {{ .Values.auth.admin.username | quote }}
+            {{- if eq $adminKey "admin-password-hash" }}
+            - name: DENDRONOTES_ADMIN_PASSWORD_HASH_FILE
+              value: /run/secrets/dendronotes/admin-password-hash
+            {{- else if eq $adminKey "admin-password" }}
+            - name: DENDRONOTES_ADMIN_PASSWORD_FILE
+              value: /run/secrets/dendronotes/admin-password
+            {{- end }}
+            {{- with $oidcKey }}
+            - name: DENDRONOTES_OIDC_CLIENT_SECRET_FILE
+              value: /run/secrets/dendronotes/{{ . }}
+            {{- end }}
+            {{- with $ldapKey }}
+            - name: DENDRONOTES_LDAP_BIND_PASSWORD_FILE
+              value: /run/secrets/dendronotes/{{ . }}
+            {{- end }}
+            {{- if .Values.metrics.enabled }}
+            - name: DENDRONOTES_METRICS_PORT
+              value: {{ .Values.metrics.port | quote }}
+            {{- end }}
+            {{- range $k, $v := .Values.config }}
+            - name: {{ $k }}
+              value: {{ $v | toString | quote }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+            {{- if .Values.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+            {{- end }}
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+            failureThreshold: 60
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+          volumeMounts:
+            - name: somas
+              mountPath: /somas
+            - name: data
+              mountPath: /data
+            - name: auth
+              mountPath: /run/secrets/dendronotes
+              readOnly: true
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: somas
+          persistentVolumeClaim:
+            claimName: {{ include "dendronotes.claimName" (list . "somas") }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "dendronotes.claimName" (list . "data") }}
+        - name: auth
+          secret:
+            secretName: {{ include "dendronotes.secretName" . }}
+            defaultMode: 0400
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

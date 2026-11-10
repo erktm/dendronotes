@@ -1,0 +1,138 @@
+# Values for the dendronotes chart. Every DENDRONOTES_* setting is described in
+# the README of the project (Configuration).
+
+image:
+  repository: ghcr.io/erktm/dendronotes
+  # Defaults to the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# Needed while the image is private (e.g. a private GitHub repository).
+imagePullSecrets: []
+
+nameOverride: ""
+# The objects are called "dendronotes" (PVCs dendronotes-somas and dendronotes-data,
+# Secret dendronotes-auth) unless overridden here.
+fullnameOverride: ""
+
+# Plain DENDRONOTES_* settings, e.g.
+#   DENDRONOTES_PUBLIC_URL: https://notes.example.org
+#   DENDRONOTES_OIDC_ISSUER: https://sso.example.org/realms/main
+#   DENDRONOTES_OIDC_CLIENT_ID: dendronotes
+config:
+  DENDRONOTES_LOG_FORMAT: json
+
+# Further environment entries (valueFrom works here).
+extraEnv: []
+
+# Secrets go into the Secret "<fullname>-auth" (or an existing one) and are
+# mounted as files under /run/secrets/dendronotes.
+auth:
+  # Use this Secret instead of creating one; it needs the keys named below.
+  existingSecret: ""
+  admin:
+    # The first admin account, created while no admin exists.
+    username: admin
+    # Its password (at least 10 characters). Empty and no hash: the chart
+    # generates one and keeps it across upgrades (see the notes after install).
+    password: ""
+    # Or an argon2id hash from `dendronotes hash-password` (wins over password).
+    passwordHash: ""
+    # With existingSecret: the key that holds the admin credential, one of
+    # "admin-password", "admin-password-hash" or "" for none.
+    secretKey: admin-password
+  # Client secret for OpenID Connect (key oidc-client-secret); with
+  # existingSecret set oidcClientSecretKey instead.
+  oidcClientSecret: ""
+  oidcClientSecretKey: ""
+  # Password of the LDAP service account (key ldap-bind-password); with
+  # existingSecret set ldapBindPasswordKey instead.
+  ldapBindPassword: ""
+  ldapBindPasswordKey: ""
+
+persistence:
+  # The notes: one folder per soma. Plain files; back them up as such.
+  somas:
+    size: 10Gi
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+    # Use an existing PersistentVolumeClaim instead of creating one.
+    existingClaim: ""
+  # state.db (accounts and shares, back it up), note histories and search indexes.
+  data:
+    size: 2Gi
+    storageClass: ""
+    accessModes: [ReadWriteOnce]
+    existingClaim: ""
+
+service:
+  type: ClusterIP
+  port: 80
+
+# Prometheus metrics on a port of their own (DENDRONOTES_METRICS_PORT), with a
+# separate Service "<fullname>-metrics", not routed through the ingress.
+metrics:
+  enabled: false
+  port: 9090
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # The live updates are Server-Sent Events: no buffering, long reads, e.g. for nginx:
+    # nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    # nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+  hosts:
+    - host: notes.example.org
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: notes-tls
+  #    hosts: [notes.example.org]
+
+# Gateway API (e.g. Envoy Gateway) instead of an Ingress.
+httpRoute:
+  enabled: false
+  annotations: {}
+  parentRefs: []
+  #  - name: eg
+  #    namespace: envoy-gateway-system
+  #    sectionName: https
+  hostnames: []
+  #  - notes.example.org
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 96Mi
+  limits:
+    memory: 512Mi
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
+serviceAccount:
+  create: true
+  # Defaults to the full name.
+  name: ""
+  annotations: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

@@ -1,0 +1,24 @@
+{{- range $which := list "somas" "data" }}
+{{- $p := index $.Values.persistence $which }}
+{{- if not $p.existingClaim }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "dendronotes.claimName" (list $ $which) }}
+  labels:
+    {{- include "dendronotes.labels" $ | nindent 4 }}
+  annotations:
+    # The notes and the account database outlive an uninstall.
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    {{- toYaml $p.accessModes | nindent 4 }}
+  {{- with $p.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ $p.size }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,21 @@
+dendronotes {{ .Chart.AppVersion }} is starting as "{{ include "dendronotes.fullname" . }}" in namespace {{ .Release.Namespace }}.
+
+{{- if .Values.ingress.enabled }}
+Open: http{{ if .Values.ingress.tls }}s{{ end }}://{{ (index .Values.ingress.hosts 0).host }}/
+{{- else if .Values.httpRoute.enabled }}
+Open: https://{{ index .Values.httpRoute.hostnames 0 | default "<your host>" }}/
+{{- else }}
+Try it locally:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "dendronotes.fullname" . }} 8080:{{ .Values.service.port }}
+  then open http://localhost:8080/
+{{- end }}
+
+Sign in as "{{ .Values.auth.admin.username }}".
+{{- if and (not .Values.auth.existingSecret) (not .Values.auth.admin.password) (not .Values.auth.admin.passwordHash) }}
+The password was generated:
+  kubectl -n {{ .Release.Namespace }} get secret {{ include "dendronotes.secretName" . }} -o jsonpath='{.data.admin-password}' | base64 -d; echo
+{{- end }}
+
+The notes live in the PVC {{ include "dendronotes.claimName" (list . "somas") }}, accounts and histories in
+{{ include "dendronotes.claimName" (list . "data") }}. Both are kept when the release is uninstalled.
+Back up state.db: kubectl -n {{ .Release.Namespace }} exec deploy/{{ include "dendronotes.fullname" . }} -- dendronotes backup /data/backup.zip

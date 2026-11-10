@@ -1,0 +1,18 @@
+apiVersion: v2
+name: dendronotes
+description: Self-hosted Markdown notes as plain files in folders (somas), with editing together, synapses and a graph.
+type: application
+# Both are set from the release tag when the chart is published.
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/erktm/dendronotes
+sources:
+  - https://github.com/erktm/dendronotes
+keywords:
+  - notes
+  - markdown
+  - wiki
+  - knowledge-base
+maintainers:
+  - name: Erik Haeger
+    url: https://github.com/erktm
