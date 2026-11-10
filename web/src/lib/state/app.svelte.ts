@@ -20,6 +20,8 @@ import { router } from '../router.svelte'
 import { strings } from '../strings'
 import { newNotePath, normalizePath, resolveFile, resolveSynapse } from '../synapses'
 import { buildTree } from '../tree'
+import { isDrawingPath, withDrawingExtension } from '../drawing/svg'
+import * as drawingsApi from '../api/drawings'
 import { NoteSession } from './note.svelte'
 import { live, type CollabEventName } from './live.svelte'
 import type { CollabEvent, NoticeEvent, PresenceEvent, SavedEvent } from '../api/collab'
@@ -29,7 +31,13 @@ import { capabilities, type Capability } from '../roles'
 type AuthState = 'checking' | 'anonymous' | 'authenticated'
 
 /** An inline input in the file tree. */
-export type TreeEdit = { kind: 'new-note' | 'new-folder'; parent: string } | { kind: 'rename'; path: string }
+export type NewEntryKind = 'new-note' | 'new-folder' | 'new-drawing'
+export type TreeEdit = { kind: NewEntryKind; parent: string } | { kind: 'rename'; path: string }
+
+/** What a tree input creates, for its edit kind. */
+export function entryKind(kind: NewEntryKind): 'note' | 'folder' | 'drawing' {
+  return kind === 'new-folder' ? 'folder' : kind === 'new-drawing' ? 'drawing' : 'note'
+}
 
 export interface Toast {
   id: number
@@ -318,7 +326,7 @@ class App {
   }
 
   /** For changing actions: false (and a hint) when the role does not allow it. */
-  private may(what: Capability): boolean {
+  may(what: Capability): boolean {
     if (this.can[what]) return true
     if (this.soma) this.toast(strings.share.notAllowed[what], 'info')
     return false
@@ -392,14 +400,14 @@ class App {
     }
   }
 
-  /** Shows the inline name input for a new note or folder in parent. */
-  startCreate(kind: 'new-note' | 'new-folder', parent: string): void {
+  /** Shows the inline name input for a new note, folder or drawing in parent. */
+  startCreate(kind: NewEntryKind, parent: string): void {
     if (!this.may('create')) return
     if (parent) this.expanded.add(parent)
     this.edit = { kind, parent }
   }
 
-  async createEntry(kind: 'note' | 'folder', parent: string, rawName: string): Promise<boolean> {
+  async createEntry(kind: 'note' | 'folder' | 'drawing', parent: string, rawName: string): Promise<boolean> {
     if (!this.may('create')) return false
     const problem = nameProblem(rawName)
     if (problem) {
@@ -408,9 +416,11 @@ class App {
     }
     let name = rawName.normalize('NFC')
     if (kind === 'note') name = withNoteExtension(name)
-    const path = join(parent, name)
+    if (kind === 'drawing') name = withDrawingExtension(name)
+    let path = join(parent, name)
     try {
       if (kind === 'note') await api.createNote(path)
+      else if (kind === 'drawing') path = (await drawingsApi.createDrawing(path, false)).path
       else await api.createFolder(path)
     } catch (err) {
       this.toast(errorMessage(err))
@@ -418,7 +428,7 @@ class App {
     }
     if (parent) this.expanded.add(parent)
     await this.refresh()
-    if (kind === 'note') {
+    if (kind === 'note' || kind === 'drawing') {
       this.focusNext = path
       await this.navigate(path)
     } else {
@@ -438,6 +448,7 @@ class App {
     // Keep a note a note: "Plan" for "Idea.md" becomes "Plan.md"; an
     // attachment keeps its type: "north bed" for "north.png" becomes "north bed.png".
     if (entry?.type === 'file' && isNote(path) && !isNote(name)) name += extname(path)
+    else if (entry?.type === 'file' && isDrawingPath(path) && !extname(name)) name = withDrawingExtension(name)
     else if (entry?.type === 'file' && !isNote(path) && !extname(name)) name += extname(path)
     const to = join(dirname(path), name)
     if (to === path) return true
@@ -651,10 +662,25 @@ class App {
     await this.navigate(path)
   }
 
+  /** The note a drawing was opened from: "Done" goes back there. */
+  drawingReturn: string | null = null
+
+  /** Leaves the drawing editor. */
+  closeDrawing(path: string): void {
+    const back = this.drawingReturn
+    this.drawingReturn = null
+    if (this.note?.path === path) void this.navigate(back && back !== path ? back : null)
+  }
+
   /** Follows the URL: opens the note it names (or none). */
   openPath(path: string | null): void {
     if (this.note?.path === path) return
     const prev = this.note
+    if (path && isDrawingPath(path)) {
+      if (prev && isNote(prev.path)) this.drawingReturn = prev.path
+    } else {
+      this.drawingReturn = null
+    }
     if (prev) void prev.flush().finally(() => prev.close())
     if (path === null) {
       this.note = null

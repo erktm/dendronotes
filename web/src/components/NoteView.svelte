@@ -5,6 +5,9 @@
   import ReadingView from './ReadingView.svelte'
   import StatusBar from './StatusBar.svelte'
   import AttachmentView from './AttachmentView.svelte'
+  import DrawingEditor from './DrawingEditor.svelte'
+  import { app } from '../lib/state/app.svelte'
+  import { isDrawingPath } from '../lib/drawing/svg'
   import type { NoteSession } from '../lib/state/note.svelte'
   import { settings } from '../lib/state/settings.svelte'
   import { viewOf } from '../lib/view'
@@ -18,6 +21,10 @@
   <p class="loading">{strings.note.loading}</p>
 {:else if session.status === 'missing'}
   <EmptyState title={strings.note.notFoundTitle} text={strings.note.notFoundText(displayName(session.path))} />
+{:else if session.status === 'unsupported' && isDrawingPath(session.path)}
+  {#key session.path}
+    <DrawingEditor path={session.path} readonly={!app.can.write} ondone={() => app.closeDrawing(session.path)} />
+  {/key}
 {:else if session.status === 'unsupported' && !isNote(session.path)}
   <AttachmentView path={session.path} />
 {:else if session.status === 'unsupported'}

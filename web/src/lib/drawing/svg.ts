@@ -22,6 +22,12 @@ export function isDrawingPath(path: string): boolean {
   return path.toLowerCase().endsWith(SUFFIX)
 }
 
+/** "Plan.drawing.svg" for "Plan" (and for "Plan.drawing"). */
+export function withDrawingExtension(name: string): string {
+  if (isDrawingPath(name)) return name
+  return name.replace(/\.drawing$/i, '') + SUFFIX
+}
+
 /** "Plan" for "Ideas/Plan.drawing.svg". */
 export function drawingTitle(path: string): string {
   const name = path.slice(path.lastIndexOf('/') + 1)

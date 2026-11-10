@@ -2,7 +2,7 @@
   import TreeItem, { DRAG_TYPE } from './TreeItem.svelte'
   import TreeInput from './TreeInput.svelte'
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
-  import { app } from '../lib/state/app.svelte'
+  import { app, entryKind, type NewEntryKind } from '../lib/state/app.svelte'
   import { strings } from '../lib/strings'
   import type { TreeNode } from '../lib/tree'
 
@@ -10,7 +10,7 @@
   let rootDrop = $state(false)
 
   const creatingAtRoot = $derived(app.edit && app.edit.kind !== 'rename' && app.edit.parent === '' ? app.edit : null)
-  const startCreate = (kind: 'new-note' | 'new-folder', parent: string) => app.startCreate(kind, parent)
+  const startCreate = (kind: NewEntryKind, parent: string) => app.startCreate(kind, parent)
 
   function openMenu(e: MouseEvent, node: TreeNode | null) {
     e.preventDefault()
@@ -27,6 +27,7 @@
     if (folder !== null && app.can.create) {
       items.push(
         { label: strings.tree.newNote, icon: 'note', action: () => startCreate('new-note', folder) },
+        { label: strings.tree.newDrawing, icon: 'drawing', action: () => startCreate('new-drawing', folder) },
         { label: strings.tree.newFolder, icon: 'folder-plus', action: () => startCreate('new-folder', folder) },
       )
     }
@@ -85,8 +86,8 @@
       <li>
         <TreeInput
           depth={0}
-          kind={creatingAtRoot.kind === 'new-folder' ? 'folder' : 'note'}
-          onsubmit={(name) => app.createEntry(creatingAtRoot.kind === 'new-folder' ? 'folder' : 'note', '', name)}
+          kind={entryKind(creatingAtRoot.kind)}
+          onsubmit={(name) => app.createEntry(entryKind(creatingAtRoot.kind), '', name)}
         />
       </li>
     {/if}

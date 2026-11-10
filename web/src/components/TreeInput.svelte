@@ -11,12 +11,13 @@
     onsubmit,
   }: {
     depth: number
-    kind: 'note' | 'folder'
+    kind: 'note' | 'folder' | 'drawing'
     initial?: string
     onsubmit: (name: string) => Promise<boolean>
   } = $props()
 
   let input: HTMLInputElement | undefined = $state()
+  const placeholder = $derived(kind === 'folder' ? strings.tree.folderName : kind === 'drawing' ? strings.tree.drawingName : strings.tree.noteName)
   let busy = false
   let done = false
 
@@ -57,7 +58,7 @@
 
 <div class="row" use:cssVars={{ '--depth': depth }}>
   <span class="spacer"></span>
-  <Icon name={kind === 'folder' ? 'folder' : 'note'} size={17} />
+  <Icon name={kind === 'folder' ? 'folder' : kind === 'drawing' ? 'drawing' : 'note'} size={17} />
   <input
     bind:this={input}
     value={initial}
@@ -66,8 +67,8 @@
     onblur={() => void commit()}
     spellcheck="false"
     autocomplete="off"
-    aria-label={initial ? strings.tree.newName : kind === 'folder' ? strings.tree.folderName : strings.tree.noteName}
-    placeholder={kind === 'folder' ? strings.tree.folderName : strings.tree.noteName}
+    aria-label={initial ? strings.tree.newName : placeholder}
+    {placeholder}
   />
 </div>
 

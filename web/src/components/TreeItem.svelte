@@ -7,7 +7,8 @@
   import TreeItem from './TreeItem.svelte'
   import TreeInput from './TreeInput.svelte'
   import Icon from './Icon.svelte'
-  import { app } from '../lib/state/app.svelte'
+  import { app, entryKind } from '../lib/state/app.svelte'
+  import { isDrawingPath } from '../lib/drawing/svg'
   import { router } from '../lib/router.svelte'
   import { cssVars } from '../lib/actions'
   import { displayName, isNote } from '../lib/paths'
@@ -123,7 +124,7 @@
         <Icon name={open ? 'folder-open' : 'folder'} size={17} />
       {:else}
         <span class="chevron"></span>
-        <Icon name={isNote(node.path) ? 'note' : 'file'} size={17} />
+        <Icon name={isNote(node.path) ? 'note' : isDrawingPath(node.path) ? 'drawing' : 'file'} size={17} />
       {/if}
       <span class="label">{displayName(node.path)}</span>
       {#if node.readOnly}<span class="badge" title={strings.tree.readOnly}><Icon name="lock" size={13} /></span>{/if}
@@ -136,8 +137,8 @@
         <li>
           <TreeInput
             depth={depth + 1}
-            kind={creating.kind === 'new-folder' ? 'folder' : 'note'}
-            onsubmit={(name) => app.createEntry(creating.kind === 'new-folder' ? 'folder' : 'note', node.path, name)}
+            kind={entryKind(creating.kind)}
+            onsubmit={(name) => app.createEntry(entryKind(creating.kind), node.path, name)}
           />
         </li>
       {/if}

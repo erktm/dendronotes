@@ -187,3 +187,28 @@ export function snap(v: number, grid: number): number {
 export function round(v: number): number {
   return Math.round(v * 100) / 100
 }
+
+/** Fewer points along nearly straight stretches (Ramer–Douglas–Peucker). */
+export function simplify(points: readonly Pt[], tolerance: number): Pt[] {
+  if (points.length < 3) return [...points]
+  const keep = new Uint8Array(points.length)
+  keep[0] = keep[points.length - 1] = 1
+  const stack: [number, number][] = [[0, points.length - 1]]
+  while (stack.length) {
+    const [a, b] = stack.pop()!
+    let worst = -1
+    let index = -1
+    for (let i = a + 1; i < b; i++) {
+      const d = segmentDist(points[i]!, points[a]!, points[b]!)
+      if (d > worst) {
+        worst = d
+        index = i
+      }
+    }
+    if (worst > tolerance) {
+      keep[index] = 1
+      stack.push([a, index], [index, b])
+    }
+  }
+  return points.filter((_, i) => keep[i])
+}
