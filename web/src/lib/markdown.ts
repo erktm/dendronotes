@@ -13,6 +13,7 @@ import { fileKind, fileURL, isFileURL } from './files'
 import { isNoteTarget, splitWikiTarget, synapseLabel } from './synapses'
 import { slugger } from './outline'
 import { strings } from './strings'
+import { isDrawingPath } from './drawing/svg'
 
 export interface RenderContext {
   /** Resolves a synapse target to a soma path (null: unresolved). */
@@ -47,6 +48,14 @@ function fileLink(path: string, label: string): string {
 function fileEmbed(path: string, label: string, size: { w: number; h?: number } | null): string {
   const src = escapeHtml(fileURL(path))
   const dims = size ? ` width="${size.w}"${size.h ? ` height="${size.h}"` : ''}` : ''
+  // Drawings: the image until the reading view draws the scene in its place.
+  if (isDrawingPath(path)) {
+    const width = size ? ` width="${size.w}"` : ''
+    return (
+      `<span class="drawing-embed" data-drawing="${escapeHtml(path)}">` +
+      `<img class="embed-image embed-drawing" src="${src}" alt="${escapeHtml(label)}" loading="lazy"${width}></span>`
+    )
+  }
   switch (fileKind(path)) {
     case 'image':
       return `<img class="embed-image" src="${src}" alt="${escapeHtml(label)}" loading="lazy"${dims}>`

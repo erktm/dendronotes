@@ -12,6 +12,9 @@
   import { comments } from '../lib/state/comments.svelte'
   import { anchorFromRendered, CONTEXT, findAnchor, type Anchor } from '../lib/anchors'
   import { cssVars } from '../lib/actions'
+  import { iconPath } from './Icon.svelte'
+  import { fillDrawing } from '../lib/drawing/embed'
+  import { isDrawingPath } from '../lib/drawing/svg'
 
   let { session }: { session: NoteSession } = $props()
 
@@ -62,6 +65,7 @@
         body.innerHTML = renderMarkdown(heading ? section(content, heading) : content, contextFor(path))
         // Checkboxes belong to the other note: shown, not toggled from here.
         for (const box of body.querySelectorAll<HTMLInputElement>('input.task-box')) box.disabled = true
+        fillDrawings(body)
         await fillEmbeds(body, [...chain, path], gen)
       }),
     )
@@ -74,6 +78,58 @@
     const gen = ++generation
     for (const el of article.querySelectorAll<HTMLElement>('.embed-note[data-filled]')) delete el.dataset.filled
     void fillEmbeds(article, [session.path], gen)
+  })
+
+  // --- Drawings (![[Plan.drawing.svg]]) -----------------------------------
+  // Drawn in place from their scene; a click edits them (writers) or shows
+  // them large (everyone else, and the button in the corner).
+
+  let viewing = $state<string | null>(null)
+
+  /** Changes when a drawing file changes, so embeds load it again. */
+  const drawingStamp = $derived(
+    app.entries
+      .filter((e) => isDrawingPath(e.path))
+      .map((e) => `${e.path}:${e.mtime}`)
+      .join('|'),
+  )
+
+  function fillDrawings(root: ParentNode) {
+    for (const host of root.querySelectorAll<HTMLElement>('.drawing-embed[data-drawing]')) {
+      const path = host.dataset.drawing ?? ''
+      const version = app.entries.find((e) => e.path === path)?.mtime
+      if (host.dataset.filled === String(version)) continue
+      host.dataset.filled = String(version)
+      if (!host.querySelector('.drawing-zoom')) host.append(zoomButton())
+      void fillDrawing(host, path, version, host.querySelector('img')?.alt || path)
+    }
+  }
+
+  function zoomButton(): HTMLButtonElement {
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.className = 'drawing-zoom'
+    b.title = strings.drawing.fullscreen
+    b.setAttribute('aria-label', strings.drawing.fullscreen)
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    svg.setAttribute('viewBox', '0 0 24 24')
+    svg.setAttribute('width', '16')
+    svg.setAttribute('height', '16')
+    svg.setAttribute('aria-hidden', 'true')
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+    p.setAttribute('d', iconPath('expand'))
+    svg.append(p)
+    b.append(svg)
+    return b
+  }
+
+  $effect(() => {
+    void html
+    void drawingStamp
+    if (article) {
+      const root = article
+      untrack(() => fillDrawings(root))
+    }
   })
 
   function toggleTask(line: number) {
@@ -90,6 +146,14 @@
       if (target instanceof HTMLInputElement && target.classList.contains('task-box')) {
         e.preventDefault()
         if (!embed) toggleTask(Number(target.dataset.line))
+        return
+      }
+      const drawing = target.closest<HTMLElement>('.drawing-embed[data-drawing]')
+      if (drawing) {
+        e.preventDefault()
+        const path = drawing.dataset.drawing ?? ''
+        if (target.closest('.drawing-zoom') || !app.can.write) viewing = path
+        else void app.navigate(path)
         return
       }
       const a = target.closest('a')
@@ -127,11 +191,13 @@
   // Passages are marked with the CSS Custom Highlight API: the rendered (and
   // sanitized) HTML stays untouched. Browsers without it show no marks.
 
-  /** The rendered text and where each text node starts in it. */
+  /** The rendered text and where each text node starts in it (drawings left out). */
   function textIndex(root: HTMLElement): { text: string; nodes: { node: Text; start: number }[] } {
     const nodes: { node: Text; start: number }[] = []
     let text = ''
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: (n) => (n.parentElement?.closest('.drawing-embed') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+    })
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
       nodes.push({ node: n as Text, start: text.length })
       text += n.nodeValue ?? ''
@@ -230,11 +296,19 @@
       selection = null
       return
     }
-    const before = document.createRange()
-    before.setStart(article, 0)
-    before.setEnd(range.startContainer, range.startOffset)
-    const start = before.toString().length
-    const text = textIndex(article).text
+    const index = textIndex(article)
+    // Where the selection starts in the indexed text (drawings left out).
+    const node = index.nodes.find((n) => n.node === range.startContainer)
+    let start: number
+    if (node) {
+      start = node.start + range.startOffset
+    } else {
+      const before = document.createRange()
+      before.setStart(article, 0)
+      before.setEnd(range.startContainer, range.startOffset)
+      start = before.toString().length
+    }
+    const text = index.text
     const quote = range.toString()
     const anchor = anchorFromRendered(
       session.content,
@@ -275,6 +349,11 @@
 <div class="note-surface" class:serif={settings.noteFont === 'serif'} class:readable={settings.readableWidth} bind:this={surface}>
   <!-- Sanitized by DOMPurify in renderMarkdown. -->
   <article class="reading" bind:this={article} use:interactions>{@html html}</article>
+  {#if viewing}
+    {#await import('./DrawingLightbox.svelte') then { default: DrawingLightbox }}
+      <DrawingLightbox path={viewing} onclose={() => (viewing = null)} />
+    {/await}
+  {/if}
   {#if selection}
     <button
       type="button"

@@ -62,20 +62,19 @@ export function drawingBox(scene: Scene, measure: Measure): Box | null {
   return union(boxes)
 }
 
+/** The canvas of a saved drawing: what it covers and a margin, in whole units (400 × 300 when empty). */
+export function canvasBox(scene: Scene, measure: Measure): Box {
+  const box = drawingBox(scene, measure)
+  if (!box) return { x: 0, y: 0, w: 400, h: 300 }
+  const x = Math.floor(box.x - MARGIN)
+  const y = Math.floor(box.y - MARGIN)
+  return { x, y, w: Math.ceil(box.x + box.w + MARGIN) - x, h: Math.ceil(box.y + box.h + MARGIN) - y }
+}
+
 /** The file of a drawing. */
 export function toSVG(input: Scene, measure: Measure): string {
   const scene = pruneFiles(input)
-  const box = drawingBox(scene, measure)
-  let x = 0
-  let y = 0
-  let w = 400
-  let h = 300
-  if (box) {
-    x = Math.floor(box.x - MARGIN)
-    y = Math.floor(box.y - MARGIN)
-    w = Math.ceil(box.x + box.w + MARGIN) - x
-    h = Math.ceil(box.y + box.h + MARGIN) - y
-  }
+  const { x, y, w, h } = canvasBox(scene, measure)
   const json = JSON.stringify({ version: 1, sketchy: scene.sketchy, elements: scene.elements })
   const defs = Object.entries(scene.files)
     .map(

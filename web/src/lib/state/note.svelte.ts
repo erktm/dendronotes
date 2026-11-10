@@ -157,6 +157,25 @@ export class NoteSession {
     void this.pull()
   }
 
+  /**
+   * Puts a block (an embed) on its own line at the cursor, as a user edit.
+   * False without an editor or when the note can't be changed.
+   */
+  insertBlock(text: string): boolean {
+    const v = this.view
+    if (!v || this.readOnly) return false
+    const pos = v.state.selection.main.head
+    const line = v.state.doc.lineAt(pos)
+    const before = pos > line.from ? '\n' : ''
+    const after = pos < line.to ? '\n' : ''
+    v.dispatch({
+      changes: { from: pos, insert: before + text + after },
+      selection: { anchor: pos + before.length + text.length },
+      userEvent: 'input',
+    })
+    return true
+  }
+
   detach(view: EditorView): void {
     if (this.view !== view) return
     this.lastSelection = { anchor: view.state.selection.main.anchor, head: view.state.selection.main.head }

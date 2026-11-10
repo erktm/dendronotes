@@ -16,6 +16,8 @@ import { isNoteTarget, splitWikiTarget } from '../synapses'
 import { fileKind, fileURL } from '../files'
 import { isNote } from '../paths'
 import { strings } from '../strings'
+import { fillDrawing, versionedURL } from '../drawing/embed'
+import { isDrawingPath } from '../drawing/svg'
 
 /** How the editor resolves and opens synapses (provided by the app). */
 export interface SynapseHost {
@@ -23,6 +25,10 @@ export interface SynapseHost {
   open(target: string, markdown: boolean): void
   /** Resolves an attachment (image, PDF …) to a soma path. */
   resolveFile(target: string, markdown: boolean): string | null
+  /** Opens a file of the soma (a drawing in its editor). */
+  openFile?(path: string): void
+  /** The version of a file (its mtime), so embeds load a changed file again. */
+  fileVersion?(path: string): number | undefined
 }
 
 export const synapseHost = Facet.define<SynapseHost, SynapseHost | null>({
@@ -147,9 +153,111 @@ class ImageWidget extends WidgetType {
   }
 }
 
+/**
+ * An embedded drawing, drawn from its scene. A click opens the editor; the
+ * handle at the corner sets the width written after the pipe.
+ */
+class DrawingWidget extends WidgetType {
+  constructor(
+    readonly path: string,
+    readonly label: string,
+    readonly width: number | undefined,
+    readonly version: number | undefined,
+    readonly resizable: boolean,
+  ) {
+    super()
+  }
+  override eq(o: DrawingWidget): boolean {
+    return o.path === this.path && o.label === this.label && o.width === this.width && o.version === this.version && o.resizable === this.resizable
+  }
+  toDOM(view: EditorView): HTMLElement {
+    const host = document.createElement('span')
+    host.className = 'cm-drawing drawing-embed'
+    host.title = strings.drawing.openDrawing(this.label)
+    const img = document.createElement('img')
+    img.src = versionedURL(this.path, this.version)
+    img.alt = this.label
+    img.draggable = false
+    if (this.width) img.width = this.width
+    host.append(img)
+    void fillDrawing(host, this.path, this.version, this.label)
+    let resized = false
+    host.addEventListener('click', (e) => {
+      e.preventDefault()
+      if (resized) {
+        resized = false
+        return
+      }
+      view.state.facet(synapseHost)?.openFile?.(this.path)
+    })
+    if (this.resizable) host.append(this.handle(view, host, () => (resized = true)))
+    return host
+  }
+  /** The resize handle: dragging changes the shown width, letting go writes it. */
+  private handle(view: EditorView, host: HTMLElement, done: () => void): HTMLElement {
+    const grip = document.createElement('span')
+    grip.className = 'cm-drawing-resize'
+    grip.title = strings.drawing.resize
+    grip.addEventListener('pointerdown', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      grip.setPointerCapture(e.pointerId)
+      const startX = e.clientX
+      const startW = host.getBoundingClientRect().width
+      const max = view.contentDOM.getBoundingClientRect().width
+      let width = Math.round(startW)
+      host.classList.add('resizing')
+      const move = (ev: PointerEvent) => {
+        width = Math.round(Math.min(max, Math.max(48, startW + ev.clientX - startX)))
+        for (const el of host.querySelectorAll('svg.dn-drawing, img')) el.setAttribute('width', String(width))
+      }
+      const up = () => {
+        grip.removeEventListener('pointermove', move)
+        grip.removeEventListener('pointerup', up)
+        grip.removeEventListener('pointercancel', up)
+        host.classList.remove('resizing')
+        done()
+        setWidth(view, host, width)
+      }
+      grip.addEventListener('pointermove', move)
+      grip.addEventListener('pointerup', up)
+      grip.addEventListener('pointercancel', up)
+    })
+    return grip
+  }
+  // The widget handles its own clicks; the Markdown shows when the cursor moves there.
+  override ignoreEvent(): boolean {
+    return true
+  }
+}
+
+/** Writes a width into the embed a widget stands for: ![[Plan.drawing.svg|600]]. */
+function setWidth(view: EditorView, dom: HTMLElement, width: number): void {
+  let pos: number
+  try {
+    pos = view.posAtDOM(dom)
+  } catch {
+    return
+  }
+  const text = view.state.sliceDoc(pos, Math.min(view.state.doc.length, pos + 1024))
+  const m = /^!\[\[([^\]|\n]+)(\|[^\]\n]*)?\]\]/.exec(text)
+  if (!m || view.state.readOnly) return
+  const insert = `![[${m[1]}|${width}]]`
+  if (insert === m[0]) return
+  view.dispatch({ changes: { from: pos, to: pos + m[0].length, insert }, userEvent: 'input' })
+}
+
 /** The widget for an embedded attachment: the image itself, or a chip. */
-function attachmentWidget(host: SynapseHost | null, target: string, markdown: boolean, label: string, width?: number): WidgetType {
+function attachmentWidget(
+  host: SynapseHost | null,
+  target: string,
+  markdown: boolean,
+  label: string,
+  width?: number,
+  resizable = false,
+): WidgetType {
   const path = host?.resolveFile(target, markdown) ?? null
+  if (path && isDrawingPath(path)) return new DrawingWidget(path, label, width, host?.fileVersion?.(path), resizable)
   if (path && fileKind(path) === 'image') return new ImageWidget(fileURL(path), label, width)
   return new ChipWidget(label || target, 'attachment')
 }
@@ -325,7 +433,7 @@ function build(view: EditorView): DecorationSet {
               const size = alias && /^(\d{1,5})(?:x\d{1,5})?$/.exec(alias.trim())
               const widget = isNoteLink
                 ? new ChipWidget(alias ?? inner, 'note')
-                : attachmentWidget(host, target, false, size ? target : (alias ?? target), size ? Number(size[1]) : undefined)
+                : attachmentWidget(host, target, false, size ? target : (alias ?? target), size ? Number(size[1]) : undefined, !state.readOnly)
               out.push(Decoration.replace({ widget }).range(node.from, node.to))
               return false
             }

@@ -665,6 +665,28 @@ class App {
   /** The note a drawing was opened from: "Done" goes back there. */
   drawingReturn: string | null = null
 
+  /**
+   * Creates a drawing next to the open note, embeds it at the cursor and
+   * opens it in the editor.
+   */
+  async insertDrawing(): Promise<void> {
+    const n = this.note
+    if (!n || n.readOnly || !this.may('create')) return
+    const now = new Date()
+    const p = (v: number) => String(v).padStart(2, '0')
+    const stamp = `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())} ${p(now.getHours())}${p(now.getMinutes())}`
+    let path: string
+    try {
+      path = (await drawingsApi.createDrawing(join(dirname(n.path), withDrawingExtension(strings.drawing.defaultName(stamp))))).path
+    } catch (err) {
+      this.toast(errorMessage(err))
+      return
+    }
+    await this.refresh()
+    if (this.note !== n || !n.insertBlock(`![[${this.embedTarget(path, n.path)}]]`)) return
+    await this.navigate(path)
+  }
+
   /** Leaves the drawing editor. */
   closeDrawing(path: string): void {
     const back = this.drawingReturn

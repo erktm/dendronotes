@@ -8,7 +8,7 @@ import { setSoma } from './api/base'
 setSoma('soma1')
 
 const notes = ['Soil types.md', 'Projects/Plan.md']
-const files = ['photo.png', 'Projects/north bed.jpg', 'Projects/report.pdf', 'song.mp3', 'clip.mp4', ...notes]
+const files = ['photo.png', 'Projects/north bed.jpg', 'Projects/report.pdf', 'song.mp3', 'clip.mp4', 'Garden.drawing.svg', ...notes]
 const find = (list: string[], want: string) =>
   list.find((n) => n.toLowerCase() === want.toLowerCase() || n.toLowerCase().endsWith(`/${want.toLowerCase()}`)) ?? null
 const ctx = {
@@ -56,6 +56,8 @@ const XSS = [
   '<video src="data:video/mp4;base64,AAAA"></video>',
   '<img src="/api/soma/files\\..\\x.png">',
   '<img srcset="https://evil.example/x.png 1x" src="/api/somas/soma1/files/photo.png">',
+  '![[Garden.drawing.svg|300" onload="alert(1)]]',
+  '<span class="drawing-embed" data-drawing="x"><img src="https://evil.example/x.drawing.svg"></span>',
 ]
 
 describe('renderMarkdown sanitizing', () => {
@@ -137,6 +139,18 @@ describe('renderMarkdown features', () => {
     expect(audio.getAttribute('src')).toBe('/api/somas/soma1/files/song.mp3')
     expect(audio.hasAttribute('controls')).toBe(true)
     expect(el.querySelector('video')!.getAttribute('preload')).toBe('metadata')
+  })
+
+  it('marks drawings for drawing in place', () => {
+    const el = dom('![[Garden.drawing.svg|480]]\n\n![plan](Garden.drawing.svg)')
+    const [a, b] = [...el.querySelectorAll<HTMLElement>('.drawing-embed')]
+    expect(a!.dataset.drawing).toBe('Garden.drawing.svg')
+    const img = a!.querySelector('img')!
+    expect(img.getAttribute('src')).toBe('/api/somas/soma1/files/Garden.drawing.svg')
+    expect(img.getAttribute('width')).toBe('480')
+    expect(img.classList.contains('embed-drawing')).toBe(true)
+    expect(b!.querySelector('img')!.getAttribute('alt')).toBe('plan')
+    expect(b!.querySelector('img')!.hasAttribute('width')).toBe(false)
   })
 
   it('links other attachments and keeps external images out', () => {

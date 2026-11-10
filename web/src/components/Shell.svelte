@@ -314,6 +314,17 @@
             <Icon name="comment" size={18} />
             {#if openThreads}<span class="count" aria-hidden="true">{openThreads}</span>{/if}
           </button>
+          {#if app.can.create && !app.note?.readOnly && settings.view === 'edit'}
+            <button
+              type="button"
+              class="icon-btn"
+              aria-label={strings.drawing.insert}
+              title={strings.drawing.insert}
+              onclick={() => void app.insertDrawing()}
+            >
+              <Icon name="drawing" size={18} />
+            </button>
+          {/if}
           <button
             type="button"
             class="icon-btn"

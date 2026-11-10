@@ -12,6 +12,7 @@
   import { pastedName } from '../lib/files'
   import { comments } from '../lib/state/comments.svelte'
   import { findAnchor, makeAnchor } from '../lib/anchors'
+  import { isDrawingPath } from '../lib/drawing/svg'
   import { strings } from '../lib/strings'
 
   /** visible: false while the reading view is shown (the editor stays open). */
@@ -34,6 +35,8 @@
         resolve: (target, markdown) => app.resolveSynapse(target, markdown, s.path),
         open: (target, markdown) => void app.openSynapse(target, markdown, s.path),
         resolveFile: (target, markdown) => app.resolveFile(target, markdown, s.path),
+        openFile: (path) => void app.navigate(path),
+        fileVersion: (path) => app.entries.find((e) => e.path === path)?.mtime,
       },
       notes: () => app.notePaths,
       headings: async (path) => outline((await readNote(path)).content),
@@ -129,9 +132,17 @@
     handle?.setReadOnly(session.readOnly)
   })
 
-  // Files added, renamed or removed: re-resolve synapses and attachments.
+  // Files added, renamed or removed: re-resolve synapses and attachments;
+  // a drawing saved anew is drawn again.
+  const drawingStamp = $derived(
+    app.entries
+      .filter((e) => isDrawingPath(e.path))
+      .map((e) => e.mtime)
+      .join(),
+  )
   $effect(() => {
     void app.filePaths
+    void drawingStamp
     handle?.refresh()
   })
 

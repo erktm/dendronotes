@@ -60,6 +60,9 @@
   } as const
 
   export type IconName = keyof typeof icons
+
+  /** The path of an icon, for SVG built outside Svelte. */
+  export const iconPath = (name: IconName): string => icons[name]
 </script>
 
 <script lang="ts">

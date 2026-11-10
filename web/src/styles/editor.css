@@ -551,3 +551,93 @@
 .cm-comment-tip button:hover {
   background: var(--bg-hover);
 }
+
+/* --- Drawings (M14) ---------------------------------------------------- */
+
+.reading .drawing-embed,
+.cm-drawing {
+  position: relative;
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0.4em 0;
+  cursor: pointer;
+}
+.cm-drawing {
+  display: inline-block;
+  vertical-align: bottom;
+}
+.drawing-embed.drawn > img {
+  display: none;
+}
+.drawing-embed svg.dn-drawing {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+.drawing-embed svg.dn-drawing.empty {
+  outline: 1px dashed var(--line-strong);
+  outline-offset: -1px;
+}
+.drawing-embed:hover svg.dn-drawing {
+  outline: 1px solid var(--line);
+  outline-offset: 2px;
+}
+.drawing-zoom {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  opacity: 0;
+  cursor: pointer;
+}
+.drawing-zoom svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.drawing-embed:hover .drawing-zoom,
+.drawing-zoom:focus-visible {
+  opacity: 1;
+}
+.drawing-zoom:hover {
+  color: var(--text);
+}
+@media (hover: none) {
+  .drawing-zoom {
+    opacity: 1;
+  }
+}
+.cm-drawing-resize {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--accent);
+  border-radius: 4px;
+  background: var(--bg);
+  cursor: nwse-resize;
+  opacity: 0;
+  touch-action: none;
+}
+.cm-drawing:hover .cm-drawing-resize,
+.cm-drawing.resizing .cm-drawing-resize {
+  opacity: 1;
+}
+@media (hover: none) {
+  .cm-drawing-resize {
+    opacity: 1;
+  }
+}

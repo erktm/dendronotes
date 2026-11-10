@@ -53,7 +53,20 @@
   import { ApiError } from '../lib/api/client'
   import { strings } from '../lib/strings'
 
-  let { path, readonly, ondone }: { path: string; readonly: boolean; ondone: () => void } = $props()
+  let {
+    path,
+    readonly,
+    ondone,
+    doneLabel = strings.drawing.done,
+    onedit,
+  }: {
+    path: string
+    readonly: boolean
+    ondone: () => void
+    doneLabel?: string
+    /** Offered while only viewing: switch to editing. */
+    onedit?: () => void
+  } = $props()
 
   type Tool = 'select' | 'hand' | ShapeType | 'line' | 'arrow' | 'pen' | 'text'
 
@@ -116,7 +129,8 @@
   onMount(() => {
     void doc.load().then(async () => {
       await tick()
-      fitView(1)
+      // Only viewing: as large as fits; editing: never larger than it is.
+      fitView(readonly ? 3 : 1)
     })
     // Text is measured again once the fonts are there.
     void document.fonts?.ready.then(() => layer?.refresh(shownScene))
@@ -853,9 +867,15 @@
         <button type="button" class="button" onclick={() => void doc.takeTheirs()}>{s.takeTheirs}</button>
         <button type="button" class="button" onclick={() => void doc.keepMine()}>{s.keepMine}</button>
       {/if}
+      {#if onedit}
+        <button type="button" class="button" onclick={onedit}>
+          <Icon name="pencil" size={16} />
+          {s.edit}
+        </button>
+      {/if}
       <button type="button" class="button primary" onclick={done}>
-        <Icon name="check" size={16} />
-        {s.done}
+        <Icon name={readonly ? 'close' : 'check'} size={16} />
+        {doneLabel}
       </button>
     </header>
 
@@ -1242,6 +1262,7 @@
     }
     .toolbar {
       flex-direction: row;
+      scrollbar-width: thin;
       border-right: none;
       border-bottom: 1px solid var(--line);
     }
