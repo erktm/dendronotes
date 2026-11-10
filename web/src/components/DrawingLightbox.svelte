@@ -4,7 +4,7 @@
   import DrawingEditor from './DrawingEditor.svelte'
   import { closeOnBackdrop } from '../lib/actions'
   import { app } from '../lib/state/app.svelte'
-  import { drawingTitle } from '../lib/drawing/svg'
+  import { drawingTitle } from '../lib/drawing/paths'
   import { strings } from '../lib/strings'
 
   let { path, onclose }: { path: string; onclose: () => void } = $props()

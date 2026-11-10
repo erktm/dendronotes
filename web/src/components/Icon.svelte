@@ -2,6 +2,7 @@
   // Simple line icons, drawn on a 24×24 grid with round caps.
   const icons = {
     chevron: 'M9 6l6 6-6 6',
+    'chevron-down': 'M6 9l6 6 6-6',
     folder: 'M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z',
     'folder-open':
       'M3.5 17.5v-10a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v1M3.5 17.5l2.4-6.3a1.5 1.5 0 0 1 1.4-1h12.2a1 1 0 0 1 .9 1.4l-2.3 5.9a1.5 1.5 0 0 1-1.4 1H5a1.5 1.5 0 0 1-1.5-1z',

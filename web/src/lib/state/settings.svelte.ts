@@ -24,6 +24,7 @@ interface Stored {
   graphDepth: number
   graphMissing: boolean
   graphOrphans: boolean
+  graphDrawings: boolean
 }
 
 const DEFAULTS: Stored = {
@@ -40,6 +41,7 @@ const DEFAULTS: Stored = {
   graphDepth: 2,
   graphMissing: true,
   graphOrphans: true,
+  graphDrawings: true,
 }
 
 function load(): Stored {
@@ -64,6 +66,7 @@ function load(): Stored {
       graphDepth: [1, 2, 3].includes(r.graphDepth as number) ? (r.graphDepth as number) : DEFAULTS.graphDepth,
       graphMissing: bool('graphMissing'),
       graphOrphans: bool('graphOrphans'),
+      graphDrawings: bool('graphDrawings'),
     }
   } catch {
     return { ...DEFAULTS }
@@ -84,6 +87,7 @@ class Settings {
   graphDepth: number
   graphMissing: boolean
   graphOrphans: boolean
+  graphDrawings: boolean
 
   constructor() {
     const s = load()
@@ -100,6 +104,7 @@ class Settings {
     this.graphDepth = $state(s.graphDepth)
     this.graphMissing = $state(s.graphMissing)
     this.graphOrphans = $state(s.graphOrphans)
+    this.graphDrawings = $state(s.graphDrawings)
 
     $effect.root(() => {
       $effect(() => {
@@ -117,6 +122,7 @@ class Settings {
           graphDepth: this.graphDepth,
           graphMissing: this.graphMissing,
           graphOrphans: this.graphOrphans,
+          graphDrawings: this.graphDrawings,
         }
         try {
           localStorage.setItem(KEY, JSON.stringify(snapshot))

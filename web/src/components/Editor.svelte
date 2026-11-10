@@ -9,10 +9,10 @@
   import { settings } from '../lib/state/settings.svelte'
   import { editorStatus } from '../lib/state/status.svelte'
   import { dirname, displayName } from '../lib/paths'
-  import { pastedName } from '../lib/files'
+  import { fileKind, pastedName } from '../lib/files'
   import { comments } from '../lib/state/comments.svelte'
   import { findAnchor, makeAnchor } from '../lib/anchors'
-  import { isDrawingPath } from '../lib/drawing/svg'
+  import { isDrawingPath } from '../lib/drawing/paths'
   import { strings } from '../lib/strings'
 
   /** visible: false while the reading view is shown (the editor stays open). */
@@ -39,6 +39,7 @@
         fileVersion: (path) => app.entries.find((e) => e.path === path)?.mtime,
       },
       notes: () => app.notePaths,
+      embeddable: () => app.filePaths.filter((p) => isDrawingPath(p) || fileKind(p) === 'image'),
       headings: async (path) => outline((await readNote(path)).content),
       onChange: (view) => s.changed(view),
       onSelection: (view) => s.selectionChanged(view),

@@ -46,12 +46,13 @@
     sceneBounds,
   } from '../lib/drawing/scene'
   import { keysOf, restyle, styleOf, type StyleKey } from '../lib/drawing/style'
-  import { drawingTitle } from '../lib/drawing/svg'
+  import { drawingTitle } from '../lib/drawing/paths'
   import { app } from '../lib/state/app.svelte'
   import { cssVars, focusOnMount } from '../lib/actions'
   import { errorMessage } from '../lib/errors'
   import { ApiError } from '../lib/api/client'
   import { strings } from '../lib/strings'
+  import { basename } from '../lib/paths'
 
   let {
     path,
@@ -100,6 +101,28 @@
 
   const mayEdit = $derived(!readonly && app.can.write)
   const name = $derived(drawingTitle(path))
+
+  // --- How to show the drawing in a note ------------------------------------
+
+  /** Embed syntax inside the help text, shown as code. */
+  const EMBED_SAMPLE = /(!\[\[[^\]\s]*(?:\]\])?)/
+  let embedOpen = $state(false)
+  let embedWrap = $state<HTMLElement>()
+  /** The embed to write: the file name, or the path when the name is not unique. */
+  const embedCode = $derived.by(() => {
+    const file = basename(path)
+    const same = app.filePaths.filter((p) => basename(p).toLowerCase() === file.toLowerCase()).length
+    return `![[${same <= 1 ? file : path}]]`
+  })
+
+  async function copyEmbed() {
+    try {
+      await navigator.clipboard.writeText(embedCode)
+      app.toast(s.embed.copied, 'info')
+    } catch {
+      app.toast(s.embed.copyFailed)
+    }
+  }
 
   // --- Saved settings of this browser -------------------------------------
 
@@ -753,7 +776,8 @@
     }
     if (mod) return
     if (e.key === 'Escape') {
-      if (gesture) cancelGesture()
+      if (embedOpen) embedOpen = false
+      else if (gesture) cancelGesture()
       else if (iconsOpen) iconsOpen = false
       else if (tool !== 'select') tool = 'select'
       else selected = new Set()
@@ -843,6 +867,9 @@
 
 <svelte:window
   onkeyup={keyUp}
+  onpointerdown={(e) => {
+    if (embedOpen && embedWrap && !embedWrap.contains(e.target as Node)) embedOpen = false
+  }}
   onbeforeunload={(e) => {
     if (doc.dirty) e.preventDefault()
   }}
@@ -866,6 +893,30 @@
       {#if doc.save === 'conflict'}
         <button type="button" class="button" onclick={() => void doc.takeTheirs()}>{s.takeTheirs}</button>
         <button type="button" class="button" onclick={() => void doc.keepMine()}>{s.keepMine}</button>
+      {/if}
+      {#if !readonly}
+        <div class="embed-wrap" bind:this={embedWrap}>
+          <button type="button" class="button" aria-expanded={embedOpen} title={s.embed.button} onclick={() => (embedOpen = !embedOpen)}>
+            <Icon name="note" size={16} />
+            <span class="label">{s.embed.button}</span>
+          </button>
+          {#if embedOpen}
+            <div class="embed-help" role="dialog" aria-label={s.embed.title}>
+              <p class="title">{s.embed.title}</p>
+              <div class="code">
+                <code>{embedCode}</code>
+                <button type="button" class="button" onclick={() => void copyEmbed()}>
+                  <Icon name="copy" size={15} />
+                  {s.embed.copy}
+                </button>
+              </div>
+              {#each [s.embed.how, s.embed.width, s.embed.insert] as text, i (i)}
+                <!-- On one line: whitespace here would show between code and text. -->
+                <p>{#each text.split(EMBED_SAMPLE) as part, j (j)}{#if j % 2}<code class="sample">{part}</code>{:else}{part}{/if}{/each}</p>
+              {/each}
+            </div>
+          {/if}
+        </div>
       {/if}
       {#if onedit}
         <button type="button" class="button" onclick={onedit}>
@@ -1071,6 +1122,53 @@
   .button.primary:hover {
     background: var(--accent-strong);
   }
+  .embed-wrap {
+    position: relative;
+  }
+  .embed-help {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 6px);
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    width: min(360px, 86vw);
+    padding: var(--space-3);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--bg-raised);
+    box-shadow: var(--shadow);
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+  .embed-help .title {
+    color: var(--text);
+    font-weight: 600;
+  }
+  .embed-help .sample {
+    padding: 0 3px;
+    border-radius: 4px;
+    background: var(--code-bg);
+    color: var(--text);
+    font-size: 0.92em;
+    white-space: nowrap;
+  }
+  .embed-help .code {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .embed-help code {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 8px;
+    overflow-x: auto;
+    border-radius: var(--radius-sm);
+    background: var(--code-bg);
+    color: var(--text);
+    white-space: nowrap;
+  }
   .workspace {
     display: flex;
     flex: 1;
@@ -1256,6 +1354,9 @@
   @media (max-width: 760px) {
     header {
       padding: var(--space-2) var(--space-3);
+    }
+    .embed-wrap .label {
+      display: none;
     }
     .workspace {
       flex-direction: column;

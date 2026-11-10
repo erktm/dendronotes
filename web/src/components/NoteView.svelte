@@ -6,7 +6,7 @@
   import StatusBar from './StatusBar.svelte'
   import AttachmentView from './AttachmentView.svelte'
   import { app } from '../lib/state/app.svelte'
-  import { isDrawingPath } from '../lib/drawing/svg'
+  import { isDrawingPath } from '../lib/drawing/paths'
   import type { NoteSession } from '../lib/state/note.svelte'
   import { settings } from '../lib/state/settings.svelte'
   import { viewOf } from '../lib/view'

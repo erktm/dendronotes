@@ -17,12 +17,13 @@
   import { settings } from '../lib/state/settings.svelte'
   import * as api from '../lib/api/soma'
   import type { GraphData } from '../lib/api/soma'
-  import { nodeRadius, selectGraph, type ViewNode } from '../lib/graph'
+  import { counts, nodeRadius, selectGraph, type ViewEdge, type ViewNode } from '../lib/graph'
+  import { drawingTitle, isDrawingPath } from '../lib/drawing/paths'
   import { displayName } from '../lib/paths'
   import { strings } from '../lib/strings'
 
   type Node = ViewNode & SimulationNodeDatum
-  type Edge = SimulationLinkDatum<Node>
+  type Edge = SimulationLinkDatum<Node> & { embed?: boolean }
 
   /** The note the local graph is centered on (the one opened last). */
   let { center }: { center: string | null } = $props()
@@ -57,11 +58,18 @@
     data
       ? selectGraph(
           data,
-          { mode: settings.graphMode, depth: settings.graphDepth, missing: settings.graphMissing, orphans: settings.graphOrphans },
+          {
+            mode: settings.graphMode,
+            depth: settings.graphDepth,
+            missing: settings.graphMissing,
+            orphans: settings.graphOrphans,
+            drawings: settings.graphDrawings,
+          },
           center,
         )
       : null,
   )
+  const shown = $derived(selection ? counts(selection) : null)
 
   // --- Layout ------------------------------------------------------------
 
@@ -86,14 +94,14 @@
     })
   })
 
-  function rebuild(next: ViewNode[], nextEdges: { source: string; target: string }[], refit: boolean) {
+  function rebuild(next: ViewNode[], nextEdges: ViewEdge[], refit: boolean) {
     const old = byId
     nodes = next.map((n) => {
       const o = old.get(n.id)
       return o ? { ...n, x: o.x, y: o.y, vx: o.vx, vy: o.vy } : { ...n }
     })
     byId = new Map(nodes.map((n) => [n.id, n]))
-    edges = nextEdges.map((e) => ({ source: e.source, target: e.target }))
+    edges = nextEdges.map((e) => ({ source: e.source, target: e.target, embed: e.embed }))
     neighbors = new Map()
     for (const e of nextEdges) {
       if (!neighbors.has(e.source)) neighbors.set(e.source, new Set())
@@ -206,7 +214,8 @@
       ctx.globalAlpha = focus && !on ? 0.15 : on ? 1 : 0.85
       ctx.strokeStyle = on ? p.accent : p.line
       ctx.lineWidth = (on ? 1.6 : 1) * px
-      ctx.setLineDash(t.missing ? [3 * px, 3 * px] : [])
+      // Unresolved synapses dashed, drawings embedded dotted.
+      ctx.setLineDash(t.missing ? [3 * px, 3 * px] : e.embed ? [1.5 * px, 3 * px] : [])
       ctx.beginPath()
       ctx.moveTo(s.x, s.y!)
       ctx.lineTo(t.x, t.y!)
@@ -220,7 +229,9 @@
       const r = nodeRadius(n.degree)
       ctx.globalAlpha = lit(n.id) ? 1 : 0.22
       ctx.beginPath()
-      ctx.arc(n.x, n.y!, r, 0, Math.PI * 2)
+      // Drawings are small rounded squares, notes circles.
+      if (n.drawing) ctx.roundRect(n.x - r * 0.9, n.y! - r * 0.9, r * 1.8, r * 1.8, r * 0.35)
+      else ctx.arc(n.x, n.y!, r, 0, Math.PI * 2)
       if (n.missing) {
         ctx.fillStyle = p.bg
         ctx.fill()
@@ -395,10 +406,10 @@
     }
   })
 
-  const centerName = $derived(center ? displayName(center) : '')
+  const centerName = $derived(center ? (isDrawingPath(center) ? drawingTitle(center) : displayName(center)) : '')
 </script>
 
-<section class="graph" aria-label={selection ? strings.graph.label(selection.nodes.length, selection.edges.length) : strings.graph.title}>
+<section class="graph" aria-label={shown ? strings.graph.label(shown.notes, shown.synapses, shown.drawings) : strings.graph.title}>
   {#if selection && selection.edges.length === 0 && !local}
     <!-- Behind the canvas and out of the way of notes without synapses. -->
     <p class="state backdrop" class:low={selection.nodes.length > 0}>{strings.graph.empty}</p>
@@ -445,6 +456,7 @@
     {#if !local}
       <label class="check"><input type="checkbox" bind:checked={settings.graphOrphans} /> {strings.graph.orphans}</label>
     {/if}
+    <label class="check"><input type="checkbox" bind:checked={settings.graphDrawings} /> {strings.graph.drawings}</label>
   </div>
 
   <div class="zoom">
@@ -455,7 +467,7 @@
 
   <p class="foot">
     {#if selection}
-      <span>{strings.graph.count(selection.nodes.length, selection.edges.length)}</span>
+      <span>{strings.graph.count(shown!.notes, shown!.synapses, shown!.drawings)}</span>
     {/if}
     <span class="hint">{strings.graph.hint}</span>
   </p>
@@ -470,7 +482,7 @@
       {#each selection.nodes.slice(0, 500) as n (n.id)}
         <li>
           <button type="button" onclick={() => open(n)}>
-            {n.label}{n.missing ? ` (${strings.graph.notCreated})` : ''}
+            {n.label}{n.missing ? ` (${strings.graph.notCreated})` : n.drawing ? ` (${strings.graph.drawing})` : ''}
           </button>
         </li>
       {/each}

@@ -2,7 +2,8 @@
 import { describe, expect, it } from 'vitest'
 import { approxMeasure } from './render'
 import { type Element, type Scene, add, emptyScene } from './scene'
-import { drawingTitle, isDrawingPath, parseDrawing, toSVG } from './svg'
+import { parseDrawing, toSVG } from './svg'
+import { drawingTitle, isDrawingPath } from './paths'
 
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
 

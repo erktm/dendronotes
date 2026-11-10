@@ -29,6 +29,11 @@ export function fileURL(path: string): string {
   return `${somaBase()}/files/${encodePath(path)}`
 }
 
+/** The URL of a file in a version (its mtime), so a changed file loads again. */
+export function versionedFileURL(path: string, version: number | undefined): string {
+  return version ? `${fileURL(path)}?v=${version}` : fileURL(path)
+}
+
 const FILE_URL = /^\/api\/somas\/[a-z0-9]{1,40}\/files\/[^\\]*$/
 
 /** Whether a URL points to a file served from a soma (and nothing else). */

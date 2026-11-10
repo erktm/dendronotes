@@ -9,7 +9,9 @@ import { Compartment, EditorSelection, EditorState, type Extension } from '@code
 import { drawSelection, dropCursor, EditorView, highlightSpecialChars, keymap, placeholder } from '@codemirror/view'
 import { tagHighlighter, tags } from '@lezer/highlight'
 import { outline, type Heading } from '../outline'
-import { dirname, displayName } from '../paths'
+import { basename, dirname, displayName } from '../paths'
+import { drawingTitle, isDrawingPath } from '../drawing/paths'
+import { strings } from '../strings'
 import { livePreview, refreshDecorations, synapseHost, type SynapseHost } from './livePreview'
 import { presence, setPeers, type PeerCursor } from './presence'
 import { commentExtension, commentPositions, setCommentRanges, type CommentHost, type CommentRange } from './comments'
@@ -26,6 +28,8 @@ export interface EditorOptions {
   host: SynapseHost
   /** Note paths offered when typing [[ . */
   notes: () => readonly string[]
+  /** Files offered as well when typing ![[ (drawings and images). */
+  embeddable?: () => readonly string[]
   /** Headings of another note, offered when typing [[Note# . */
   headings: (path: string) => Promise<readonly Heading[]>
   /** The document changed (typing, or updates from others). */
@@ -119,36 +123,46 @@ function headingCompletion(o: EditorOptions) {
   }
 }
 
-function synapseCompletion(notes: () => readonly string[]) {
+function synapseCompletion(notes: () => readonly string[], embeddable?: () => readonly string[]) {
   return (ctx: CompletionContext): CompletionResult | null => {
     const before = ctx.matchBefore(/\[\[[^[\]\n|#]*$/)
     if (!before) return null
+    const apply = (insert: string) => (view: EditorView, _c: unknown, from: number, to: number) => {
+      const closed = view.state.sliceDoc(to, to + 2) === ']]'
+      view.dispatch({
+        changes: { from, to, insert: closed ? insert : `${insert}]]` },
+        selection: { anchor: from + insert.length + 2 },
+      })
+    }
     const list = notes()
     const counts = new Map<string, number>()
     for (const p of list) {
       const key = displayName(p).toLowerCase()
       counts.set(key, (counts.get(key) ?? 0) + 1)
     }
-    return {
-      from: before.from + 2,
-      validFor: /^[^[\]\n|#]*$/,
-      options: list.map((path) => {
-        const name = displayName(path)
-        // Names that occur more than once are written with their path.
-        const insert = counts.get(name.toLowerCase()) === 1 ? name : path.replace(/\.md$/i, '')
-        return {
-          label: name,
-          detail: dirname(path) || undefined,
-          apply: (view: EditorView, _c: unknown, from: number, to: number) => {
-            const closed = view.state.sliceDoc(to, to + 2) === ']]'
-            view.dispatch({
-              changes: { from, to, insert: closed ? insert : `${insert}]]` },
-              selection: { anchor: from + insert.length + 2 },
-            })
-          },
-        }
-      }),
+    const options = list.map((path) => {
+      const name = displayName(path)
+      // Names that occur more than once are written with their path.
+      const insert = counts.get(name.toLowerCase()) === 1 ? name : path.replace(/\.md$/i, '')
+      return { label: name, detail: dirname(path) || undefined, apply: apply(insert) }
+    })
+    // After "![[" drawings and images can be embedded too, by their file name.
+    const embed = before.from > 0 && ctx.state.sliceDoc(before.from - 1, before.from) === '!'
+    if (embed && embeddable) {
+      const files = embeddable()
+      const names = new Map<string, number>()
+      for (const p of files) names.set(basename(p).toLowerCase(), (names.get(basename(p).toLowerCase()) ?? 0) + 1)
+      for (const path of files) {
+        const name = basename(path)
+        const drawing = isDrawingPath(path)
+        options.push({
+          label: drawing ? drawingTitle(path) : name,
+          detail: [drawing ? strings.drawing.kind : strings.files.image, dirname(path)].filter(Boolean).join(' · '),
+          apply: apply(names.get(name.toLowerCase()) === 1 ? name : path),
+        })
+      }
     }
+    return { from: before.from + 2, validFor: /^[^[\]\n|#]*$/, options }
   }
 }
 
@@ -170,7 +184,7 @@ export function createEditor(parent: HTMLElement, o: EditorOptions): EditorHandl
     markdown({ base: markdownLanguage, extensions: [SynapseSyntax] }),
     syntaxHighlighting(highlighter),
     closeBrackets(),
-    autocompletion({ override: [synapseCompletion(o.notes), headingCompletion(o)], icons: false }),
+    autocompletion({ override: [synapseCompletion(o.notes, o.embeddable), headingCompletion(o)], icons: false }),
     search({ top: true }),
     highlightSelectionMatches(),
     keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, ...completionKeymap, indentWithTab]),

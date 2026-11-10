@@ -13,7 +13,7 @@ import { fileKind, fileURL, isFileURL } from './files'
 import { isNoteTarget, splitWikiTarget, synapseLabel } from './synapses'
 import { slugger } from './outline'
 import { strings } from './strings'
-import { isDrawingPath } from './drawing/svg'
+import { isDrawingPath } from './drawing/paths'
 
 export interface RenderContext {
   /** Resolves a synapse target to a soma path (null: unresolved). */

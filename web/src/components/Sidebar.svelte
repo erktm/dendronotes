@@ -12,6 +12,7 @@
   import { strings } from '../lib/strings'
   import Wordmark from './Wordmark.svelte'
   import { UPLOAD_EXTENSIONS } from '../lib/files'
+  import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
 
   let serverState = $state<ServerState>('checking')
 
@@ -40,6 +41,21 @@
 
   // New entries go next to the open note.
   const targetFolder = () => (app.note ? dirname(app.note.path) : '')
+
+  // The arrow next to "New note" offers the other kinds.
+  let newMenu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null)
+
+  function openNewMenu(e: MouseEvent) {
+    const r = (e.currentTarget as HTMLElement).closest('.split')!.getBoundingClientRect()
+    newMenu = {
+      x: r.left,
+      y: r.bottom + 4,
+      items: [
+        { label: strings.tree.newNote, icon: 'note', action: () => app.startCreate('new-note', targetFolder()) },
+        { label: strings.tree.newDrawing, icon: 'drawing', action: () => app.startCreate('new-drawing', targetFolder()) },
+      ],
+    }
+  }
 </script>
 
 <aside class="sidebar" aria-label={app.sidebarView === 'search' ? strings.search.title : strings.nav.files}>
@@ -50,9 +66,22 @@
     <Wordmark />
     <div class="actions">
       {#if app.can.create}
-      <button type="button" aria-label={strings.tree.newNote} title={strings.tree.newNote} onclick={() => app.startCreate('new-note', targetFolder())}>
-        <Icon name="plus" size={18} />
-      </button>
+      <div class="split">
+        <button type="button" aria-label={strings.tree.newNote} title={strings.tree.newNote} onclick={() => app.startCreate('new-note', targetFolder())}>
+          <Icon name="plus" size={18} />
+        </button>
+        <button
+          type="button"
+          class="more"
+          aria-label={strings.tree.newMenu}
+          title={strings.tree.newMenu}
+          aria-haspopup="menu"
+          aria-expanded={newMenu !== null}
+          onclick={openNewMenu}
+        >
+          <Icon name="chevron-down" size={13} />
+        </button>
+      </div>
       <button
         type="button"
         aria-label={strings.tree.newFolder}
@@ -84,6 +113,10 @@
 
   <SomaSwitcher />
   <FileTree />
+  {/if}
+
+  {#if newMenu}
+    <ContextMenu x={newMenu.x} y={newMenu.y} items={newMenu.items} onclose={() => (newMenu = null)} />
   {/if}
 
   <footer class="foot">
@@ -138,6 +171,19 @@
   }
   .trash {
     margin-left: auto;
+  }
+  .split {
+    display: flex;
+    border-radius: var(--radius-sm);
+  }
+  .split:hover {
+    background: var(--bg-hover);
+  }
+  .split button {
+    width: 26px;
+  }
+  .split .more {
+    width: 16px;
   }
   .foot {
     display: flex;

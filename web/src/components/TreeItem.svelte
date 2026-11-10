@@ -8,7 +8,7 @@
   import TreeInput from './TreeInput.svelte'
   import Icon from './Icon.svelte'
   import { app, entryKind } from '../lib/state/app.svelte'
-  import { isDrawingPath } from '../lib/drawing/svg'
+  import { isDrawingPath } from '../lib/drawing/paths'
   import { router } from '../lib/router.svelte'
   import { cssVars } from '../lib/actions'
   import { displayName, isNote } from '../lib/paths'

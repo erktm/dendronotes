@@ -2,7 +2,7 @@
 // from their scene, so they take the app's palette, light or dark. Until
 // the scene is there – or when the file has none – the plain image shows.
 
-import { fileURL } from '../files'
+import { versionedFileURL } from '../files'
 import { SVG_NS, elementNode, measureText } from './dom'
 import type { Scene } from './scene'
 import { canvasBox, parseDrawing } from './svg'
@@ -14,7 +14,7 @@ export function loadScene(path: string, version: number | undefined): Promise<Sc
   const key = `${path}\u0000${version ?? ''}`
   let p = scenes.get(key)
   if (!p) {
-    p = fetch(versionedURL(path, version), { credentials: 'same-origin' })
+    p = fetch(versionedFileURL(path, version), { credentials: 'same-origin' })
       .then((r) => (r.ok ? r.text() : ''))
       .then((text) => (text ? parseDrawing(text) : null))
       .catch(() => null)
@@ -22,10 +22,6 @@ export function loadScene(path: string, version: number | undefined): Promise<Sc
     scenes.set(key, p)
   }
   return p
-}
-
-export function versionedURL(path: string, version: number | undefined): string {
-  return version ? `${fileURL(path)}?v=${version}` : fileURL(path)
 }
 
 /** The drawing as an inline <svg> (natural size: one unit, one pixel). */

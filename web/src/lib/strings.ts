@@ -62,6 +62,7 @@ export const strings = {
     modified: 'Modified',
     noPreview: 'No preview for this file type.',
     viewerLabel: (name: string) => `File ${name}`,
+    image: 'Image',
   },
 
   details: {
@@ -81,9 +82,12 @@ export const strings = {
     title: 'Graph',
     open: `Graph (${modShiftKey}G)`,
     close: 'Back to the note',
-    label: (notes: number, synapses: number) =>
-      `Graph of ${notes === 1 ? '1 note' : `${notes} notes`} and ${synapses === 1 ? '1 synapse' : `${synapses} synapses`}`,
-    count: (notes: number, synapses: number) => `${notes} ${notes === 1 ? 'note' : 'notes'} · ${synapses} ${synapses === 1 ? 'synapse' : 'synapses'}`,
+    label: (notes: number, synapses: number, drawings = 0) =>
+      `Graph of ${notes === 1 ? '1 note' : `${notes} notes`}${drawings ? `, ${drawings === 1 ? '1 drawing' : `${drawings} drawings`}` : ''} and ${synapses === 1 ? '1 synapse' : `${synapses} synapses`}`,
+    count: (notes: number, synapses: number, drawings = 0) =>
+      `${notes} ${notes === 1 ? 'note' : 'notes'}${drawings ? ` · ${drawings} ${drawings === 1 ? 'drawing' : 'drawings'}` : ''} · ${synapses} ${synapses === 1 ? 'synapse' : 'synapses'}`,
+    drawings: 'Drawings',
+    drawing: 'drawing',
     mode: 'Show',
     global: 'Whole soma',
     local: 'Around this note',
@@ -98,7 +102,7 @@ export const strings = {
     empty: 'No synapses yet. Connect notes with [[…]] and they appear here.',
     noCenter: 'Open a note to see its neighborhood.',
     listLabel: 'Notes in the graph',
-    hint: 'Scroll to zoom, drag to move. Click a note to open it.',
+    hint: 'Scroll to zoom, drag to move. Click a note or drawing to open it.',
     notCreated: 'not created yet',
   },
   search: {
@@ -704,6 +708,7 @@ export const strings = {
   tree: {
     newNote: 'New note',
     newDrawing: 'New drawing',
+    newMenu: 'New note or drawing',
     drawingName: 'Drawing name',
     newFolder: 'New folder',
     rename: 'Rename',
@@ -778,6 +783,7 @@ export const strings = {
     errorTitle: 'Couldn’t load this drawing',
     defaultName: (stamp: string) => `Drawing ${stamp}`,
     insert: 'Insert drawing',
+    kind: 'Drawing',
     canvas: 'Drawing canvas',
     tools: 'Drawing tools',
     tool: {
@@ -845,6 +851,16 @@ export const strings = {
     closeViewer: 'Close',
     openDrawing: (name: string) => `Open drawing ${name}`,
     resize: 'Drag to change the width',
+    embed: {
+      button: 'Embed in a note',
+      title: 'Show this drawing in a note',
+      copy: 'Copy',
+      copied: 'Copied. Paste it into a note.',
+      copyFailed: 'Couldn’t copy. Select the text and copy it yourself.',
+      how: 'Paste this line into a note – or type ![[ in a note and pick the drawing from the list.',
+      width: 'A number after the name sets the width: ![[Name.drawing.svg|600]]. In the note, drag the drawing’s corner to change it.',
+      insert: 'To start a new drawing right inside a note, use the drawing button in the note’s top bar.',
+    },
     icons: {
       title: 'Icons',
       hint: 'Pictures everyone in this soma can put into drawings. A drawing keeps its own copy.',

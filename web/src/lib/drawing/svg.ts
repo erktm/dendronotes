@@ -10,29 +10,11 @@ import { type Measure, type Prim, lineLabelBox, primitives, usedColors } from '.
 import { type FileData, type Scene, bounds, isLinear, pruneFiles, sanitizeScene } from './scene'
 
 export const METADATA_ID = 'dendronotes-drawing'
-export const SUFFIX = '.drawing.svg'
 const SVG_NS = 'http://www.w3.org/2000/svg'
 const XLINK_NS = 'http://www.w3.org/1999/xlink'
 
 /** Space around the drawing in a saved file. */
 const MARGIN = 16
-
-/** Whether a path names a drawing. */
-export function isDrawingPath(path: string): boolean {
-  return path.toLowerCase().endsWith(SUFFIX)
-}
-
-/** "Plan.drawing.svg" for "Plan" (and for "Plan.drawing"). */
-export function withDrawingExtension(name: string): string {
-  if (isDrawingPath(name)) return name
-  return name.replace(/\.drawing$/i, '') + SUFFIX
-}
-
-/** "Plan" for "Ideas/Plan.drawing.svg". */
-export function drawingTitle(path: string): string {
-  const name = path.slice(path.lastIndexOf('/') + 1)
-  return isDrawingPath(name) ? name.slice(0, -SUFFIX.length) : name
-}
 
 const escapeText = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 const escapeAttr = (s: string) => escapeText(s).replace(/"/g, '&quot;')

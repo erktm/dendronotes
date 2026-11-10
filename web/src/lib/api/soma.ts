@@ -286,11 +286,16 @@ export interface GraphNode {
   label?: string
   missing?: boolean
   tags?: string[]
+  /** "drawing" for a drawing (*.drawing.svg). */
+  kind?: 'drawing'
 }
 
 export interface GraphData {
   nodes: GraphNode[]
+  /** Synapses. */
   edges: { source: string; target: string }[]
+  /** Notes embedding or linking a drawing (not synapses). */
+  embeds?: { source: string; target: string }[]
 }
 
 export const graph = (signal?: AbortSignal) => request<GraphData>('GET', `${somaBase()}/graph`, { signal })

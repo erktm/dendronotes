@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { selectGraph, type GraphOptions } from './graph'
+import { counts, selectGraph, type GraphOptions } from './graph'
 import type { GraphData } from './api/soma'
 
 const data: GraphData = {
@@ -18,13 +18,29 @@ const data: GraphData = {
     { source: 'A.md', target: '?ghost' },
   ],
 }
-const all: GraphOptions = { mode: 'global', depth: 1, missing: true, orphans: true }
+const all: GraphOptions = { mode: 'global', depth: 1, missing: true, orphans: true, drawings: true }
 const ids = (opts: Partial<GraphOptions>, center: string | null = null) =>
   selectGraph(data, { ...all, ...opts }, center)
     .nodes.map((n) => n.id)
     .sort()
 
 describe('selectGraph', () => {
+  it('shows drawings with the notes embedding them, apart from synapses', () => {
+    const withDrawings: GraphData = {
+      ...data,
+      nodes: [...data.nodes, { id: 'Plans/Beds.drawing.svg', kind: 'drawing' }, { id: 'Unused.drawing.svg', kind: 'drawing' }],
+      embeds: [{ source: 'A.md', target: 'Plans/Beds.drawing.svg' }],
+    }
+    const s = selectGraph(withDrawings, all, null)
+    expect(s.nodes.find((n) => n.id === 'Plans/Beds.drawing.svg')).toMatchObject({ label: 'Beds', drawing: true, degree: 1 })
+    expect(s.nodes.find((n) => n.id === 'A.md')!.degree).toBe(3)
+    expect(s.edges.filter((e) => e.embed)).toEqual([{ source: 'A.md', target: 'Plans/Beds.drawing.svg', embed: true }])
+    expect(counts(s)).toEqual({ notes: 6, drawings: 2, synapses: 4 })
+    // Without drawings, or without what stands alone.
+    expect(selectGraph(withDrawings, { ...all, drawings: false }, null).nodes.some((n) => n.drawing)).toBe(false)
+    expect(selectGraph(withDrawings, { ...all, orphans: false }, null).nodes.map((n) => n.id)).not.toContain('Unused.drawing.svg')
+  })
+
   it('shows everything globally, with degrees and labels', () => {
     const s = selectGraph(data, all, null)
     expect(s.nodes).toHaveLength(6)

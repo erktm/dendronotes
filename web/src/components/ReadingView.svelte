@@ -13,8 +13,7 @@
   import { anchorFromRendered, CONTEXT, findAnchor, type Anchor } from '../lib/anchors'
   import { cssVars } from '../lib/actions'
   import { iconPath } from './Icon.svelte'
-  import { fillDrawing } from '../lib/drawing/embed'
-  import { isDrawingPath } from '../lib/drawing/svg'
+  import { isDrawingPath } from '../lib/drawing/paths'
 
   let { session }: { session: NoteSession } = $props()
 
@@ -101,7 +100,9 @@
       if (host.dataset.filled === String(version)) continue
       host.dataset.filled = String(version)
       if (!host.querySelector('.drawing-zoom')) host.append(zoomButton())
-      void fillDrawing(host, path, version, host.querySelector('img')?.alt || path)
+      const label = host.querySelector('img')?.alt || path
+      // The drawing code loads with the first drawing shown.
+      void import('../lib/drawing/embed').then((m) => m.fillDrawing(host, path, version, label))
     }
   }
 

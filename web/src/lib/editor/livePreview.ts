@@ -13,11 +13,10 @@ import {
   WidgetType,
 } from '@codemirror/view'
 import { isNoteTarget, splitWikiTarget } from '../synapses'
-import { fileKind, fileURL } from '../files'
+import { fileKind, fileURL, versionedFileURL } from '../files'
 import { isNote } from '../paths'
 import { strings } from '../strings'
-import { fillDrawing, versionedURL } from '../drawing/embed'
-import { isDrawingPath } from '../drawing/svg'
+import { isDrawingPath } from '../drawing/paths'
 
 /** How the editor resolves and opens synapses (provided by the app). */
 export interface SynapseHost {
@@ -175,12 +174,13 @@ class DrawingWidget extends WidgetType {
     host.className = 'cm-drawing drawing-embed'
     host.title = strings.drawing.openDrawing(this.label)
     const img = document.createElement('img')
-    img.src = versionedURL(this.path, this.version)
+    img.src = versionedFileURL(this.path, this.version)
     img.alt = this.label
     img.draggable = false
     if (this.width) img.width = this.width
     host.append(img)
-    void fillDrawing(host, this.path, this.version, this.label)
+    // The drawing code loads with the first drawing shown.
+    void import('../drawing/embed').then((m) => m.fillDrawing(host, this.path, this.version, this.label))
     let resized = false
     host.addEventListener('click', (e) => {
       e.preventDefault()
