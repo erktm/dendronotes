@@ -19,27 +19,53 @@ export function random(seed: number): () => number {
 
 const f = (n: number) => String(round(n))
 
-/** One wobbly stroke from a to b as a path segment (starting with M). */
-function wobble(a: Pt, b: Pt, rnd: () => number, amount: number): string {
+/**
+ * One hand-drawn stroke from a to b: a gently bowed curve whose ends may run
+ * a little past the corner (over) or stop just short of it, like a pen.
+ * k scales the wobble (the second pass retraces with less).
+ */
+function stroke(a: Pt, b: Pt, rnd: () => number, amount: number, k: number, overA: boolean, overB: boolean): string {
   const len = Math.hypot(b[0] - a[0], b[1] - a[1])
-  const off = Math.min(amount, len / 10 + 0.5)
-  const j = () => (rnd() - 0.5) * 2 * off
-  const bow = (rnd() - 0.5) * Math.min(len / 12, amount * 2)
-  // The control point sits near the middle, pushed sideways.
-  const nx = len > 0 ? -(b[1] - a[1]) / len : 0
-  const ny = len > 0 ? (b[0] - a[0]) / len : 0
-  const mx = (a[0] + b[0]) / 2 + nx * bow + j() / 2
-  const my = (a[1] + b[1]) / 2 + ny * bow + j() / 2
-  return `M${f(a[0] + j())} ${f(a[1] + j())}Q${f(mx)} ${f(my)} ${f(b[0] + j())} ${f(b[1] + j())}`
+  if (len < 0.5) return `M${f(a[0])} ${f(a[1])}L${f(b[0])} ${f(b[1])}`
+  const ux = (b[0] - a[0]) / len
+  const uy = (b[1] - a[1]) / len
+  const nx = -uy
+  const ny = ux
+  const s = (n: number) => (rnd() - 0.5) * 2 * n * k
+  // How far the stroke drifts across, and how much it bows: more for long lines, within limits.
+  const drift = Math.min(amount * 0.8, len / 20 + 0.4)
+  const bow = s(Math.min(amount * 2.2, len * 0.02 + 0.8))
+  const over = Math.min(amount * 2, len * 0.04)
+  const extA = overA ? over * (rnd() * 1.4 - 0.4) : 0
+  const extB = overB ? over * (rnd() * 1.4 - 0.4) : 0
+  const pa: Pt = [a[0] - ux * extA + nx * s(drift), a[1] - uy * extA + ny * s(drift)]
+  const pb: Pt = [b[0] + ux * extB + nx * s(drift), b[1] + uy * extB + ny * s(drift)]
+  // The control points share the bow, each with a little of its own.
+  const c1 = len * (0.28 + rnd() * 0.1)
+  const c2 = len * (0.62 + rnd() * 0.1)
+  const b1 = bow + s(drift * 0.5)
+  const b2 = bow + s(drift * 0.5)
+  return (
+    `M${f(pa[0])} ${f(pa[1])}` +
+    `C${f(a[0] + ux * c1 + nx * b1)} ${f(a[1] + uy * c1 + ny * b1)} ` +
+    `${f(a[0] + ux * c2 + nx * b2)} ${f(a[1] + uy * c2 + ny * b2)} ${f(pb[0])} ${f(pb[1])}`
+  )
 }
 
-/** A sketchy polyline (closed when closed is set), drawn twice. */
+/**
+ * A sketchy polyline (closed when closed is set), drawn twice. Corners get
+ * the small overshoots of a pen; the open ends of a line stay where they are
+ * (an arrowhead sits there).
+ */
 export function sketchLines(points: readonly Pt[], seed: number, closed = false, amount = 2): string {
   const rnd = random(seed)
   const pts = closed ? [...points, points[0]!] : points
   let d = ''
   for (let pass = 0; pass < 2; pass++) {
-    for (let i = 1; i < pts.length; i++) d += wobble(pts[i - 1]!, pts[i]!, rnd, amount)
+    const k = pass === 0 ? 1 : 0.8
+    for (let i = 1; i < pts.length; i++) {
+      d += stroke(pts[i - 1]!, pts[i]!, rnd, amount, k, closed || i > 1, closed || i < pts.length - 1)
+    }
   }
   return d
 }
@@ -80,29 +106,63 @@ export function smooth(points: readonly Pt[]): string {
   return d
 }
 
-/** A sketchy rectangle with rounded corners, drawn twice. */
+/** Circle quarter as a cubic Bézier: control arm length per radius. */
+const KAPPA = 0.5523
+
+/**
+ * A sketchy rectangle with rounded corners: one continuous stroke around,
+ * drawn twice. Each side bows a little, the corners flow into the sides, and
+ * the stroke ends a bit past where it began.
+ */
 export function sketchRoundRect(x: number, y: number, w: number, h: number, r: number, seed: number, amount = 2): string {
   const rnd = random(seed)
-  // Each corner wobbles as a whole, so it stays round; the sides between
-  // them take up the difference.
-  const corner = (cx: number, cy: number, from: number): Pt[] => {
-    const dx = (rnd() - 0.5) * amount
-    const dy = (rnd() - 0.5) * amount
-    return [0, 0.5, 1].map((k) => {
-      const t = from + (k * Math.PI) / 2
-      return [cx + Math.cos(t) * r + dx, cy + Math.sin(t) * r + dy]
-    })
-  }
+  // The sides, clockwise from the top: start, end, direction.
+  const sides: [Pt, Pt, Pt][] = [
+    [[x + r, y], [x + w - r, y], [1, 0]],
+    [[x + w, y + r], [x + w, y + h - r], [0, 1]],
+    [[x + w - r, y + h], [x + r, y + h], [-1, 0]],
+    [[x, y + h - r], [x, y + r], [0, -1]],
+  ]
   let d = ''
   for (let pass = 0; pass < 2; pass++) {
-    // Clockwise from the top right corner, past the start so the ends overlap.
-    const pts: Pt[] = [
-      ...corner(x + w - r, y + r, -Math.PI / 2),
-      ...corner(x + w - r, y + h - r, 0),
-      ...corner(x + r, y + h - r, Math.PI / 2),
-      ...corner(x + r, y + r, Math.PI),
-    ]
-    d += smooth([...pts, pts[0]!, pts[1]!])
+    const k = pass === 0 ? 1 : 0.8
+    const s = (n: number) => (rnd() - 0.5) * 2 * n * k
+    // Every side shifted across a little at each end.
+    const ends = sides.map(([a, b, [ux, uy]]) => {
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1])
+      const drift = Math.min(amount * 0.8, len / 20 + 0.4)
+      const nx = -uy
+      const ny = ux
+      const sa = s(drift)
+      const sb = s(drift)
+      return {
+        a: [a[0] + nx * sa, a[1] + ny * sa] as Pt,
+        b: [b[0] + nx * sb, b[1] + ny * sb] as Pt,
+        u: [ux, uy] as Pt,
+        n: [nx, ny] as Pt,
+        len,
+        bow: s(Math.min(amount * 2.2, len * 0.02 + 0.8)),
+      }
+    })
+    const first = ends[0]!
+    d += `M${f(first.a[0])} ${f(first.a[1])}`
+    for (let i = 0; i < 4; i++) {
+      const e = ends[i]!
+      const c1 = e.len * 0.33
+      const c2 = e.len * 0.67
+      d +=
+        `C${f(e.a[0] + e.u[0] * c1 + e.n[0] * e.bow)} ${f(e.a[1] + e.u[1] * c1 + e.n[1] * e.bow)} ` +
+        `${f(e.a[0] + e.u[0] * c2 + e.n[0] * e.bow)} ${f(e.a[1] + e.u[1] * c2 + e.n[1] * e.bow)} ${f(e.b[0])} ${f(e.b[1])}`
+      // The corner: a quarter circle from this side's end into the next side's start.
+      const next = ends[(i + 1) % 4]!
+      const arm = r * KAPPA * (1 + s(0.12))
+      d +=
+        `C${f(e.b[0] + e.u[0] * arm)} ${f(e.b[1] + e.u[1] * arm)} ` +
+        `${f(next.a[0] - next.u[0] * arm)} ${f(next.a[1] - next.u[1] * arm)} ${f(next.a[0])} ${f(next.a[1])}`
+    }
+    // Run on a little along the top, like a pen that does not stop exactly.
+    const run = Math.min(first.len * 0.3, 4 + rnd() * 10)
+    d += `L${f(first.a[0] + first.u[0] * run + first.n[0] * s(1))} ${f(first.a[1] + first.u[1] * run + first.n[1] * s(1))}`
   }
   return d
 }
