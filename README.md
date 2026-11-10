@@ -174,3 +174,7 @@ dendronotes is licensed under the [Apache License 2.0](LICENSE). The third-party
 contains are listed in the [SBOM](security/sbom.cdx.json); their license texts are in
 [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt), which binaries and the image carry as well
 (`/usr/share/doc/dendronotes/` in the image).
+
+## Transparency Note
+
+Developed with AI assistance (Claude)
