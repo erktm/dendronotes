@@ -87,11 +87,17 @@ admin's first soma.
   ordinary attachment for Obsidian, git or a sync tool. The graph shows drawings as small
   squares, joined by dotted lines to the notes that embed them (embeds are not synapses; the
   "Drawings" switch hides them).
-- **Icons for drawings.** Each soma has an icon library (the picture button in the drawing
-  editor): everyone with access uses it, everyone who may create files adds PNG, JPEG, WebP,
-  GIF or SVG pictures (scaled to at most 512 pixels; SVG only without scripts or external
-  references), and uploaders or editors delete them. A drawing keeps its own copy of the icons
-  it uses.
+- **Icons for drawings** (the picture button in the drawing editor). dendronotes brings 64 line
+  icons of its own for project management, software development, cloud and networking; they take
+  the line color and width like shapes, suit light and dark, and lines stick to them. Each soma
+  also has a library of uploaded pictures: everyone with access uses it, everyone who may create
+  files adds PNG, JPEG, WebP, GIF or SVG pictures (scaled to at most 512 pixels; SVG only
+  without scripts or external references), and uploaders or editors delete them. A drawing
+  keeps its own copy of the uploaded pictures it uses. A field above the icons finds one by name.
+- **Downloading drawings** ("Download" in the drawing editor or the large view): the SVG file
+  itself – any image viewer shows it, and it stays editable in dendronotes – or a PNG picture at
+  twice its size, light or dark as the app is shown. Text in the PNG uses the fonts of the
+  system.
 - **Graph** (⌘⇧G / Ctrl+Shift+G, or the graph button in the left rail). All notes as
   nodes, synapses as lines, sized by their number of synapses; unresolved synapses point to
   dashed nodes. Hover a note to see its neighborhood, click to open it, drag to arrange, scroll
