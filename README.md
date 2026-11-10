@@ -1,24 +1,37 @@
 # dendronotes
 
-Self-hosted Markdown notes. Your notes stay plain `.md` files in folders, the **somas**.
-Accounts, who owns which soma and sessions live in a small SQLite database next to them; the
-search indexes are caches that can be rebuilt at any time.
+Self-hosted Markdown notes for one person or a team. Your notes stay plain `.md` files in
+folders, the **somas**, readable and editable with any other tool; dendronotes adds editing
+together in real time, synapses between notes with backlinks and a graph, full-text search,
+drawings, comments, a history of every note, and sharing with people and groups.
 
-One container, one process, no external services, no external requests (air-gap friendly).
+One program, no database server, no external requests: it runs as a binary, a container or in
+Kubernetes, also in an air gap.
 
-> **Status: milestone 9** – editing together in real time, accounts with their own somas,
-> sharing with people and groups in five roles, sign-in through Keycloak (OpenID Connect) and
-> an administration area, on top of the notes app: file tree, an editor with live preview and optional Vim key bindings, a
-> reading view, synapses with backlinks, full-text search with tags, live updates when files
-> change on disk, synapses that follow renamed notes, attachments (images, audio, video and
-> other files) and embedded notes, and a graph of all notes and synapses.
-> Next: Kubernetes manifests (M5).
+## Features
+
+- **Editor** with live preview, optional Vim key bindings and a reading view; tasks, tables,
+  code, images, audio and video, embedded notes.
+- **Synapses**: `[[Note]]`, `[[Note|Alias]]`, `[[Note#Heading]]` with suggestions; backlinks,
+  a graph of all notes, synapses that follow renamed notes.
+- **Editing together**: everyone in a note sees the others' changes and cursors at once;
+  changes made on disk (Obsidian, git, a sync tool) are taken over live.
+- **Drawings**: shapes, arrows that stick to shapes, text, freehand strokes and built-in icons
+  for project management, software, cloud and networking; embedded in notes, downloadable as
+  SVG or PNG.
+- **Search** across all notes with phrases and `#tags`.
+- **Comments** with `@mentions`, a **history** of every note, a **trash** with restore.
+- **Accounts and sharing**: every account has its own somas, shared with people and groups in
+  five roles; sign-in with passwords, Keycloak or another OpenID Connect provider, Active
+  Directory / LDAP, or an authenticating proxy; personal API tokens.
+- **Operation**: administration area, audit log, backups while running, Prometheus metrics,
+  reproducible images, SBOM and vulnerability statements with every release.
 
 ## Vocabulary
 
 | Term        | Meaning                                                                          |
 |-------------|----------------------------------------------------------------------------------|
-| **soma**    | A folder that holds notes – the cell body everything grows from. Plural: somas. Every account has its own. |
+| **soma**    | A folder that holds notes. Plural: somas. Every account has its own.             |
 | **note**    | A Markdown file in the soma.                                                     |
 | **synapse** | A connection between two notes, e.g. the wiki link `[[Note]]`. Plural: synapses. |
 | backlinks   | The synapses pointing *to* a note ("Incoming synapses").                         |
@@ -26,279 +39,40 @@ One container, one process, no external services, no external requests (air-gap 
 Files in a soma remain plain, Obsidian-compatible Markdown; the wiki link syntax is the usual
 `[[Note]]`, `[[Note|Alias]]` and `[[Note#Heading]]`. Obsidian vaults can be opened as a soma.
 
-## Quick start
+## Getting started
 
-Requirements: Go ≥ 1.26, Node 26 / npm, Docker (for the image).
-
-```bash
-make dev          # Go server :8080 + Vite dev server :5173 (soma: ./dev/soma)
-make test         # go vet, Go tests (-race), Svelte type check, frontend unit tests (Vitest)
-make fuzz         # fuzz the path validation for 60 s
-make build        # bin/dendronotes with the embedded frontend
-make image        # build the container image and load it into Docker
-make run-image    # run the image hardened (read-only, no capabilities)
-```
-
-`make dev` creates a random password for the account `admin` in `dev/password` on first start
-and prints it. The dev server keeps its somas in `dev/somas` and registers `dev/soma` as the
-admin's first soma.
-
-## Writing notes
-
-- **Edit and Read.** The editor renders Markdown as you type (live preview); the line with
-  the cursor shows its syntax. The reading view shows the finished note. Switch with the
-  toggle in the top bar or ⌘E / Ctrl+E.
-- **Synapses.** Type `[[` for suggestions from the soma, and `[[Note#` for the headings of
-  that note (`[[#` for this note's own). Click a synapse to open the note –
-  in the editor, on the line you are editing, hold ⌘ / Ctrl while clicking. A synapse whose
-  note does not exist yet is shown dashed; clicking it creates the note next to the current
-  one (or at the path given, e.g. `[[Projects/Idea]]`). Markdown links to notes, such as
-  `[Text](Other.md)`, are synapses too.
-- **Tasks.** Checkboxes (`- [ ]`) can be ticked in both views; the file changes accordingly.
-- **Details panel** (on wide screens). Outline of the note, its synapses, and the
-  **incoming synapses**: every note that connects here, with the line it does so in.
-- **Search** (⌘⇧F / Ctrl+Shift+F, or the magnifier in the left rail). Words match their
-  beginning, `"quoted text"` an exact phrase and `#tag` a tag, including nested tags such as
-  `#garden/beds`; case and accents are ignored. A result opens the note at the matching line.
-  With an empty search field, the panel lists all tags.
-- **Tags.** `#tag` anywhere in the text (not in code) or a `tags:` list in the front matter.
-- **Attachments.** Paste an image or drop files into the editor: they are uploaded next to the
-  note and embedded as `![[photo.png]]`. Files dropped on a folder in the tree (or picked with
-  the upload button) go into that folder. Embeds show images (`![[photo.png|300]]` sets the
-  width), audio and video players; other files, such as PDFs, become links that open them.
-  Standard Markdown works too: `![alt](photo.png)`, `[report](report.pdf)`. Clicking a file in
-  the tree shows it with its size and a download button. Images from other hosts are never
-  loaded.
-- **Drawings.** Simple diagrams and sketches: "New drawing" behind the arrow next to the `+` at
-  the top of the file tree (or in the tree's context menu), or the drawing button in the top bar
-  while editing, which puts a new drawing next to the note, embeds it at the cursor
-  (`![[Drawing 2026-11-10 1530.drawing.svg]]`) and opens it. To show an existing drawing in a
-  note, type `![[` and pick it from the suggestions (they list drawings and images), or copy the
-  line from "Embed in a note" in the drawing editor. The editor has
-  rectangles, ellipses, diamonds, lines and arrows, a pen, text, and icons; double-click a shape
-  to write in it. The ends of lines and arrows stick to shapes, text and icons and follow them
-  when they move; arrows can bend at right angles. Colors come from fixed slots that suit every
-  palette, light and dark; strokes can be switched to a sketchy look per drawing. Changes save
-  about a second after the last one ("Done" goes back to the note); if someone else saved the
-  drawing meanwhile, you choose whose version stays. In a note, drawings show in place: a click
-  opens the editor (readers get a large view, everyone has the button in the corner), and in
-  the editor the handle at the corner sets the width (`|600`). A drawing is a plain SVG file
-  that any image viewer shows, with the editable drawing stored inside it – so it is also an
-  ordinary attachment for Obsidian, git or a sync tool. The graph shows drawings as small
-  squares, joined by dotted lines to the notes that embed them (embeds are not synapses; the
-  "Drawings" switch hides them).
-- **Icons for drawings** (the picture button in the drawing editor). dendronotes brings 64 line
-  icons of its own for project management, software development, cloud and networking; they take
-  the line color and width like shapes, suit light and dark, and lines stick to them. Each soma
-  also has a library of uploaded pictures: everyone with access uses it, everyone who may create
-  files adds PNG, JPEG, WebP, GIF or SVG pictures (scaled to at most 512 pixels; SVG only
-  without scripts or external references), and uploaders or editors delete them. A drawing
-  keeps its own copy of the uploaded pictures it uses. A field above the icons finds one by name.
-- **Downloading drawings** ("Download" in the drawing editor or the large view): the SVG file
-  itself – any image viewer shows it, and it stays editable in dendronotes – or a PNG picture at
-  twice its size, light or dark as the app is shown. Text in the PNG uses the fonts of the
-  system.
-- **Graph** (⌘⇧G / Ctrl+Shift+G, or the graph button in the left rail). All notes as
-  nodes, synapses as lines, sized by their number of synapses; unresolved synapses point to
-  dashed nodes. Hover a note to see its neighborhood, click to open it, drag to arrange, scroll
-  or use the buttons to zoom. "Around …" shows only the neighborhood of the note opened last,
-  one to three steps deep; notes without synapses and unresolved synapses can be hidden.
-- **Embedded notes.** `![[Note]]` shows another note inside this one in the reading view,
-  `![[Note#Heading]]` only that section (up to three levels deep).
-- **Renaming and moving.** Synapses in other notes are rewritten so they keep pointing to the
-  renamed or moved note (Markdown links included), and so are embeds and links to renamed or
-  moved attachments (`![[photo.png]]`, `![](photo.png)`, `[report](report.pdf)`), unless
-  switched off in the settings. A note that was changed by someone else in that moment is left
-  alone and reported.
-- **Editing together.** Everyone who has a note open – other people the soma is shared with,
-  or your own second tab – edits the same text at once: changes appear right away, the others'
-  cursors and selections show with their names, and the bar at the bottom of the note shows who
-  else is in it. Readers follow along in the reading view without being able to change anything.
-- **Saving.** The server writes a note about a second after typing stops, at the latest every
-  five seconds while typing goes on ("Saving …", then "Saved"); ⌘S / Ctrl+S saves at once.
-  Files keep their line breaks (also Windows-style) and a byte order mark. Without a
-  connection, changes stay in the tab ("Offline – changes kept here") and are sent as soon as
-  it is back – also if the server restarted meanwhile: they are merged into the current text.
-- **History** (the clock in the top bar). Every save is kept as a version: saves by the same
-  people within ten minutes count as one, changes made outside dendronotes and restored
-  versions get their own. The history lists who changed what and when, shows the changes from
-  any version to the current note line by line, and – for everyone who may change notes –
-  brings a version back (the current text stays in the history). It follows renames and the
-  trash; versions older than `DENDRONOTES_HISTORY_DAYS` (90 days) are removed, but the newest
-  version of every note always stays. The history lives in `DENDRONOTES_DATA_DIR/history/`,
-  never in the soma.
-- **Comments** (the speech bubble in the top bar). Select text – in the editor or the reading
-  view – and press "Comment", or comment on the whole note. Everyone with access comments and
-  replies, readers too; writers mark threads as done, authors change or delete their own
-  comments, editors anyone's. The commented text is marked in the note and found again after
-  edits; if it is gone, the thread says so. `@user name` lets someone with access know, and
-  replies notify the others in the thread: the bell in the top bar lists both and jumps to
-  the comment. Comments live in `state.db`, never in the note, and follow renames and the
-  trash.
-- **Trash** (the bin at the bottom of the sidebar, for everyone who may delete). Deleted files
-  and folders wait in the soma's `.trash` folder – the same place Obsidian uses – with who
-  deleted them, when and from where. Restore puts them back where they were (missing folders
-  are created again, an occupied name gets a " (n)" suffix); the owner can also delete single
-  entries or everything for good, which takes their history along. After
-  `DENDRONOTES_TRASH_DAYS` (7 days) entries are deleted for good on their own – for files put
-  into the trash elsewhere, counted from when dendronotes first sees them. Deleted somas are not
-  affected; admins restore or delete them.
-- **Download as ZIP** (soma switcher). All visible notes, files and folders of the soma as they
-  are now; hidden folders such as `.trash` and `.obsidian` stay out.
-- **Live updates.** Changes made outside dendronotes – another editor, git, a sync tool –
-  appear right away: the file tree, search and backlinks update, and an open note takes over
-  the change. If it was edited here at the same time, both are merged line by line; where both
-  sides changed the same lines, both versions are kept one after the other (and a notice says
-  so) – nothing is lost.
-
-| Shortcut         | Action                         |
-|------------------|--------------------------------|
-| ⌘O / Ctrl+O      | Quick switcher: open or create a note (Shift+Enter creates) |
-| ⌘⇧F / Ctrl+Shift+F | Search notes                 |
-| ⌘⇧G / Ctrl+Shift+G | Graph (again: back to the note) |
-| ⌘E / Ctrl+E      | Switch between edit and read   |
-| ⌘S / Ctrl+S      | Save now                       |
-| ⌘, / Ctrl+,      | Settings                       |
-
-In the drawing editor: V select, H move the canvas (or hold Space), R rectangle, O ellipse,
-D diamond, L line, A arrow, P pen, T text, I icons, G grid; ⌘Z / ⇧⌘Z undo and redo, ⌘D
-duplicate, ⌘C / ⌘V copy and paste (also between drawings), ⌘] / ⌘[ forward and backward
-(with ⇧ to the front or back), arrow keys nudge (with ⇧ by 10), Delete removes, Enter edits the
-text, ⇧1 fits the drawing, ⌘ + scroll or pinch zooms. Shift keeps proportions and 15° steps;
-Alt-drag moves a copy.
-
-**Settings** (stored in the browser, never in the soma): live preview, Vim key bindings,
-readable line length, note font (sans or serif), theme (system, light, dark), color palette,
-the details panel, and whether renaming updates synapses.
-
-**Color palettes**, each with a light and a dark variant: Cortex (the default; gray matter,
-graphite with a touch of rose), Sage (leaf green) and six taken from the ways nerve tissue is
-made visible – the stains Golgi (ink on aged paper, silver turned gold), Nissl (cresyl violet),
-Eosin (H&E: pink and blue-violet) and Myelin (Luxol fast blue with a rose counterstain), and the
-fluorescence of Confocal (cyan and magenta) and Brainbow (coral and turquoise).
-
-Uploads are limited to images (PNG, JPEG, GIF, WebP, AVIF, BMP, ICO, SVG), PDF, audio (MP3,
-WAV, Ogg, FLAC, M4A), video (MP4, WebM, MOV), text (Markdown, TXT, CSV, JSON) and zip files,
-up to `DENDRONOTES_MAX_UPLOAD_MB`. The content must match the extension.
-
-## Accounts, somas and administration
-
-- **Somas.** Every account has its own somas; new accounts start with an empty one called
-  "Notes". The switcher at the top of the sidebar changes the soma ("Switch soma") and creates,
-  renames or deletes one. Each soma is a folder in `DENDRONOTES_SOMAS_DIR`, named after the
-  soma when it is created (renaming the soma keeps the folder). Deleting a soma moves its
-  folder to `DENDRONOTES_SOMAS_DIR/.trash/`; admins find it under *Somas → Deleted somas* and
-  restore it with its notes and shares, or delete it for good. A soma registered from
-  `DENDRONOTES_SOMA_DIR` keeps its folder where it is.
-- **Sharing** ("Share soma …" in the soma switcher). The owner adds people and groups by name,
-  each with a role; every role includes the ones above it:
-
-  | Role | May |
-  |------|-----|
-  | *Can read* (viewer) | read notes and files |
-  | *Can write* (writer) | change existing notes and tick tasks |
-  | *Can add* (contributor) | create notes, folders and files (uploads, new notes from synapses) |
-  | *Full access* (editor) | rename, move and delete |
-  | *Owner* | share, rename or delete the soma, hand it over ("Make owner"; the previous owner keeps full access) |
-
-  Someone who gets a soma both personally and through groups has the highest of those roles.
-  Somas shared with you are listed under "Shared with you"; "People with access …" shows who
-  else is in and lets you leave a soma shared with you personally (access through a group
-  stays). What a role does not allow is hidden in the interface and refused by the server.
-  Changes to sharing take effect at once, also in browsers that have the soma open – someone
-  who loses access is disconnected right away.
-- **Profile** (your picture at the top right, which also signs you out): profile picture,
-  display name, e-mail and, for accounts with a password, a new password. Changing it signs
-  out your other sessions.
-- **Profile pictures**: design one from a color, a pattern (dendrite, myelin rings, vesicles)
-  and your initials, or upload a photo and place it in a circle. The browser crops the photo to
-  a small square; the server stores it in `state.db`, encoded anew without metadata, and shows
-  it only to people you share a soma with (and to admins). Pictures appear in the header (yours),
-  at the bottom of a note (the others in it), in the sharing dialog and in the administration.
-- **Administration** (the shield in the left rail, admins only):
-  - *Users*: create accounts, change role, disable, set a new password, sign out everywhere,
-    delete. A deleted account's somas go to an account you choose or to the trash. The last
-    admin can be neither demoted, disabled nor deleted.
-  - *Groups*: create, rename and delete groups and choose their members. The group
-    *Everyone* is built in and contains every account, also future ones; share a soma with it
-    to open it to the whole server. Groups taken over from Active Directory are marked as such;
-    their name and members come from the directory (see [Authentication](#authentication)).
-  - *Somas*: every soma with owner, members, groups, size and folder; create a soma for any
-    account – optionally shared with a group right away, for example *Everyone* –, hand a soma
-    to another owner or delete it.
-  - *Sessions*: who is signed in from where; end single sessions.
-  - *Server*: version, uptime, storage, open somas, a backup download, whether the OpenID
-    Connect provider and the directory are reachable, and the effective configuration
-    (secrets show only whether they are set).
-  - *Audit log*: sign-ins (failed ones too), account and soma changes.
-
-Disabling an account, setting its password or ending its sessions takes effect at once; open
-browser tabs notice within 25 seconds.
-
-## Index and live updates
-
-dendronotes keeps a search index per soma in `$DENDRONOTES_DATA_DIR/index/<soma id>/index.db`
-(SQLite with FTS5, compiled into the binary, no extra service). It is a cache: delete it at
-any time and it is rebuilt from the soma the next time the soma is opened, as it is when its
-format changes or the file is damaged. Somas are opened on first use and closed after 30
-minutes without connected browsers.
-
-Changes on disk are picked up through file system events (inotify on Linux). Every
-`DENDRONOTES_RESCAN_INTERVAL` (default 5 minutes) the whole soma is compared as well, which
-covers file systems without events, such as some network volumes. A very large soma may need
-a higher inotify limit on the host (`fs.inotify.max_user_watches`); without it, changes are
-still found by the rescans.
-
-Browsers receive updates through Server-Sent Events (`/api/somas/{soma}/events`). Behind a reverse
-proxy, do not buffer that path and allow idle reads of at least 30 seconds (a heartbeat is
-sent every 25 seconds); dendronotes sets `X-Accel-Buffering: no` for nginx.
-
-## Running the container
+The quickest way is the container:
 
 ```bash
+mkdir -p somas && sudo chown 65532:65532 somas
+head -c 18 /dev/urandom | base64 > admin-password && chmod 644 admin-password
 docker run -d --name dendronotes -p 8080:8080 \
-  --read-only --cap-drop ALL --security-opt no-new-privileges \
-  -v /path/to/somas:/somas -v dendronotes-data:/data \
-  -e DENDRONOTES_ADMIN_PASSWORD_HASH='<output of hash-password>' \
-  dendronotes:<version>
+  -v "$PWD/somas:/somas" -v dendronotes-data:/data \
+  -v "$PWD/admin-password:/run/secrets/admin-password:ro" \
+  -e DENDRONOTES_ADMIN_PASSWORD_FILE=/run/secrets/admin-password \
+  ghcr.io/erktm/dendronotes:latest
 ```
 
-The image runs as UID 65532. `/somas` holds the notes (one folder per soma), `/data` the
-account database `state.db` and the search indexes; both must be writable.
+Open <http://localhost:8080> and sign in as `admin` with the password in `admin-password`.
 
-**Backups** need both: the somas directory and what in `/data` is not a cache – `state.db`
-(accounts, shares, groups, profile pictures, the trash records) and the note histories in
-`/data/history/`. The indexes in `/data/index` are caches and can be left out. The databases
-are written while running, so copy them consistently: *Admin → Server → Download backup*, or
+| Way | Get it | Guide |
+|-----|--------|-------|
+| Binary (Linux, macOS; amd64, arm64) | [Releases](https://github.com/erktm/dendronotes/releases) | [installation → binary](docs/installation.md#binary) |
+| Container | `ghcr.io/erktm/dendronotes` | [installation → container](docs/installation.md#container) |
+| Kubernetes | `helm install dendronotes oci://ghcr.io/erktm/charts/dendronotes` | [installation → Helm](docs/installation.md#kubernetes-with-helm) |
 
-```bash
-docker exec dendronotes dendronotes backup /data/backup-$(date +%F).zip
-```
+## Documentation
 
-Both make a ZIP of consistent copies while dendronotes keeps running; to restore, stop it and
-unpack the ZIP into `/data`. The somas directory is plain files: back it up as such (or use
-volume snapshots for everything). Before a new release changes the database format,
-dendronotes copies `state.db` to `state.db.v<n>.bak`; it refuses to open a database written by
-a newer release.
-
-**Monitoring.** With `DENDRONOTES_METRICS_PORT` (e.g. `9090`) dendronotes serves Prometheus
-metrics on that port – only `/metrics`, nothing else, so keep the port internal (a separate
-container port, not routed through the ingress): requests by route pattern, method and status
-with durations, sign-ins by way and result, accounts, sessions, somas, open somas, live
-connections, notes being edited, disk usage, whether the OpenID Connect provider and the
-directory answer, the last directory sync, and Go runtime figures. Note paths never become
-labels.
-
-**Locked out?** `dendronotes reset-password [user]` sets a new password for a local account
-(by default the admin account), enables it and ends its sessions – also while the server runs:
-
-```bash
-docker exec -it dendronotes dendronotes reset-password
-```
-
-**Upgrading from a single soma** (before M6): mount the old notes folder, e.g. at `/soma`, and
-set `DENDRONOTES_SOMA_DIR=/soma`. On the first start with no somas registered, it becomes the
-admin's soma "Notes" and stays in place.
+- [User guide](docs/guide.md): notes, synapses, drawings, search, comments, history, sharing,
+  administration
+- [Installation and operation](docs/installation.md): binary, container, Helm, reverse proxy,
+  backups, monitoring, upgrades, air gap
+- [Authentication](docs/authentication.md): passwords, Keycloak / OpenID Connect, Active
+  Directory / LDAP, authenticating proxy
+- [Architecture](docs/architecture.md): parts, data, request flow, editing together, decisions
+- [Security](docs/security.md): design, supply chain, SBOM and VEX; reporting in
+  [SECURITY.md](SECURITY.md)
+- [API](docs/api.md) and its description in [`docs/openapi.yaml`](docs/openapi.yaml)
 
 ## Configuration
 
@@ -323,7 +97,7 @@ All variables carry the `DENDRONOTES_` prefix. Variables without it are ignored.
 | `DENDRONOTES_TRUSTED_PROXIES`          |                    | IPs/CIDRs of reverse proxies whose `X-Forwarded-*` headers are believed |
 | `DENDRONOTES_AUTH_MODE`                | `local`            | `local` (accounts with passwords) or `proxy`               |
 | `DENDRONOTES_ADMIN_USERNAME`           | `admin`            | The first admin account, created at start while no admin exists |
-| `DENDRONOTES_ADMIN_PASSWORD_HASH`      |                    | Its argon2id hash (see below) – only used to create it     |
+| `DENDRONOTES_ADMIN_PASSWORD_HASH`      |                    | Its argon2id hash (see below), only used to create it      |
 | `DENDRONOTES_ADMIN_PASSWORD_HASH_FILE` |                    | File containing that hash (e.g. a mounted secret)          |
 | `DENDRONOTES_ADMIN_PASSWORD_FILE`      |                    | File containing the plain password, hashed at start        |
 | `DENDRONOTES_SESSION_TTL`              | `720h`             | Session lifetime, extended while in use                    |
@@ -373,260 +147,24 @@ The port variable is deliberately not called `DENDRONOTES_PORT`: Kubernetes inje
 Operational endpoints: `/healthz` (liveness), `/readyz` (readiness; 503 while starting,
 while shutting down, or when the account database or the somas directory is unreachable).
 
-## Authentication
+## Development
 
-**Accounts with passwords** (default, `local`). On the first start dendronotes creates the
-admin account `DENDRONOTES_ADMIN_USERNAME` with the password from one of the admin password
-variables. Create a hash for it and pass it as a secret:
+Requirements: Go (see `go.mod`), Node 26 with npm, Docker for the image, Helm for the chart.
 
 ```bash
-docker run --rm -it dendronotes:<version> hash-password
+make dev          # Go server :8080 + Vite dev server :5173 (somas in ./dev)
+make test         # go vet, Go tests (-race), Svelte type check, frontend unit tests (Vitest)
+make build        # bin/dendronotes with the embedded web interface
+make image        # the container image (reproducible), loaded into Docker
+make sbom         # security/sbom.cdx.json
+make vulncheck    # govulncheck and npm audit against security/vex.openvex.json
+make help         # all targets
 ```
 
-Further accounts are created by an admin in the administration area. People sign in with user
-name or e-mail address and password (at least 10 characters) and can change the password in
-their profile. An e-mail address only works when exactly one account with a password has it.
-Passwords are stored as argon2id hashes. Sign-in attempts are rate-limited per client IP, per
-account and globally; sessions are stored only as SHA-256 hashes in `state.db` and sent as
-`HttpOnly`, `SameSite=Strict` cookies (`__Host-` prefixed and `Secure` over HTTPS).
+`make dev` creates a random password for the account `admin` in `dev/password` on first start
+and prints it.
 
-**Behind an authenticating proxy** (e.g. oauth2-proxy with Keycloak): set
-`DENDRONOTES_AUTH_MODE=proxy`, `DENDRONOTES_TRUSTED_PROXIES` to the proxy's address range and
-`DENDRONOTES_AUTH_PROXY_HEADER` to the header it sets (oauth2-proxy with
-`--set-xauthrequest`: `X-Auth-Request-User`). The header is ignored from any other peer, so make
-sure only the proxy can reach dendronotes (Kubernetes: a NetworkPolicy). Each user name gets an
-account on first access; the one named `DENDRONOTES_ADMIN_USERNAME` becomes admin while there is
-no admin yet.
+## License
 
-**Through Keycloak or another OpenID Connect provider** (in local mode, next to passwords).
-Register a client in Keycloak:
-
-- Client type *OpenID Connect*, *Standard flow* on; *Client authentication* on (then put the
-  secret into a file for `DENDRONOTES_OIDC_CLIENT_SECRET_FILE`) or off for a public client –
-  dendronotes always uses PKCE.
-- *Valid redirect URIs*: `https://notes.example.org/api/auth/oidc/callback`;
-  *Valid post logout redirect URIs*: `https://notes.example.org/` (with your
-  `DENDRONOTES_PUBLIC_URL`).
-- For groups: a *Group Membership* mapper in the client's dedicated scope, token claim name
-  `groups`, added to the ID token or the userinfo response ("Full group path" on or off both
-  work: a leading `/` is ignored). Realm roles work too with
-  `DENDRONOTES_OIDC_GROUPS_CLAIM=realm_access.roles`.
-
-```bash
--e DENDRONOTES_PUBLIC_URL=https://notes.example.org \
--e DENDRONOTES_OIDC_ISSUER=https://sso.example.org/realms/main \
--e DENDRONOTES_OIDC_CLIENT_ID=dendronotes \
--e DENDRONOTES_OIDC_CLIENT_SECRET_FILE=/run/secrets/oidc-client-secret \
--e DENDRONOTES_OIDC_ADMIN_GROUPS=dendronotes-admins \
--e DENDRONOTES_OIDC_LOGIN_LABEL=Keycloak
-```
-
-The sign-in page then offers "Continue with Keycloak". The first sign-in creates an account
-(with an empty soma "Notes"); accounts are matched by the provider's issuer and subject, never
-by name, so a provider user called like an existing local account gets a name with a suffix
-(`erik-2`) instead of taking it over. Display name and e-mail follow the provider on every
-sign-in; with `DENDRONOTES_OIDC_ADMIN_GROUPS` set, so does the admin role (without it, roles are
-managed in the administration area). `DENDRONOTES_OIDC_ALLOWED_GROUPS` keeps everyone else out.
-"Sign out" also ends the Keycloak session. dendronotes keeps its own session afterwards
-(`DENDRONOTES_SESSION_TTL`): taking someone's access away in Keycloak takes effect at their next
-sign-in – to end it at once, disable the account or end its sessions in the administration area.
-
-With `DENDRONOTES_LOCAL_LOGIN=false` the sign-in page shows only the Keycloak button; the admin
-account can still sign in with its password at `/?local=1` should the provider be unreachable.
-The administration area shows whether the provider is reachable.
-
-**With Active Directory** (or another LDAP directory; in local mode, next to or instead of
-passwords). People sign in on the normal form with their directory account – user name
-(`sAMAccountName`), `user@domain` (UPN) or e-mail – and its password. dendronotes looks the
-account up with a read-only service account, then checks the password by binding as that
-account; it never stores the password. Local accounts come first: when what was typed matches a
-local account with a password, only that password counts.
-
-```bash
--e DENDRONOTES_LDAP_URL=ldaps://dc1.example.org -e DENDRONOTES_LDAP_BIND_DN='CN=svc-dendronotes,OU=Service,DC=example,DC=org' -e DENDRONOTES_LDAP_BIND_PASSWORD_FILE=/run/secrets/ldap-bind-password -e DENDRONOTES_LDAP_BASE_DN='DC=example,DC=org' -e DENDRONOTES_LDAP_GROUP_BASE_DN='OU=dendronotes,OU=Groups,DC=example,DC=org' -e DENDRONOTES_LDAP_ADMIN_GROUPS='dendronotes-admins' -e DENDRONOTES_LDAP_ALLOWED_GROUPS='dendronotes-users;dendronotes-admins'
-```
-
-- **Connection**: `ldaps://` (port 636), or `ldap://` with `DENDRONOTES_LDAP_START_TLS=true`.
-  Certificates are verified; add your own CA with `DENDRONOTES_LDAP_CA_FILE`. Unencrypted
-  `ldap://` is refused except for `localhost`.
-- **Accounts** are created at the first sign-in (with an empty soma "Notes") and bound to the
-  directory's `objectGUID`, never to the name; a directory account called like an existing local
-  account gets a suffix (`erik-2`). Display name and e-mail follow the directory on every
-  sign-in and cannot be changed in dendronotes; there is no dendronotes password.
-- **Admins and access**: with `DENDRONOTES_LDAP_ADMIN_GROUPS`, membership decides the admin role
-  at every sign-in (without it, roles are managed in the administration area);
-  `DENDRONOTES_LDAP_ALLOWED_GROUPS` keeps everyone else out. Groups are given by name (`cn`) or
-  DN; nested groups count.
-- **Groups**: every group below `DENDRONOTES_LDAP_GROUP_BASE_DN` that someone is a member of –
-  directly or through nested groups – becomes a dendronotes group at their sign-in, so somas can
-  be shared with it like with any group. Name and members follow the directory: someone joins
-  or leaves a group at their next sign-in. In the administration area these groups are marked
-  *Active Directory*; they can be deleted (the next member's sign-in brings them back) but not
-  renamed or given other members. Keep the group base narrow – a dedicated OU – rather than the
-  whole domain. A local group with the same name stays separate; the directory group is shown
-  as "Name (AD)".
-- **Sync in the background** (`DENDRONOTES_LDAP_SYNC_INTERVAL`, every 15 minutes; `0` turns it
-  off): every directory account is looked up again by its `objectGUID`. Accounts that are gone,
-  disabled in Active Directory or no longer in `LDAP_ALLOWED_GROUPS` are signed out everywhere
-  and lose their API tokens – the account itself stays, its next sign-in fails. The others take
-  over name, e-mail, the admin role and their groups without signing in. If the directory cannot
-  be reached nothing changes, and if most accounts are missing at once nobody is signed out (a
-  wrong base DN or filter is more likely); the administration area shows the last result and
-  offers *Sync now*. Without the sync, changes in Active Directory take effect at the next
-  sign-in, and dendronotes keeps its own session until then (`DENDRONOTES_SESSION_TTL`). With
-  `DENDRONOTES_LOCAL_LOGIN=false` only directory accounts and the admin account sign in with a
-  password.
-- The service account needs read access only. The administration area (*Server*) shows whether
-  the directory is reachable and checks the connection on request.
-
-Other LDAP directories work with their own filters and attributes, for example OpenLDAP:
-
-```bash
--e DENDRONOTES_LDAP_USER_FILTER='(&(objectClass=inetOrgPerson)(|(uid={login})(mail={login})))' -e DENDRONOTES_LDAP_USERNAME_ATTR=uid -e DENDRONOTES_LDAP_NAME_ATTR=cn -e DENDRONOTES_LDAP_ID_ATTR=entryUUID -e DENDRONOTES_LDAP_GROUP_FILTER='(&(objectClass=groupOfNames)(member={dn}))'
-```
-
-## Security notes
-
-- Somas are separated per account: requests for a soma the account has no access to (neither
-  personally nor through a group) are answered with 404, as if it did not exist; members with
-  too low a role get 403. The administration needs the admin role. A test runs every route as
-  non-member and with every role, given personally and through a group.
-- OpenID Connect uses the authorization code flow with PKCE (S256), a random state bound to
-  the browser by a short-lived cookie (no login CSRF, each state works once) and a nonce; the
-  ID token's signature, issuer, audience, expiry and nonce are checked. After sign-in the
-  browser only returns to paths within dendronotes. The search for people to share with needs
-  two characters and shows only user and display names (and group names).
-- Every file access goes through Go's `os.Root`: paths with `..`, absolute paths and symlinks
-  pointing out of the soma are refused by the kernel-level lookup. API paths are validated
-  beforehand and can never address hidden entries (`.git`, `.trash`, …). Symlinks inside the
-  soma are shown read-only.
-- Saving requires the version the client started from (`If-Match`); changes made elsewhere in
-  the meantime are never overwritten silently.
-- State-changing requests from other origins are rejected (`Sec-Fetch-Site`/`Origin`); the API
-  only accepts JSON bodies.
-- Strict Content-Security-Policy with per-response nonce; no inline scripts, no `eval`, no
-  external hosts. The only inline style allowed is the exact `tab-size: 4` attribute the
-  editor sets (by hash).
-- Uploads must have an allowed extension and content that matches it (a `.png` must be a
-  PNG); HTML, scripts and executables are refused. Files are served with the type of their
-  extension, `nosniff`, and a sandboxing Content-Security-Policy, so a file opened directly in
-  the browser (an SVG, say) can never run scripts. Notes show media only from the soma.
-- Drawings are SVG that the server checks on every save (`internal/drawing`): a short list of
-  elements and attributes, pictures only as `data:image` URLs, no scripts, event handlers,
-  `foreignObject`, external references or CSS `url()`. SVG icons pass the same check, PNG icons
-  are decoded and encoded anew. In the app drawings are drawn from their stored scene, which is
-  checked again (known fields, numbers in range, colors from the slots), never from the file's
-  markup; files changed outside dendronotes are shown as plain images until they have a valid
-  scene.
-- `change` events on the event stream carry only paths and versions. Note content travels
-  only to the tabs that joined that note for editing together, which needs read access to the
-  soma; pushing changes needs edit access. The server checks every change set (structure,
-  length against the document, size limit) before applying it, and limits how many updates
-  and cursor moves a tab may send. Streams end when the session ends or the account loses
-  access to the soma. Search snippets mark matches with control characters, not HTML.
-- Note content is untrusted: the reading view renders it with markdown-it and sanitizes the
-  result with DOMPurify (no scripts, event handlers, style attributes, forms, frames, SVG or
-  `javascript:` URLs). External links open with `rel="noopener noreferrer"`. A test corpus of
-  XSS payloads guards this.
-
-## API
-
-All endpoints return JSON. Everything that works on a soma lives below
-`/api/somas/{soma}/` (`{soma}` is the soma's id); paths inside the soma are soma-relative and
-URL-encoded per segment. The full description is in [`docs/openapi.yaml`](docs/openapi.yaml),
-which a test keeps in sync with the server.
-
-| Method & path                           | Purpose                                              |
-|-----------------------------------------|------------------------------------------------------|
-| `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | Session handling         |
-| `PATCH /api/me`, `POST /api/me/password` | Own profile and password                            |
-| `PUT /api/me/avatar`, `PUT`/`DELETE /api/me/avatar/photo`, `GET /api/users/{id}/avatar` | Profile picture: design, photo |
-| `GET /api/somas`, `POST /api/somas`     | The account's somas; create one                      |
-| `PATCH /api/somas/{soma}`, `DELETE /api/somas/{soma}` | Rename, hand over or delete a soma (owner) |
-| `GET /api/somas/{soma}/tree`            | All visible files and folders                        |
-| `GET /api/somas/{soma}/notes/{path}`    | Read a note (with `ETag`)                            |
-| `PUT /api/somas/{soma}/notes/{path}`    | Save a note; requires `If-Match`, `412` on conflict  |
-| `POST /api/somas/{soma}/notes/{path}`   | Create a note                                        |
-| `POST /api/somas/{soma}/folders/{path}` | Create a folder                                      |
-| `POST /api/somas/{soma}/move`           | Rename or move: `{"from": …, "to": …, "updateSynapses": true}` |
-| `DELETE /api/somas/{soma}/entries/{path}` | Move a file or folder to `.trash/` in the soma     |
-| `GET /api/somas/{soma}/trash`           | The trash; `POST …/trash/{path}` restores, `DELETE` deletes for good (owner) |
-| `GET /api/somas/{soma}/history/{path}`  | Versions of a note; `GET …/versions/{id}`, `POST …/versions/{id}/restore` |
-| `GET /api/somas/{soma}/export`          | The soma as a ZIP                                    |
-| `GET /api/somas/{soma}/comments?path=`  | Comments on a note; `POST` adds one (or a reply), `PATCH`/`DELETE …/comments/{id}`, `POST …/{id}/resolve` |
-| `GET /api/me/notifications`             | Mentions and replies; `POST …/read` marks them read  |
-| `GET /api/somas/{soma}/drawings/{path}` | Read a drawing (`*.drawing.svg`, with `ETag`); `POST` creates an empty one, `PUT` saves (`If-Match`, `412` on conflict, checked SVG) |
-| `GET /api/somas/{soma}/icons`           | The icon library; `POST` adds a picture (raw body, `?name=`), `GET`/`DELETE …/icons/{id}` |
-| `GET /api/somas/{soma}/files/{path}`    | Download a file (attachments, images, media)         |
-| `POST /api/somas/{soma}/files/{path}`   | Upload a file (raw body; `?unique=1` avoids name clashes) |
-| `GET /api/somas/{soma}/search?q=`       | Full-text search (words, "phrases", #tags)           |
-| `GET /api/somas/{soma}/backlinks/{path}` | Notes with synapses to a note                       |
-| `GET /api/somas/{soma}/tags`            | All tags with their number of notes                  |
-| `GET /api/somas/{soma}/graph`           | All notes and the synapses between them              |
-| `GET /api/somas/{soma}/events`          | Live updates (Server-Sent Events)                    |
-| `POST /api/somas/{soma}/collab/join`, `/leave`, `/push`, `/presence`; `GET …/collab/pull` | Editing together: open a note with the stream's id, send changes (CodeMirror change sets), cursors, catch up |
-| `GET /api/somas/{soma}/members`         | Who has access – people and groups – with roles     |
-| `PUT`, `DELETE /api/somas/{soma}/members/{id}` | Share with an account or change its role; take access away (owner) |
-| `PUT`, `DELETE /api/somas/{soma}/groups/{id}` | Share with a group or change its role; take access away (owner) |
-| `DELETE /api/somas/{soma}/membership`   | Leave a soma shared with you personally              |
-| `GET /api/users/search?q=`              | Find people to share with (two characters or more)   |
-| `GET /api/auth/methods`, `/api/auth/oidc/login`, `/api/auth/oidc/callback` | Sign-in options and the OpenID Connect flow |
-| `/api/admin/users`, `/groups`, `/somas`, `/sessions`, `/server`, `/sso/check`, `/audit` | Administration (admins only) |
-
-**Personal API tokens** (profile → *API tokens*) let scripts use the API as their account:
-"Read" tokens only read, "Read and write" tokens also change notes and files. No token manages
-anything – administration, sharing, renaming or deleting somas, the account and its tokens
-answer `403 token_not_allowed`. A token is shown once; only its hash is stored.
-
-```bash
-curl -H "Authorization: Bearer dn_…" https://notes.example.org/api/somas
-```
-
-## Air gap and reproducible builds
-
-```bash
-make vendor          # vendor/ (Go) + .offline/npm-cache (npm, Linux binaries for amd64/arm64)
-make image-offline   # rebuild without cache and without network in the build steps
-```
-
-- Base images are pinned by digest in the `Dockerfile`. In an air gap, mirror them into a local
-  registry and pass `--build-arg NODE_IMAGE=… GO_IMAGE=… RUNTIME_IMAGE=…`.
-- `make image` also writes `bin/dendronotes-<version>-<platform>.oci.tar` for transfer.
-- Same source ⇒ same image digest (`SOURCE_DATE_EPOCH`, `rewrite-timestamp`, no provenance
-  attestation with timestamps).
-- `npm run build` fails if the bundle contains unexpected external URLs.
-
-## Layout
-
-```
-cmd/dendronotes/   entry point: serve, hash-password, reset-password, backup, healthcheck, version
-internal/config/   read and validate DENDRONOTES_* environment variables
-internal/soma/     soma access exclusively through os.Root (tree, notes, move, trash)
-internal/mdparse/  synapses and tags of a note (same rules as web/src/lib/synapses.ts)
-internal/store/    state.db: accounts, sessions, avatars, somas and members, audit log (versioned migrations)
-internal/avatar/   checks uploaded profile photos and encodes them anew (square PNG, no metadata)
-internal/drawing/  checks drawings (*.drawing.svg) and SVG icons against an allow list; PNG icons anew
-internal/somas/    soma manager: opens somas on demand (index, watcher, live updates), closes idle ones
-internal/collab/   editing together: live documents, change sets (UTF-16), saving, 3-way merge
-internal/index/    SQLite cache per soma: versions, synapses, tags, full-text search
-internal/history/  earlier versions of notes, one SQLite database per soma (not a cache)
-internal/backup/   consistent copies of state.db and the histories as a ZIP
-internal/watch/    file system events (fsnotify) for changes made outside dendronotes
-internal/events/   fan-out of live updates to connected browsers
-internal/relink/   rewrites synapses when notes are renamed or moved
-internal/attach/   which files may be uploaded (type allow list, content check) and how they are served
-internal/auth/     sign-in (argon2id, OIDC accounts, proxy header), sessions, rate limits, first admin
-internal/sso/      OpenID Connect client: discovery, PKCE, ID token checks, groups
-internal/ldap/     Active Directory / LDAP: service-account search, bind, nested groups
-internal/clientip/ client address behind trusted proxies
-internal/httpx/    JSON helpers
-internal/server/   route table with access levels, API and admin handlers, middleware (CSP with nonce,
-                   logging, recovery), health, assets
-web/               Svelte 5 frontend (Vite), embedded into the binary via go:embed
-  src/lib/editor/  CodeMirror 6 setup, live preview, synapse syntax
-  src/lib/drawing/ drawings: scene, SVG file format, sketchy strokes, rendering, editor state
-  src/lib/         Markdown rendering + sanitizing, synapse resolution, state, UI strings
-docs/openapi.yaml  API description
-```
-
-Contributors (human or AI): read [`CLAUDE.md`](CLAUDE.md) for the vocabulary and naming rules.
+dendronotes is licensed under the [Apache License 2.0](LICENSE). The third-party components it
+contains and their licenses are listed in the [SBOM](security/sbom.cdx.json).

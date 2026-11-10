@@ -198,7 +198,7 @@ paths:
             application/json:
               schema: { type: object, properties: { tokens: { type: array, items: { $ref: "#/components/schemas/APIToken" } } } }
     post:
-      summary: Create a personal API token – it is shown in this answer only (at most 20 per account)
+      summary: Create a personal API token, shown in this answer only (at most 20 per account)
       requestBody:
         required: true
         content:
@@ -863,7 +863,7 @@ paths:
         "403": { description: Not your comment (`not_author`). }
         "404": { $ref: "#/components/responses/Error" }
     delete:
-      summary: Delete a comment – a thread's first comment takes the replies along (your own; editors any)
+      summary: Delete a comment; a thread's first comment takes the replies along (your own; editors any)
       responses:
         "200": { description: Deleted. }
         "403": { $ref: "#/components/responses/Error" }
@@ -979,7 +979,7 @@ paths:
                         deletedAt: { type: string, format: date-time }
                         deletedBy: { $ref: "#/components/schemas/Person" }
     delete:
-      summary: Empty the trash – everything in it is deleted for good (owner)
+      summary: Empty the trash, deleting everything in it for good (owner)
       responses:
         "200": { description: Emptied. }
         "403": { $ref: "#/components/responses/Error" }
@@ -1130,7 +1130,7 @@ paths:
         A `hello` event starts every stream, also after a reconnect; clients then
         reload what they show. Its `stream` id is used to join notes for editing
         together (/collab/join); a joined note's `collab`, `presence`, `saved` and
-        `notice` events then arrive on this stream – only on the streams that
+        `notice` events then arrive on this stream, only on the streams that
         joined it. `change` events report what changed in the soma, whoever
         changed it, without content. The stream ends on sign-out, when the
         account's access ends, and on shutdown.
@@ -1525,7 +1525,7 @@ paths:
     parameters:
       - { name: id, in: path, required: true, schema: { type: string } }
     delete:
-      summary: Delete a deleted soma for good – its files in the trash too (an imported folder stays) (admin)
+      summary: Delete a deleted soma for good, its files in the trash too (an imported folder stays) (admin)
       responses:
         "200": { description: Deleted. }
         "404": { $ref: "#/components/responses/Error" }
@@ -1879,7 +1879,7 @@ components:
       properties:
         id: { type: string }
         name: { type: string }
-        role: { $ref: "#/components/schemas/Role", description: Effective – the highest of your personal share and your groups'. }
+        role: { $ref: "#/components/schemas/Role", description: "Effective: the highest of your personal share and your groups'." }
         direct: { type: boolean, description: Shared with you personally (only then can you leave it). }
         owner:
           type: object
