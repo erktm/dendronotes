@@ -51,6 +51,8 @@ LABEL org.opencontainers.image.title="dendronotes" \
       org.opencontainers.image.source="https://github.com/erktm/dendronotes" \
       org.opencontainers.image.licenses="Apache-2.0"
 COPY --from=build /out/dendronotes /usr/local/bin/dendronotes
+# The licenses of dendronotes and of everything compiled into it.
+COPY --from=build /src/LICENSE /src/NOTICE /src/THIRD_PARTY_LICENSES.txt /usr/share/doc/dendronotes/
 # /somas holds the notes, one folder per soma; /data the accounts (state.db,
 # back it up) and the rebuildable search indexes.
 COPY --from=build --chown=65532:65532 /out/somas /somas

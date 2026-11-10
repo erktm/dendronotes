@@ -1,5 +1,5 @@
-// Synapses are connections between two notes (see CLAUDE.md, "What is a
-// synapse"): wiki links [[Note]], [[Note|Alias]], [[Note#Heading]], embeds
+// Synapses are connections between two notes (see the README, Vocabulary):
+// wiki links [[Note]], [[Note|Alias]], [[Note#Heading]], embeds
 // ![[Note]] and Markdown links to notes [Text](Other.md). Links to
 // attachments, external URLs and headings in the same note are not synapses.
 

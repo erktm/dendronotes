@@ -64,4 +64,8 @@ are described under [supply chain](#supply-chain).
   vulnerable package of a module that dendronotes does not import. `make vulncheck` runs
   govulncheck and `npm audit` and fails when a finding has no statement there
   (`scripts/vex-check.mjs`); the CI does the same on every change and every week.
+- **License notices.** [`THIRD_PARTY_LICENSES.txt`](../THIRD_PARTY_LICENSES.txt) holds the license
+  texts and copyright notices of everything in the binary and the web interface (`make licenses`,
+  `scripts/licenses.mjs`); release archives and the image (`/usr/share/doc/dendronotes/`) include
+  it.
 - **Reporting.** See [SECURITY.md](../SECURITY.md).

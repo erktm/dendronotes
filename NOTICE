@@ -3,5 +3,6 @@ Copyright 2026 Erik Haeger
 
 This product includes software developed by third parties under their own
 licenses (MIT, BSD, Apache-2.0, ISC, MPL-2.0, PSF-2.0 and the SIL Open Font
-License for the bundled fonts). The complete list with versions and licenses
-is the software bill of materials in security/sbom.cdx.json.
+License for the bundled fonts). Their license texts and copyright notices are
+in THIRD_PARTY_LICENSES.txt; the software bill of materials in
+security/sbom.cdx.json lists them with versions.

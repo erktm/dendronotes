@@ -1,5 +1,5 @@
 // Every user-facing text of dendronotes lives here (English only), so the
-// wording stays consistent and is easy to change. Vocabulary: see CLAUDE.md
+// wording stays consistent and is easy to change. Vocabulary: see the README
 // (soma = the notes folder, synapse = a connection between two notes).
 // The product name is always written in lowercase: dendronotes.
 

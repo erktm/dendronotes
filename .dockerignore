@@ -7,6 +7,9 @@
 !web/
 !vendor/
 !.offline/
+!LICENSE
+!NOTICE
+!THIRD_PARTY_LICENSES.txt
 
 web/node_modules/
 web/dist/

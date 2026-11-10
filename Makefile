@@ -17,7 +17,7 @@ DEV_ENV       = DENDRONOTES_SOMAS_DIR=$(DEV_SOMAS) DENDRONOTES_SOMA_DIR=$(DEV_SO
 NPM_DEPS := web/node_modules/.package-lock.json
 
 .PHONY: help dev dev-ports dev-setup dev-api dev-web web build test test-go test-web fuzz \
-        vendor vendor-go vendor-npm image image-offline run-image audit vulncheck sbom clean
+        vendor vendor-go vendor-npm image image-offline run-image audit vulncheck sbom licenses clean
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*## "}{printf "  \033[1m%-14s\033[0m %s\n", $$1, $$2}'
@@ -99,6 +99,9 @@ vulncheck: $(NPM_DEPS) ## Scan Go and npm dependencies; fail on findings without
 
 sbom: ## Write the software bill of materials (security/sbom.cdx.json)
 	node scripts/sbom.mjs $(VERSION) > security/sbom.cdx.json
+
+licenses: $(NPM_DEPS) ## Collect the license texts of all third-party parts (THIRD_PARTY_LICENSES.txt)
+	node scripts/licenses.mjs > THIRD_PARTY_LICENSES.txt
 
 # --- Air gap / vendoring -------------------------------------------------------------
 
