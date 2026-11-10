@@ -29,7 +29,7 @@ import (
 
 // schemaVersion is stored as PRAGMA user_version; a different value makes
 // Open discard the database and build a new one.
-const schemaVersion = 2
+const schemaVersion = 3
 
 // FileName is the database file inside the data directory.
 const FileName = "index.db"
@@ -56,7 +56,9 @@ CREATE INDEX synapses_name ON synapses(name_key);
 CREATE INDEX synapses_note ON synapses(note_id);
 CREATE TABLE file_refs (
 	note_id  INTEGER NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
-	name_key TEXT NOT NULL
+	name_key TEXT NOT NULL,
+	target   TEXT NOT NULL,
+	markdown INTEGER NOT NULL
 );
 CREATE INDEX file_refs_name ON file_refs(name_key);
 CREATE INDEX file_refs_note ON file_refs(note_id);
@@ -437,7 +439,8 @@ func putNote(tx *sql.Tx, p string, size, mtime int64, etag, content string) erro
 		}
 	}
 	for _, f := range doc.Files {
-		if _, err := tx.Exec(`INSERT INTO file_refs (note_id, name_key) VALUES (?, ?)`, id, mdparse.Fold(path.Base(f.Target))); err != nil {
+		if _, err := tx.Exec(`INSERT INTO file_refs (note_id, name_key, target, markdown) VALUES (?, ?, ?, ?)`,
+			id, mdparse.Fold(path.Base(f.Target)), f.Target, f.Markdown); err != nil {
 			return err
 		}
 	}

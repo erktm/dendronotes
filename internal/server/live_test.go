@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -78,6 +79,42 @@ func TestSearchBacklinksTagsAPI(t *testing.T) {
 	expect(t, rec, 200, "")
 	if tags := decode[struct{ Tags []index.TagCount }](t, rec).Tags; len(tags) != 2 {
 		t.Errorf("tags: %+v", tags)
+	}
+}
+
+// Drawings are nodes of their own; the notes embedding or linking them are
+// connected by embeds, never by synapses.
+func TestGraphDrawings(t *testing.T) {
+	s := newIndexedServer(t, map[string]string{
+		"Projects/Garden plan.md":    "![[Beds.drawing.svg|400]] and ![plan](Beds.drawing.svg), [[Soil types]]",
+		"Soil types.md":              "![[Projects/Beds.drawing.svg]] ![[photo.png]] ![[Gone.drawing.svg]]",
+		"Projects/Beds.drawing.svg":  "<svg/>",
+		"Archive/Unused.drawing.svg": "<svg/>",
+		"photo.png":                  "png",
+	})
+	c := newClient(t, s)
+	c.login()
+	rec := c.do("GET", "/api/somas/testsoma01/graph", "")
+	expect(t, rec, 200, "")
+	g := decode[index.Graph](t, rec)
+	var drawings []string
+	for _, n := range g.Nodes {
+		if n.Kind == "drawing" {
+			drawings = append(drawings, n.ID)
+		}
+	}
+	if !slices.Equal(drawings, []string{"Archive/Unused.drawing.svg", "Projects/Beds.drawing.svg"}) {
+		t.Errorf("drawing nodes: %v", drawings)
+	}
+	want := []index.GraphEdge{
+		{Source: "Projects/Garden plan.md", Target: "Projects/Beds.drawing.svg"},
+		{Source: "Soil types.md", Target: "Projects/Beds.drawing.svg"},
+	}
+	if !slices.Equal(g.Embeds, want) {
+		t.Errorf("embeds: %+v", g.Embeds)
+	}
+	if len(g.Edges) != 1 {
+		t.Errorf("synapses: %+v", g.Edges)
 	}
 }
 

@@ -332,6 +332,32 @@ func (ix *Index) FileReferrers(ctx context.Context, files []string) ([]string, e
 	return out, rows.Err()
 }
 
+// FileRef is a reference from a note to an attachment, as written.
+type FileRef struct {
+	Note     string
+	Target   string
+	Markdown bool
+}
+
+// FileRefs returns every attachment reference of every note, by note.
+func (ix *Index) FileRefs(ctx context.Context) ([]FileRef, error) {
+	rows, err := ix.db.QueryContext(ctx, `SELECT n.path, f.target, f.markdown FROM file_refs f JOIN notes n ON n.id = f.note_id
+		ORDER BY n.path, f.rowid`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []FileRef
+	for rows.Next() {
+		var r FileRef
+		if err := rows.Scan(&r.Note, &r.Target, &r.Markdown); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
 // TagCount is a tag with the number of notes carrying it.
 type TagCount struct {
 	Tag   string `json:"tag"`

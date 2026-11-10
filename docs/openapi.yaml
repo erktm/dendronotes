@@ -1077,11 +1077,13 @@ paths:
     parameters:
       - $ref: "#/components/parameters/soma"
     get:
-      summary: All notes and the synapses between them
+      summary: All notes and the synapses between them, and the drawings
       description: >
-        Nodes are the notes (with their tags) and, prefixed with "?", notes that
-        unresolved synapses point to. Edges are resolved synapses, at most one per
-        direction; a note's synapses to itself are left out.
+        Nodes are the notes (with their tags), prefixed with "?" notes that
+        unresolved synapses point to, and drawings (`kind: drawing`). Edges are
+        resolved synapses, at most one per direction; a note's synapses to itself
+        are left out. Embeds are the notes that embed or link a drawing (not
+        synapses).
       responses:
         "200":
           description: The graph.
@@ -1089,7 +1091,7 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [nodes, edges]
+                required: [nodes, edges, embeds]
                 properties:
                   nodes:
                     type: array
@@ -1101,6 +1103,7 @@ paths:
                         label: { type: string, description: Name of a missing note as written. }
                         missing: { type: boolean }
                         tags: { type: array, items: { type: string } }
+                        kind: { type: string, enum: [drawing], description: Only for drawings. }
                   edges:
                     type: array
                     items:
@@ -1109,6 +1112,14 @@ paths:
                       properties:
                         source: { type: string }
                         target: { type: string }
+                  embeds:
+                    type: array
+                    items:
+                      type: object
+                      required: [source, target]
+                      properties:
+                        source: { type: string, description: The note. }
+                        target: { type: string, description: The drawing. }
         "401": { $ref: "#/components/responses/Unauthorized" }
   /api/somas/{soma}/events:
     parameters:

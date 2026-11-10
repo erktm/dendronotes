@@ -1,11 +1,16 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
+	"dendronotes/internal/drawing"
 	"dendronotes/internal/httpx"
+	"dendronotes/internal/index"
+	"dendronotes/internal/mdparse"
 	"dendronotes/internal/soma"
+	"dendronotes/internal/somas"
 )
 
 const (
@@ -71,11 +76,61 @@ func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleGraph(w http.ResponseWriter, r *http.Request) {
 	rt := runtimeOf(r)
 	g, err := rt.Index.Graph(r.Context())
+	if err == nil {
+		err = addDrawings(r.Context(), rt, &g)
+	}
 	if err != nil {
 		s.internalError(w, r, "graph", err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, g)
+}
+
+// addDrawings puts the soma's drawings into the graph, each embedded (or
+// linked) drawing connected to the notes that do so – resolved like every
+// attachment reference.
+func addDrawings(ctx context.Context, rt *somas.Runtime, g *index.Graph) error {
+	entries, err := rt.Soma.Tree()
+	if err != nil {
+		return err
+	}
+	var files []string
+	isDrawing := map[string]bool{}
+	for _, e := range entries {
+		if e.Type != "file" {
+			continue
+		}
+		files = append(files, e.Path)
+		if drawing.IsDrawing(e.Path) {
+			isDrawing[e.Path] = true
+			g.Nodes = append(g.Nodes, index.GraphNode{ID: e.Path, Kind: "drawing"})
+		}
+	}
+	if len(isDrawing) == 0 {
+		return nil
+	}
+	notes := map[string]bool{}
+	for _, n := range g.Nodes {
+		if n.Kind == "" && !n.Missing {
+			notes[n.ID] = true
+		}
+	}
+	refs, err := rt.Index.FileRefs(ctx)
+	if err != nil {
+		return err
+	}
+	res := mdparse.NewFileResolver(files)
+	seen := map[index.GraphEdge]bool{}
+	for _, ref := range refs {
+		to := res.Resolve(ref.Target, ref.Markdown, ref.Note)
+		e := index.GraphEdge{Source: ref.Note, Target: to}
+		if !notes[ref.Note] || !isDrawing[to] || seen[e] {
+			continue
+		}
+		seen[e] = true
+		g.Embeds = append(g.Embeds, e)
+	}
+	return nil
 }
 
 func (s *Server) internalError(w http.ResponseWriter, r *http.Request, what string, err error) {

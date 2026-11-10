@@ -12,12 +12,13 @@ import (
 // (the target of unresolved synapses); the rest is its folded name.
 const MissingPrefix = "?"
 
-// GraphNode is a note, or a missing note that synapses point to.
+// GraphNode is a note, a missing note that synapses point to, or a drawing.
 type GraphNode struct {
 	ID      string   `json:"id"`              // soma path, or MissingPrefix + name
 	Label   string   `json:"label,omitempty"` // only for missing notes: the name as written
 	Missing bool     `json:"missing,omitempty"`
 	Tags    []string `json:"tags,omitempty"`
+	Kind    string   `json:"kind,omitempty"` // "drawing" for drawings, empty for notes
 }
 
 // GraphEdge is a synapse between two nodes (at most one per direction).
@@ -26,10 +27,12 @@ type GraphEdge struct {
 	Target string `json:"target"`
 }
 
-// Graph is the network of notes and synapses.
+// Graph is the network of notes and synapses, and the drawings notes embed
+// (embeds are not synapses, so they are kept apart).
 type Graph struct {
-	Nodes []GraphNode `json:"nodes"`
-	Edges []GraphEdge `json:"edges"`
+	Nodes  []GraphNode `json:"nodes"`
+	Edges  []GraphEdge `json:"edges"`
+	Embeds []GraphEdge `json:"embeds"`
 }
 
 // Graph returns all notes with the synapses between them, resolved with the
@@ -39,7 +42,7 @@ func (ix *Index) Graph(ctx context.Context) (Graph, error) {
 	notes := slices.Clone(res.Notes())
 	slices.Sort(notes)
 	known := make(map[string]int, len(notes))
-	g := Graph{Nodes: make([]GraphNode, 0, len(notes)), Edges: []GraphEdge{}}
+	g := Graph{Nodes: make([]GraphNode, 0, len(notes)), Edges: []GraphEdge{}, Embeds: []GraphEdge{}}
 	for i, p := range notes {
 		known[p] = i
 		g.Nodes = append(g.Nodes, GraphNode{ID: p})
