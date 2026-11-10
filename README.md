@@ -69,6 +69,24 @@ admin's first soma.
   Standard Markdown works too: `![alt](photo.png)`, `[report](report.pdf)`. Clicking a file in
   the tree shows it with its size and a download button. Images from other hosts are never
   loaded.
+- **Drawings.** Simple diagrams and sketches: "New drawing" in the file tree, or the drawing
+  button in the top bar while editing, which puts a new drawing next to the note, embeds it at
+  the cursor (`![[Drawing 2026-11-10 1530.drawing.svg]]`) and opens it. The editor has
+  rectangles, ellipses, diamonds, lines and arrows, a pen, text, and icons; double-click a shape
+  to write in it. The ends of lines and arrows stick to shapes, text and icons and follow them
+  when they move; arrows can bend at right angles. Colors come from fixed slots that suit every
+  palette, light and dark; strokes can be switched to a sketchy look per drawing. Changes save
+  about a second after the last one ("Done" goes back to the note); if someone else saved the
+  drawing meanwhile, you choose whose version stays. In a note, drawings show in place: a click
+  opens the editor (readers get a large view, everyone has the button in the corner), and in
+  the editor the handle at the corner sets the width (`|600`). A drawing is a plain SVG file
+  that any image viewer shows, with the editable drawing stored inside it – so it is also an
+  ordinary attachment for Obsidian, git or a sync tool.
+- **Icons for drawings.** Each soma has an icon library (the picture button in the drawing
+  editor): everyone with access uses it, everyone who may create files adds PNG, JPEG, WebP,
+  GIF or SVG pictures (scaled to at most 512 pixels; SVG only without scripts or external
+  references), and uploaders or editors delete them. A drawing keeps its own copy of the icons
+  it uses.
 - **Graph** (⌘⇧G / Ctrl+Shift+G, or the graph button in the left rail). All notes as
   nodes, synapses as lines, sized by their number of synapses; unresolved synapses point to
   dashed nodes. Hover a note to see its neighborhood, click to open it, drag to arrange, scroll
@@ -130,6 +148,13 @@ admin's first soma.
 | ⌘E / Ctrl+E      | Switch between edit and read   |
 | ⌘S / Ctrl+S      | Save now                       |
 | ⌘, / Ctrl+,      | Settings                       |
+
+In the drawing editor: V select, H move the canvas (or hold Space), R rectangle, O ellipse,
+D diamond, L line, A arrow, P pen, T text, I icons, G grid; ⌘Z / ⇧⌘Z undo and redo, ⌘D
+duplicate, ⌘C / ⌘V copy and paste (also between drawings), ⌘] / ⌘[ forward and backward
+(with ⇧ to the front or back), arrow keys nudge (with ⇧ by 10), Delete removes, Enter edits the
+text, ⇧1 fits the drawing, ⌘ + scroll or pinch zooms. Shift keeps proportions and 15° steps;
+Alt-drag moves a copy.
 
 **Settings** (stored in the browser, never in the soma): live preview, Vim key bindings,
 readable line length, note font (sans or serif), theme (system, light, dark), color palette,
@@ -475,6 +500,13 @@ Other LDAP directories work with their own filters and attributes, for example O
   PNG); HTML, scripts and executables are refused. Files are served with the type of their
   extension, `nosniff`, and a sandboxing Content-Security-Policy, so a file opened directly in
   the browser (an SVG, say) can never run scripts. Notes show media only from the soma.
+- Drawings are SVG that the server checks on every save (`internal/drawing`): a short list of
+  elements and attributes, pictures only as `data:image` URLs, no scripts, event handlers,
+  `foreignObject`, external references or CSS `url()`. SVG icons pass the same check, PNG icons
+  are decoded and encoded anew. In the app drawings are drawn from their stored scene, which is
+  checked again (known fields, numbers in range, colors from the slots), never from the file's
+  markup; files changed outside dendronotes are shown as plain images until they have a valid
+  scene.
 - `change` events on the event stream carry only paths and versions. Note content travels
   only to the tabs that joined that note for editing together, which needs read access to the
   soma; pushing changes needs edit access. The server checks every change set (structure,
@@ -512,6 +544,8 @@ which a test keeps in sync with the server.
 | `GET /api/somas/{soma}/export`          | The soma as a ZIP                                    |
 | `GET /api/somas/{soma}/comments?path=`  | Comments on a note; `POST` adds one (or a reply), `PATCH`/`DELETE …/comments/{id}`, `POST …/{id}/resolve` |
 | `GET /api/me/notifications`             | Mentions and replies; `POST …/read` marks them read  |
+| `GET /api/somas/{soma}/drawings/{path}` | Read a drawing (`*.drawing.svg`, with `ETag`); `POST` creates an empty one, `PUT` saves (`If-Match`, `412` on conflict, checked SVG) |
+| `GET /api/somas/{soma}/icons`           | The icon library; `POST` adds a picture (raw body, `?name=`), `GET`/`DELETE …/icons/{id}` |
 | `GET /api/somas/{soma}/files/{path}`    | Download a file (attachments, images, media)         |
 | `POST /api/somas/{soma}/files/{path}`   | Upload a file (raw body; `?unique=1` avoids name clashes) |
 | `GET /api/somas/{soma}/search?q=`       | Full-text search (words, "phrases", #tags)           |
@@ -560,6 +594,7 @@ internal/soma/     soma access exclusively through os.Root (tree, notes, move, t
 internal/mdparse/  synapses and tags of a note (same rules as web/src/lib/synapses.ts)
 internal/store/    state.db: accounts, sessions, avatars, somas and members, audit log (versioned migrations)
 internal/avatar/   checks uploaded profile photos and encodes them anew (square PNG, no metadata)
+internal/drawing/  checks drawings (*.drawing.svg) and SVG icons against an allow list; PNG icons anew
 internal/somas/    soma manager: opens somas on demand (index, watcher, live updates), closes idle ones
 internal/collab/   editing together: live documents, change sets (UTF-16), saving, 3-way merge
 internal/index/    SQLite cache per soma: versions, synapses, tags, full-text search
@@ -578,6 +613,7 @@ internal/server/   route table with access levels, API and admin handlers, middl
                    logging, recovery), health, assets
 web/               Svelte 5 frontend (Vite), embedded into the binary via go:embed
   src/lib/editor/  CodeMirror 6 setup, live preview, synapse syntax
+  src/lib/drawing/ drawings: scene, SVG file format, sketchy strokes, rendering, editor state
   src/lib/         Markdown rendering + sanitizing, synapse resolution, state, UI strings
 docs/openapi.yaml  API description
 ```
