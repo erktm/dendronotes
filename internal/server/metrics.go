@@ -23,6 +23,7 @@ type serverMetrics struct {
 	requests *metrics.Counter
 	duration *metrics.Histogram
 	logins   *metrics.Counter
+	mails    *metrics.Counter
 
 	// Disk usage is expensive: measured in the background, at most every
 	// storageEvery.
@@ -83,6 +84,7 @@ func (s *Server) newMetrics() *serverMetrics {
 		duration: reg.Histogram("dendronotes_http_request_duration_seconds", "Time to answer HTTP requests by route pattern (event streams last long).",
 			[]float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10}, "route"),
 		logins: reg.Counter("dendronotes_logins_total", "Sign-ins by way (password, directory, sso) and result.", "via", "result"),
+		mails:  reg.Counter("dendronotes_mails_total", "Emails by kind and result (sent, failed and retried, dropped).", "kind", "result"),
 	}
 	reg.Collect(s.collectMetrics)
 	return m

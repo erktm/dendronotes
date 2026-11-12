@@ -43,11 +43,13 @@ type Server struct {
 	ldapSync ldapSyncStatus
 	// commentLimits holds a rate limiter per account (api_comments.go).
 	commentLimits sync.Map
-	metrics       *serverMetrics
-	ips           *clientip.Resolver
-	assets        *assets
-	version       string
-	started       time.Time
+	// mail sends email through the relay (mail.go); nil without SMTP.
+	mail    *mailer
+	metrics *serverMetrics
+	ips     *clientip.Resolver
+	assets  *assets
+	version string
+	started time.Time
 
 	httpSrv  *http.Server
 	ready    atomic.Bool // true only after a complete startup
@@ -144,6 +146,14 @@ func New(cfg config.Config, log *slog.Logger, webFS fs.FS, version string) (*Ser
 		trashCtx, stopTrash := context.WithCancel(context.Background())
 		go s.expireTrashEvery(trashCtx)
 		s.addCloser("trash", func() error { stopTrash(); return nil })
+	}
+	if cfg.Mail.Enabled() {
+		if s.mail, err = newMailer(cfg.Mail, cfg.Auth.PublicURL); err != nil {
+			return fail(fmt.Errorf("mail: %w", err))
+		}
+		mailCtx, stopMail := context.WithCancel(context.Background())
+		go s.mailLoop(mailCtx)
+		s.addCloser("mail", func() error { stopMail(); return nil })
 	}
 	if s.ldap != nil && cfg.Auth.LDAP.SyncInterval > 0 {
 		s.ldapSync.Interval = cfg.Auth.LDAP.SyncInterval.String()

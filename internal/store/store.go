@@ -250,6 +250,37 @@ var migrations = []string{
 		created_at INTEGER NOT NULL
 	);
 	CREATE INDEX soma_icons_soma ON soma_icons(soma_id);`,
+	// 9: email. The outbox holds messages until the relay took them (sent
+	// ones are deleted); password tokens keep only their SHA-256; every
+	// account chooses which notifications it gets by email; notifications
+	// remember when they were handled for email.
+	`CREATE TABLE mail_outbox (
+		id         INTEGER PRIMARY KEY,
+		kind       TEXT NOT NULL,
+		to_addr    TEXT NOT NULL,
+		to_name    TEXT NOT NULL DEFAULT '',
+		subject    TEXT NOT NULL,
+		text       TEXT NOT NULL,
+		html       TEXT NOT NULL DEFAULT '',
+		created_at INTEGER NOT NULL,
+		attempts   INTEGER NOT NULL DEFAULT 0,
+		next_at    INTEGER NOT NULL,
+		last_error TEXT NOT NULL DEFAULT ''
+	);
+	CREATE INDEX mail_outbox_next ON mail_outbox(next_at);
+	CREATE TABLE password_tokens (
+		id         INTEGER PRIMARY KEY,
+		user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		token_hash TEXT NOT NULL UNIQUE,
+		purpose    TEXT NOT NULL CHECK (purpose IN ('reset', 'welcome')),
+		created_at INTEGER NOT NULL,
+		expires_at INTEGER NOT NULL,
+		used_at    INTEGER NOT NULL DEFAULT 0
+	);
+	CREATE INDEX password_tokens_user ON password_tokens(user_id, purpose);
+	ALTER TABLE users ADD COLUMN mail_comments INTEGER NOT NULL DEFAULT 1;
+	ALTER TABLE users ADD COLUMN mail_shares INTEGER NOT NULL DEFAULT 1;
+	ALTER TABLE notifications ADD COLUMN mailed_at INTEGER NOT NULL DEFAULT 0;`,
 }
 
 // rebuilds are the migrations (by index) that recreate a table others refer

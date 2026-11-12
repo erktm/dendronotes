@@ -94,7 +94,7 @@ func (s *Store) LookupToken(ctx context.Context, token, ip string) (User, APITok
 	t, err := scanToken(s.db.QueryRowContext(ctx, `SELECT `+prefixed("t", tokenCols)+`, `+prefixed("u", userCols)+`
 		FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ?`, tokenHash(token)),
 		&u.ID, &u.Username, &u.DisplayName, &u.Email, &u.Role, &u.Source, &u.PasswordHash, &u.OIDCIssuer, &u.OIDCSubject,
-		&u.LDAPID, &u.Disabled, &created, &login, &style, &photo)
+		&u.LDAPID, &u.Disabled, &created, &login, &style, &photo, &u.MailComments, &u.MailShares)
 	if err != nil {
 		return User{}, APIToken{}, false
 	}

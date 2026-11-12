@@ -46,6 +46,9 @@ type User struct {
 	CreatedAt    time.Time `json:"createdAt"`
 	LastLoginAt  time.Time `json:"lastLoginAt"`
 	Avatar       Avatar    `json:"avatar"`
+	// Which notifications reach the account by email as well.
+	MailComments bool `json:"mailComments"`
+	MailShares   bool `json:"mailShares"`
 }
 
 // Name is what the UI shows: the display name, else the user name.
@@ -56,7 +59,7 @@ func (u User) Name() string {
 	return u.Username
 }
 
-const userCols = `id, username, display_name, email, role, source, password_hash, oidc_issuer, oidc_subject, ldap_id, disabled, created_at, last_login_at, avatar_style, avatar_photo`
+const userCols = `id, username, display_name, email, role, source, password_hash, oidc_issuer, oidc_subject, ldap_id, disabled, created_at, last_login_at, avatar_style, avatar_photo, mail_comments, mail_shares`
 
 func scanUser(row interface{ Scan(...any) error }) (User, error) {
 	var (
@@ -66,7 +69,7 @@ func scanUser(row interface{ Scan(...any) error }) (User, error) {
 		photo          int64
 	)
 	err := row.Scan(&u.ID, &u.Username, &u.DisplayName, &u.Email, &u.Role, &u.Source, &u.PasswordHash,
-		&u.OIDCIssuer, &u.OIDCSubject, &u.LDAPID, &u.Disabled, &created, &login, &style, &photo)
+		&u.OIDCIssuer, &u.OIDCSubject, &u.LDAPID, &u.Disabled, &created, &login, &style, &photo, &u.MailComments, &u.MailShares)
 	if errors.Is(err, sql.ErrNoRows) {
 		return User{}, ErrNotFound
 	}
@@ -171,6 +174,8 @@ type UserUpdate struct {
 	Disabled     *bool
 	PasswordHash *string
 	Username     *string
+	MailComments *bool
+	MailShares   *bool
 }
 
 // UpdateUser applies the changes; ErrNotFound for unknown accounts.
@@ -197,6 +202,12 @@ func (s *Store) UpdateUser(ctx context.Context, id int64, up UserUpdate) (User, 
 	}
 	if up.Username != nil {
 		add("username", *up.Username)
+	}
+	if up.MailComments != nil {
+		add("mail_comments", *up.MailComments)
+	}
+	if up.MailShares != nil {
+		add("mail_shares", *up.MailShares)
 	}
 	if len(sets) > 0 {
 		res, err := s.db.ExecContext(ctx, `UPDATE users SET `+strings.Join(sets, ", ")+` WHERE id = ?`, append(args, id)...)
@@ -315,7 +326,8 @@ func (s *Store) LookupSession(ctx context.Context, token string, ttl time.Durati
 		photo          int64
 	)
 	err := row.Scan(&sid, &expires, &seen, &u.ID, &u.Username, &u.DisplayName, &u.Email, &u.Role, &u.Source,
-		&u.PasswordHash, &u.OIDCIssuer, &u.OIDCSubject, &u.LDAPID, &u.Disabled, &created, &login, &style, &photo)
+		&u.PasswordHash, &u.OIDCIssuer, &u.OIDCSubject, &u.LDAPID, &u.Disabled, &created, &login, &style, &photo,
+		&u.MailComments, &u.MailShares)
 	if err != nil {
 		return User{}, 0, false
 	}
