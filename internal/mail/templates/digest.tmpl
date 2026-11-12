@@ -1,0 +1,14 @@
+{{define "subject"}}{{if eq (len .Items) 1}}{{with index .Items 0}}{{.Actor}} {{if .Mention}}mentioned you{{else}}replied{{end}} in {{.Note}}{{end}}{{else}}{{len .Items}} new comments for you{{end}}{{end}}
+{{define "button"}}Open dendronotes{{end}}
+{{define "text"}}{{if eq (len .Items) 1}}There is a comment for you:{{else}}There are {{len .Items}} comments for you:{{end}}
+{{range .Items}}
+{{.Actor}} {{if .Mention}}mentioned you{{else}}replied{{end}} in {{.Note}} ({{.Soma}}):
+  {{.Excerpt}}
+  {{.URL}}
+{{end}}{{end}}
+{{define "html"}}<p style="margin:0 0 12px;">{{if eq (len .Items) 1}}There is a comment for you:{{else}}There are {{len .Items}} comments for you:{{end}}</p>
+{{range .Items}}<div style="margin:0 0 16px;">
+<p style="margin:0 0 4px;"><strong>{{.Actor}}</strong> {{if .Mention}}mentioned you{{else}}replied{{end}} in <a href="{{.URL}}" style="color:#1c1c1b;">{{.Note}}</a> <span style="color:#6b6b68;">({{.Soma}})</span></p>
+<p style="margin:0;padding:8px 12px;border-left:3px solid #d4d4cf;background:#f7f7f5;color:#3a3a38;white-space:pre-wrap;">{{.Excerpt}}</p>
+</div>
+{{end}}{{end}}

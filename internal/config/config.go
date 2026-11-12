@@ -98,6 +98,7 @@ type Config struct {
 	HistoryDays     int            // how long earlier versions of notes are kept; 0 = forever
 	TrashDays       int            // entries in a soma's trash are deleted for good after this; 0 = never
 	Auth            Auth
+	Mail            Mail // email through an SMTP relay (mail.go)
 }
 
 // Auth holds the authentication settings.
@@ -307,6 +308,7 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 
 	add(c.loadAuth(getenv))
+	add(c.loadMail(getenv)) // after auth: the links need the public URL
 	add(c.checkDirs())
 	return c, errors.Join(errs...)
 }
@@ -675,6 +677,9 @@ func (c Config) Describe(name string) string {
 		return c.Auth.OIDC.CAFile
 	}
 	if v, ok := c.ldapSetting(name); ok {
+		return v
+	}
+	if v, ok := c.mailSetting(name); ok {
 		return v
 	}
 	return ""

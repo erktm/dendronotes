@@ -1,0 +1,7 @@
+{{define "subject"}}Reset your dendronotes password{{end}}
+{{define "button"}}Choose a new password{{end}}
+{{define "text"}}Someone, hopefully you, asked to reset the password of your account {{.Username}}. Choose a new password with the link below. It is valid for {{.Expires}} and works once.
+
+If you did not ask for this, ignore this email. Your password stays as it is.{{end}}
+{{define "html"}}<p style="margin:0 0 12px;">Someone, hopefully you, asked to reset the password of your account <strong>{{.Username}}</strong>. Choose a new password with the button below. The link is valid for {{.Expires}} and works once.</p>
+<p style="margin:0;">If you did not ask for this, ignore this email. Your password stays as it is.</p>{{end}}

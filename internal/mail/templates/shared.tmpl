@@ -1,0 +1,6 @@
+{{define "subject"}}{{.Actor}} shared “{{.Soma}}” with you{{end}}
+{{define "button"}}Open {{.Soma}}{{end}}
+{{define "text"}}{{.Actor}} shared the soma “{{.Soma}}” with you.
+Your role: {{.Role}}.{{end}}
+{{define "html"}}<p style="margin:0 0 12px;"><strong>{{.Actor}}</strong> shared the soma <strong>{{.Soma}}</strong> with you.</p>
+<p style="margin:0;">Your role: {{.Role}}.</p>{{end}}

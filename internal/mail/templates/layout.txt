@@ -1,0 +1,12 @@
+{{define "layout"}}Hi {{.Name}},
+
+{{template "text" .}}
+{{- if .URL}}
+
+{{template "button" .}}: {{.URL}}
+{{- end}}
+
+-- 
+dendronotes, {{.Base}}
+{{if .Settings}}You get this email because of your settings in dendronotes. You can turn these emails off in your profile.{{else}}This email was sent automatically because of your account. Replies are not read.{{end}}
+{{end}}

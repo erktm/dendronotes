@@ -1,0 +1,8 @@
+{{define "subject"}}Welcome to dendronotes{{end}}
+{{define "button"}}{{if .SetPasswordURL}}Choose your password{{else}}Sign in{{end}}{{end}}
+{{define "text"}}{{.Actor}} created a dendronotes account for you. Your user name: {{.Username}}
+{{if .SetPasswordURL}}
+Choose your password with the link below. It is valid for {{.Expires}} and works once.{{else}}
+Sign in with the password you got from {{.Actor}}.{{end}}{{end}}
+{{define "html"}}<p style="margin:0 0 12px;"><strong>{{.Actor}}</strong> created a dendronotes account for you. Your user name: <strong>{{.Username}}</strong></p>
+{{if .SetPasswordURL}}<p style="margin:0;">Choose your password with the button below. The link is valid for {{.Expires}} and works once.</p>{{else}}<p style="margin:0;">Sign in with the password you got from {{.Actor}}.</p>{{end}}{{end}}

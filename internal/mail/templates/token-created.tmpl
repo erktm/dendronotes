@@ -1,0 +1,7 @@
+{{define "subject"}}A new API token for your dendronotes account{{end}}
+{{define "button"}}Open dendronotes{{end}}
+{{define "text"}}The API token “{{.TokenName}}” ({{.Scope}} access) was created for your account {{.Username}} on {{.When}}.
+
+If this was not you, delete the token in your profile and change your password.{{end}}
+{{define "html"}}<p style="margin:0 0 12px;">The API token <strong>{{.TokenName}}</strong> ({{.Scope}} access) was created for your account <strong>{{.Username}}</strong> on {{.When}}.</p>
+<p style="margin:0;">If this was not you, delete the token in your profile and change your password.</p>{{end}}

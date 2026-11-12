@@ -1,0 +1,7 @@
+{{define "subject"}}Your dendronotes email address was changed{{end}}
+{{define "button"}}Open dendronotes{{end}}
+{{define "text"}}The email address of your account {{.Username}} was changed {{if .NewEmail}}to {{.NewEmail}} {{else}}(removed) {{end}}on {{.When}}{{if .Actor}} by {{.Actor}}{{end}}. This address gets no more emails from dendronotes.
+
+If this was not you, contact your administrator right away.{{end}}
+{{define "html"}}<p style="margin:0 0 12px;">The email address of your account <strong>{{.Username}}</strong> was changed {{if .NewEmail}}to <strong>{{.NewEmail}}</strong> {{else}}(removed) {{end}}on {{.When}}{{if .Actor}} by {{.Actor}}{{end}}. This address gets no more emails from dendronotes.</p>
+<p style="margin:0;">If this was not you, contact your administrator right away.</p>{{end}}
