@@ -98,6 +98,13 @@ func New(cfg config.Config, log *slog.Logger, webFS fs.FS, version string) (*Ser
 		s.sso.Start(ctx)
 		s.addCloser("oidc", func() error { stop(); return nil })
 	}
+	var sendResetLink func(context.Context, store.User, string) // stays nil without email
+	if cfg.Mail.Enabled() {
+		if s.mail, err = newMailer(cfg.Mail, cfg.Auth.PublicURL); err != nil {
+			return fail(fmt.Errorf("mail: %w", err))
+		}
+		sendResetLink = s.sendResetLink
+	}
 	var directory auth.Directory // stays nil (not a typed nil) without LDAP
 	if l := cfg.Auth.LDAP; l.Enabled() {
 		if s.ldap, err = ldap.New(l); err != nil {
@@ -128,6 +135,9 @@ func New(cfg config.Config, log *slog.Logger, webFS fs.FS, version string) (*Ser
 		OnProvision:            s.welcome,
 		OnLogin:                s.metrics.login,
 		OnSignedOut:            s.dropUserStreams,
+		MailEnabled:            cfg.Mail.Enabled(),
+		SendResetLink:          sendResetLink,
+		OnPasswordSet:          s.onPasswordSet,
 	}, st, s.ips, log)
 	if err != nil {
 		return fail(fmt.Errorf("auth: %w", err))
@@ -147,10 +157,7 @@ func New(cfg config.Config, log *slog.Logger, webFS fs.FS, version string) (*Ser
 		go s.expireTrashEvery(trashCtx)
 		s.addCloser("trash", func() error { stopTrash(); return nil })
 	}
-	if cfg.Mail.Enabled() {
-		if s.mail, err = newMailer(cfg.Mail, cfg.Auth.PublicURL); err != nil {
-			return fail(fmt.Errorf("mail: %w", err))
-		}
+	if s.mail != nil {
 		mailCtx, stopMail := context.WithCancel(context.Background())
 		go s.mailLoop(mailCtx)
 		s.addCloser("mail", func() error { stopMail(); return nil })

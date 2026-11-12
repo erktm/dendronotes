@@ -2,7 +2,9 @@ package store
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"errors"
 	"time"
 )
@@ -91,23 +93,29 @@ const (
 	TokenWelcome = "welcome"
 )
 
-// CreatePasswordToken stores the hash of a new token for an account; older
-// unused tokens of the same purpose stop working.
-func (s *Store) CreatePasswordToken(ctx context.Context, userID int64, purpose, hash string, ttl time.Duration) error {
+// NewPasswordToken makes a token (256 bits) for an account and returns it
+// once; only its hash is stored. Older unused tokens of the same purpose
+// stop working.
+func (s *Store) NewPasswordToken(ctx context.Context, userID int64, purpose string, ttl time.Duration) (string, error) {
+	var raw [32]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		return "", err
+	}
+	token := base64.RawURLEncoding.EncodeToString(raw[:])
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer tx.Rollback()
 	now := s.unixNow()
 	if _, err := tx.ExecContext(ctx, `DELETE FROM password_tokens WHERE user_id = ? AND purpose = ? AND used_at = 0`, userID, purpose); err != nil {
-		return err
+		return "", err
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO password_tokens (user_id, token_hash, purpose, created_at, expires_at)
-		VALUES (?, ?, ?, ?, ?)`, userID, hash, purpose, now, now+int64(ttl/time.Second)); err != nil {
-		return err
+		VALUES (?, ?, ?, ?, ?)`, userID, tokenHash(token), purpose, now, now+int64(ttl/time.Second)); err != nil {
+		return "", err
 	}
-	return tx.Commit()
+	return token, tx.Commit()
 }
 
 // LastPasswordToken returns when the newest token of an account and purpose
@@ -123,10 +131,13 @@ func (s *Store) LastPasswordToken(ctx context.Context, userID int64, purpose str
 
 // UsePasswordToken spends a token: it works once and only before it
 // expires. ErrNotFound for unknown, used or expired tokens.
-func (s *Store) UsePasswordToken(ctx context.Context, hash string) (userID int64, purpose string, err error) {
+func (s *Store) UsePasswordToken(ctx context.Context, token string) (userID int64, purpose string, err error) {
+	if token == "" || len(token) > 128 {
+		return 0, "", ErrNotFound
+	}
 	now := s.unixNow()
 	err = s.db.QueryRowContext(ctx, `UPDATE password_tokens SET used_at = ?1
-		WHERE token_hash = ?2 AND used_at = 0 AND expires_at > ?1 RETURNING user_id, purpose`, now, hash).Scan(&userID, &purpose)
+		WHERE token_hash = ?2 AND used_at = 0 AND expires_at > ?1 RETURNING user_id, purpose`, now, tokenHash(token)).Scan(&userID, &purpose)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, "", ErrNotFound
 	}

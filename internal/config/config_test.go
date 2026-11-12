@@ -332,6 +332,7 @@ func TestDescribeHidesSecrets(t *testing.T) {
 	for _, v := range Vars {
 		if v != EnvSomaDir && v != EnvTrustedProxies && v != EnvIgnore && v != EnvProxyAllowed && v != EnvProxyLogoutURL &&
 			v != EnvAdminHash && v != EnvAdminHashFile && v != EnvPublicURL && v != EnvMetricsPort && !strings.HasPrefix(v, Prefix+"OIDC_") && !strings.HasPrefix(v, Prefix+"LDAP_") &&
+			!strings.HasPrefix(v, Prefix+"SMTP_") && v != EnvMailFrom &&
 			c.Describe(v) == "" {
 			t.Errorf("%s has no description", v)
 		}

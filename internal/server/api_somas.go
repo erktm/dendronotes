@@ -150,8 +150,10 @@ func (s *Server) handleDeleteSoma(w http.ResponseWriter, r *http.Request) {
 // handleUpdateProfile changes the caller's display name and e-mail.
 func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		DisplayName *string `json:"displayName"`
-		Email       *string `json:"email"`
+		DisplayName  *string `json:"displayName"`
+		Email        *string `json:"email"`
+		MailComments *bool   `json:"mailComments"`
+		MailShares   *bool   `json:"mailShares"`
 	}
 	if err := httpx.DecodeJSON(w, r, &body, 4096); err != nil {
 		httpx.WriteDecodeError(w, err)
@@ -161,8 +163,10 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	up.MailComments, up.MailShares = body.MailComments, body.MailShares
 	u, _ := auth.UserFrom(r.Context())
-	if (u.Source == store.SourceOIDC && s.sso != nil) || u.Source == store.SourceLDAP {
+	managed := (u.Source == store.SourceOIDC && s.sso != nil) || u.Source == store.SourceLDAP
+	if managed && (body.DisplayName != nil || body.Email != nil) {
 		// The provider is the source of name and e-mail; they are updated
 		// on every sign-in.
 		httpx.Error(w, http.StatusBadRequest, "managed_by_provider")
@@ -174,6 +178,7 @@ func (s *Server) handleUpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.audit(r, "profile.update", u.Username, "")
+	s.mailEmailChanged(r.Context(), u, nu, &u)
 	httpx.WriteJSON(w, http.StatusOK, nu)
 }
 
@@ -234,6 +239,8 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = s.store.DeleteUserSessions(r.Context(), u.ID, auth.SessionIDFrom(r.Context()))
+	_ = s.store.DropPasswordTokens(r.Context(), u.ID)
 	s.audit(r, "password.change", u.Username, "")
+	s.mailPasswordChanged(r.Context(), u, "self", nil)
 	httpx.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }

@@ -95,12 +95,15 @@ func (s *Server) handleSetMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sm, _ := somaOf(r)
+	before := s.rolesOf(r.Context(), sm.ID, []int64{u.ID})
 	if err := s.store.SetMember(r.Context(), sm.ID, u.ID, body.Role); err != nil {
 		s.internalError(w, r, "setting member", err)
 		return
 	}
 	s.audit(r, "member.set", sm.ID, u.Username+": "+body.Role)
 	accessChanged(r)
+	me, _ := auth.UserFrom(r.Context())
+	s.mailNewAccess(r.Context(), me, sm, before)
 	s.handleMembers(w, r)
 }
 
@@ -211,12 +214,15 @@ func (s *Server) handleSetSomaGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sm, _ := somaOf(r)
+	before := s.rolesOf(r.Context(), sm.ID, s.groupMemberIDs(r.Context(), g))
 	if err := s.store.SetSomaGroup(r.Context(), sm.ID, g.ID, body.Role); err != nil {
 		s.internalError(w, r, "sharing with group", err)
 		return
 	}
 	s.audit(r, "member.group.set", sm.ID, g.Name+": "+body.Role)
 	accessChanged(r)
+	me, _ := auth.UserFrom(r.Context())
+	s.mailNewAccess(r.Context(), me, sm, before)
 	s.handleMembers(w, r)
 }
 

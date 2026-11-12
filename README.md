@@ -29,6 +29,8 @@ Kubernetes, also in an air gap.
   SVG or PNG.
 - **Search** across all notes with phrases and `#tags`.
 - **Comments** with `@mentions`, a **history** of every note, a **trash** with restore.
+- **Email** through any SMTP relay: somas shared with you, mentions and replies you have not
+  read yet, security notices, welcome emails and "forgot password".
 - **Accounts and sharing**: every account has its own somas, shared with people and groups in
   five roles; sign-in with passwords, Keycloak or another OpenID Connect provider, Active
   Directory / LDAP, or an authenticating proxy; personal API tokens.
@@ -163,6 +165,13 @@ All variables carry the `DENDRONOTES_` prefix. Variables without it are ignored.
 | `DENDRONOTES_LDAP_ADMIN_GROUPS`        |                    | Semicolon-separated groups (names or DNs) whose members are admins, synced on every sign-in |
 | `DENDRONOTES_LDAP_ALLOWED_GROUPS`      |                    | Semicolon-separated groups (names or DNs) allowed to sign in (empty: every account found) |
 | `DENDRONOTES_LDAP_SYNC_INTERVAL`       | `15m`              | How often all directory accounts are checked in the background (gone, disabled, groups); `0` turns it off |
+| `DENDRONOTES_SMTP_HOST`                |                    | SMTP relay for email (e.g. `in-v3.mailjet.com`); empty: no email. Needs `DENDRONOTES_PUBLIC_URL` |
+| `DENDRONOTES_SMTP_PORT`                | `587`              | Port of the relay                                          |
+| `DENDRONOTES_SMTP_TLS`                 | `starttls`         | `starttls`, `tls` (implicit, usually port 465) or `none` (only for a relay without a password) |
+| `DENDRONOTES_SMTP_USERNAME`            |                    | User name at the relay (Mailjet: the API key)              |
+| `DENDRONOTES_SMTP_PASSWORD_FILE`       |                    | File containing the relay password (Mailjet: the secret key) |
+| `DENDRONOTES_MAIL_FROM`                |                    | Sender, e.g. `dendronotes <no-reply@example.org>`; required with `DENDRONOTES_SMTP_HOST` |
+| `DENDRONOTES_MAIL_DIGEST_DELAY`        | `10m`              | How long a mention or reply may stay unread before it is sent by email |
 
 In local mode, one of the three admin password variables is required while no enabled admin
 account exists; without it, the server does not start. Once an admin exists, they are ignored

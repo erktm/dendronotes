@@ -113,7 +113,8 @@ paths:
           description: >
             `local` says whether the password form is offered to everyone (with
             DENDRONOTES_LOCAL_LOGIN=false only the admin account may use it);
-            `sso` is null without OpenID Connect.
+            `sso` is null without OpenID Connect; `passwordReset` offers
+            "forgot password" (email is configured).
           content:
             application/json:
               schema:
@@ -125,6 +126,58 @@ paths:
                     type: [object, "null"]
                     properties:
                       label: { type: string }
+                  passwordReset: { type: boolean }
+  /api/auth/password/forgot:
+    post:
+      summary: Ask for a link to reset the password by email
+      description: >
+        Only accounts that may sign in with a password of their own and have
+        an email address get a link, at most one every 5 minutes; it works
+        once and for one hour. The answer is the same whether an account
+        exists or not. Limited per client IP.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [login]
+              properties:
+                login: { type: string, maxLength: 254, description: User name or email address. }
+      responses:
+        "202": { description: Accepted (whatever the input). }
+        "404": { description: Email or password sign-in is not configured. }
+        "429": { $ref: "#/components/responses/Error" }
+  /api/auth/password/reset:
+    post:
+      summary: Set a new password with the token from a reset or welcome email
+      description: >
+        The token is spent; every session of the account ends and the account
+        gets a security notice by email. A weak password is refused before
+        the token is spent.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, minLength: 10 }
+      responses:
+        "200":
+          description: Password set; sign in with it.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  username: { type: string }
+        "400": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
   /api/auth/oidc/login:
     get:
       summary: Start signing in through the OpenID Connect provider (browser navigation)
@@ -156,7 +209,11 @@ paths:
         "404": { description: OpenID Connect is not configured. }
   /api/me:
     patch:
-      summary: Change your display name or e-mail
+      summary: Change your display name, e-mail or email notifications
+      description: >
+        Accounts from an OpenID Connect provider or the directory get name and
+        address from there (`managed_by_provider`); everyone may change the
+        email notifications. A changed address gets a notice at the old one.
       requestBody:
         required: true
         content:
@@ -166,6 +223,8 @@ paths:
               properties:
                 displayName: { type: string }
                 email: { type: string }
+                mailComments: { type: boolean, description: Mentions and replies that stay unread by email. }
+                mailShares: { type: boolean, description: An email when a soma is shared with you. }
       responses:
         "200": { description: The updated account., content: { application/json: { schema: { $ref: "#/components/schemas/User" } } } }
         "400": { $ref: "#/components/responses/Error" }
@@ -1286,13 +1345,14 @@ paths:
           application/json:
             schema:
               type: object
-              required: [username, password, role]
+              required: [username, role]
               properties:
                 username: { type: string }
                 displayName: { type: string }
                 email: { type: string }
-                password: { type: string, minLength: 10 }
+                password: { type: string, minLength: 10, description: Required unless a welcome email lets the person choose it. }
                 role: { type: string, enum: [admin, user] }
+                sendWelcome: { type: boolean, description: "Email the account its user name (needs an address and configured email); without a password, with a link to choose one (7 days)." }
       responses:
         "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/User" } } } }
         "400": { $ref: "#/components/responses/Error" }
@@ -1547,6 +1607,14 @@ paths:
       summary: Server state, storage, open somas and effective configuration (admin; secrets only as "(set)")
       responses:
         "200": { description: Server state. }
+  /api/admin/mail/test:
+    post:
+      summary: Send a test email to your own address at once (admin)
+      responses:
+        "200": { description: The relay took the message. }
+        "400": { description: Your account has no email address (`no_email`). }
+        "404": { description: Email is not configured. }
+        "502": { description: "The relay refused or could not be reached (`mail_failed`, with `detail`)." }
   /api/admin/sso/check:
     post:
       summary: Ask the OpenID Connect provider again (discovery) and report its state (admin)
@@ -1709,6 +1777,7 @@ components:
         user: { $ref: "#/components/schemas/User" }
         mode: { type: string, enum: [local, proxy] }
         logoutUrl: { type: string }
+        mail: { type: boolean, description: Email is configured. }
     User:
       type: object
       properties:
@@ -1722,6 +1791,8 @@ components:
         createdAt: { type: string, format: date-time }
         lastLoginAt: { type: string, format: date-time }
         avatar: { $ref: "#/components/schemas/Avatar" }
+        mailComments: { type: boolean }
+        mailShares: { type: boolean }
     AvatarStyle:
       type: object
       required: [color, pattern, initials]

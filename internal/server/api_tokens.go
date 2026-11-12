@@ -11,6 +11,7 @@ import (
 
 	"dendronotes/internal/auth"
 	"dendronotes/internal/httpx"
+	"dendronotes/internal/mail"
 	"dendronotes/internal/store"
 )
 
@@ -98,6 +99,7 @@ func (s *Server) handleCreateToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.audit(r, "token.create", me.Username, t.Name+" ("+t.Scope+")")
+	s.queueMail(r.Context(), me, mail.KindTokenCreated, mail.Data{TokenName: t.Name, Scope: t.Scope, URL: s.appLink()})
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{"token": token, "info": t})
 }
 

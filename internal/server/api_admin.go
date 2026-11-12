@@ -68,6 +68,9 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 		Email       *string    `json:"email"`
 		Password    string     `json:"password"`
 		Role        store.Role `json:"role"`
+		// SendWelcome emails the account its user name; without a password
+		// the email carries a link to choose one.
+		SendWelcome bool `json:"sendWelcome"`
 	}
 	if err := httpx.DecodeJSON(w, r, &body, 8192); err != nil {
 		httpx.WriteDecodeError(w, err)
@@ -82,18 +85,28 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid_role")
 		return
 	}
-	if err := auth.ValidPassword(body.Password); err != nil {
-		httpx.Error(w, http.StatusBadRequest, "weak_password")
-		return
-	}
 	up, ok := profileUpdate(w, body.DisplayName, body.Email)
 	if !ok {
 		return
 	}
-	hash, err := s.auth.HashNew(body.Password)
-	if err != nil {
-		s.internalError(w, r, "hashing password", err)
+	welcome := body.SendWelcome && s.mailEnabled() && up.Email != nil && *up.Email != ""
+	if body.SendWelcome && !welcome {
+		httpx.Error(w, http.StatusBadRequest, "no_email")
 		return
+	}
+	// With a welcome email the person may choose the password; an account
+	// without one cannot sign in with a password until then.
+	var hash string
+	if body.Password != "" || !welcome {
+		if err := auth.ValidPassword(body.Password); err != nil {
+			httpx.Error(w, http.StatusBadRequest, "weak_password")
+			return
+		}
+		var err error
+		if hash, err = s.auth.HashNew(body.Password); err != nil {
+			s.internalError(w, r, "hashing password", err)
+			return
+		}
 	}
 	nu := store.User{Username: name, Role: body.Role, Source: store.SourceLocal, PasswordHash: hash}
 	if up.DisplayName != nil {
@@ -113,6 +126,12 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	s.audit(r, "user.create", u.Username, string(u.Role))
 	_ = s.welcome(r.Context(), u)
+	if welcome {
+		me, _ := auth.UserFrom(r.Context())
+		if err := s.mailWelcome(r.Context(), u, me, hash == ""); err != nil {
+			s.log.Error("welcome email", "user", u.Username, "err", err)
+		}
+	}
 	httpx.WriteJSON(w, http.StatusCreated, u)
 }
 
@@ -164,6 +183,8 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 		_ = s.store.DeleteUserSessions(r.Context(), u.ID, 0)
 	}
 	s.audit(r, "user.update", u.Username, describeUpdate(body.Role, body.Disabled))
+	me, _ := auth.UserFrom(r.Context())
+	s.mailEmailChanged(r.Context(), u, nu, &me)
 	httpx.WriteJSON(w, http.StatusOK, nu)
 }
 
@@ -209,7 +230,10 @@ func (s *Server) handleAdminSetPassword(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	_ = s.store.DeleteUserSessions(r.Context(), u.ID, 0)
+	_ = s.store.DropPasswordTokens(r.Context(), u.ID)
 	s.audit(r, "user.password", u.Username, "")
+	me, _ := auth.UserFrom(r.Context())
+	s.mailPasswordChanged(r.Context(), u, "admin", &me)
 	httpx.WriteJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
@@ -384,12 +408,15 @@ func (s *Server) handleAdminCreateSoma(w http.ResponseWriter, r *http.Request) {
 		Owner: store.Person{ID: owner.ID, Username: owner.Username, DisplayName: owner.DisplayName}}
 	detail := sm.Name + " for " + owner.Username
 	if body.Group != nil {
+		before := s.rolesOf(r.Context(), sm.ID, s.groupMemberIDs(r.Context(), group))
 		if err := s.store.SetSomaGroup(r.Context(), sm.ID, group.ID, body.Group.Role); err != nil {
 			s.internalError(w, r, "sharing with group", err)
 			return
 		}
 		info.Groups = 1
 		detail += ", shared with " + group.Name + ": " + body.Group.Role
+		me, _ := auth.UserFrom(r.Context())
+		s.mailNewAccess(r.Context(), me, sm, before)
 	}
 	s.audit(r, "soma.create", sm.ID, detail)
 	httpx.WriteJSON(w, http.StatusCreated, info)
@@ -528,6 +555,7 @@ func (s *Server) handleAdminServer(w http.ResponseWriter, r *http.Request) {
 		"localLogin": s.cfg.Auth.LocalLogin,
 		"sso":        s.ssoStatus(),
 		"ldap":       s.ldapState(),
+		"mail":       s.mailStatusOf(r.Context()),
 	})
 }
 

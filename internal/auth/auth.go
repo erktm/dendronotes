@@ -77,6 +77,14 @@ type Config struct {
 	OnDirectoryGroups func(ctx context.Context, changed []int64)
 	// OnLogin counts sign-ins (via: password, directory, sso).
 	OnLogin func(via string, ok bool)
+	// MailEnabled tells clients that email is configured.
+	MailEnabled bool
+	// SendResetLink emails the link to reset a password (reset.go); nil
+	// turns "forgot password" off.
+	SendResetLink func(ctx context.Context, u store.User, token string)
+	// OnPasswordSet runs after a password was set with a link (purpose
+	// store.TokenReset or store.TokenWelcome).
+	OnPasswordSet func(ctx context.Context, u store.User, purpose string)
 	// OnSignedOut runs after the directory sync signed an account out (to
 	// end its live streams).
 	OnSignedOut func(ctx context.Context, userID int64)
@@ -98,6 +106,7 @@ type Authenticator struct {
 	// badTokens slows down clients that keep sending invalid API tokens.
 	badTokens *rateLimiter
 	starts    *rateLimiter // SSO sign-in attempts per client IP
+	resets    *rateLimiter // password reset requests and attempts per client IP
 	allowed   map[string]bool
 	sem       chan struct{} // bounds concurrent argon2 computations (memory)
 	dummy     *Hash         // verified for unknown users, so timing reveals nothing
@@ -117,6 +126,7 @@ func New(cfg Config, st *store.Store, ips *clientip.Resolver, log *slog.Logger) 
 		byUser:    newRateLimiter(30*time.Second, 5, time.Millisecond, 1<<30),
 		badTokens: newRateLimiter(2*time.Second, 10, time.Millisecond, 1<<30),
 		starts:    newRateLimiter(3*time.Second, 20, 20*time.Millisecond, 500),
+		resets:    newRateLimiter(30*time.Second, 10, 200*time.Millisecond, 50),
 		sem:       make(chan struct{}, 2),
 	}
 	enc, err := HashPassword("not a real password", cfg.HashParams)
@@ -372,6 +382,8 @@ type MeResponse struct {
 	User      store.User `json:"user"`
 	Mode      Mode       `json:"mode"`
 	LogoutURL string     `json:"logoutUrl,omitempty"`
+	// Mail tells whether email is configured (the profile offers its settings).
+	Mail bool `json:"mail"`
 }
 
 // HandleMe reports who is signed in (401 if nobody).
@@ -381,7 +393,7 @@ func (a *Authenticator) HandleMe(w http.ResponseWriter, r *http.Request) {
 		a.unauthorized(w)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, MeResponse{User: id.user, Mode: a.cfg.Mode, LogoutURL: a.logoutURL(id.user)})
+	httpx.WriteJSON(w, http.StatusOK, MeResponse{User: id.user, Mode: a.cfg.Mode, LogoutURL: a.logoutURL(id.user), Mail: a.cfg.MailEnabled})
 }
 
 // logoutURL is where the browser goes after signing out of dendronotes: the
@@ -403,12 +415,15 @@ type MethodsResponse struct {
 	SSO   *struct {
 		Label string `json:"label"`
 	} `json:"sso"`
+	// PasswordReset offers "forgot password" (email is configured).
+	PasswordReset bool `json:"passwordReset"`
 }
 
 // HandleMethods lists the ways to sign in (public).
 func (a *Authenticator) HandleMethods(w http.ResponseWriter, r *http.Request) {
 	// The password form is for local accounts and for the directory.
-	m := MethodsResponse{Mode: a.cfg.Mode, Local: a.cfg.Mode == ModeLocal && (!a.cfg.PasswordsAdminOnly || a.cfg.Directory != nil)}
+	m := MethodsResponse{Mode: a.cfg.Mode, Local: a.cfg.Mode == ModeLocal && (!a.cfg.PasswordsAdminOnly || a.cfg.Directory != nil),
+		PasswordReset: a.resetEnabled()}
 	if a.cfg.Mode == ModeLocal && a.cfg.SSO != nil {
 		m.SSO = &struct {
 			Label string `json:"label"`

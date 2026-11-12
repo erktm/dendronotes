@@ -32,6 +32,8 @@ func (s *Server) routes() []route {
 		{"POST", "/api/auth/logout", s.auth.HandleLogout, public},
 		{"GET", "/api/auth/me", s.auth.HandleMe, public},
 		{"GET", "/api/auth/methods", s.auth.HandleMethods, public},
+		{"POST", "/api/auth/password/forgot", s.auth.HandleForgotPassword, public},
+		{"POST", "/api/auth/password/reset", s.auth.HandleResetPassword, public},
 		{"GET", "/api/auth/oidc/login", s.auth.HandleSSOLogin, public},
 		{"GET", "/api/auth/oidc/callback", s.auth.HandleSSOCallback, public},
 
@@ -125,6 +127,7 @@ func (s *Server) routes() []route {
 		{"GET", "/api/admin/sessions", s.handleAdminSessions, adminOnly},
 		{"DELETE", "/api/admin/sessions/{id}", s.handleAdminEndSession, adminOnly},
 		{"GET", "/api/admin/server", s.handleAdminServer, adminOnly},
+		{"POST", "/api/admin/mail/test", s.handleAdminTestMail, adminOnly},
 		{"POST", "/api/admin/sso/check", s.handleAdminSSOCheck, adminOnly},
 		{"POST", "/api/admin/ldap/check", s.handleAdminLDAPCheck, adminOnly},
 		{"POST", "/api/admin/ldap/sync", s.handleAdminLDAPSync, adminOnly},
