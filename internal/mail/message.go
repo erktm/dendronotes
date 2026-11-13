@@ -64,6 +64,12 @@ func Build(from *mail.Address, m Message, now time.Time) ([]byte, error) {
 	// Out-of-office replies and the like stay away from the sender.
 	header("Auto-Submitted", "auto-generated")
 	header("X-Auto-Response-Suppress", "All")
+	// Mailjet rewrites links through its own domain and adds a pixel unless
+	// told not to. The links carry tokens and must lead straight to
+	// dendronotes; tracking also makes spam filters suspicious. Other relays
+	// ignore these headers.
+	header("X-Mailjet-TrackOpen", "0")
+	header("X-Mailjet-TrackClick", "0")
 	if m.HTML == "" {
 		header("Content-Type", "text/plain; charset=utf-8")
 		header("Content-Transfer-Encoding", "quoted-printable")

@@ -268,7 +268,10 @@ auth:
 The relay must accept the sender: confirm the address or the whole domain at your provider and
 publish its SPF and DKIM records in DNS, otherwise the messages are refused or end up as spam.
 Other relays work the same way; `DENDRONOTES_SMTP_TLS=tls` is for implicit TLS (port 465),
-`none` only for a relay without a password in your own network.
+`none` only for a relay without a password in your own network. Every message asks Mailjet not
+to track opens and clicks (`X-Mailjet-TrackOpen: 0`, `X-Mailjet-TrackClick: 0`), so links reach
+dendronotes directly; other relays ignore these headers. For good delivery, also publish a
+DMARC record (for example `_dmarc` TXT `v=DMARC1; p=none`).
 
 Messages wait in an outbox in `state.db` until the relay took them; failed attempts are
 repeated after 1, 5 and 30 minutes, then hourly, and given up after a day (or at once when the

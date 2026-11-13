@@ -58,6 +58,9 @@ func TestBuildMultipart(t *testing.T) {
 	if msg.Header.Get("Auto-Submitted") != "auto-generated" {
 		t.Error("missing Auto-Submitted")
 	}
+	if msg.Header.Get("X-Mailjet-TrackOpen") != "0" || msg.Header.Get("X-Mailjet-TrackClick") != "0" {
+		t.Error("relay tracking not turned off")
+	}
 	_, params, err := mime.ParseMediaType(msg.Header.Get("Content-Type"))
 	if err != nil {
 		t.Fatal(err)
