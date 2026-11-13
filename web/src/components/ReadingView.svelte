@@ -1,5 +1,6 @@
 <script lang="ts">
   import { displayName } from '../lib/paths'
+  import { highlightCodeBlocks } from '../lib/codeHighlight'
   import { untrack } from 'svelte'
   import type { NoteSession } from '../lib/state/note.svelte'
   import { app } from '../lib/state/app.svelte'
@@ -66,6 +67,7 @@
         // Checkboxes belong to the other note: shown, not toggled from here.
         for (const box of body.querySelectorAll<HTMLInputElement>('input.task-box')) box.disabled = true
         fillDrawings(body)
+        void highlightCodeBlocks(body)
         await fillEmbeds(body, [...chain, path], gen)
       }),
     )
@@ -78,6 +80,7 @@
     const gen = ++generation
     for (const el of article.querySelectorAll<HTMLElement>('.embed-note[data-filled]')) delete el.dataset.filled
     void fillEmbeds(article, [session.path], gen)
+    void highlightCodeBlocks(article)
   })
 
   // --- Drawings (![[Plan.drawing.svg]]) -----------------------------------

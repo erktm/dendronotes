@@ -268,6 +268,31 @@
   background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
+/* --- Code colors (lib/codeHighlight.ts; editor and reading view) -------- */
+
+.ct-keyword {
+  color: var(--code-keyword);
+}
+.ct-string {
+  color: var(--code-string);
+}
+.ct-comment {
+  color: var(--code-comment);
+  font-style: italic;
+}
+.ct-literal {
+  color: var(--code-literal);
+}
+.ct-type {
+  color: var(--code-type);
+}
+.ct-function {
+  color: var(--code-function);
+}
+.ct-property {
+  color: var(--code-property);
+}
+
 /* --- Note title (the file name above the text, as in Obsidian) ---------- */
 
 .note-title {
@@ -398,6 +423,7 @@ input.note-title-text:focus {
   border-radius: 8px;
   background: var(--code-bg);
   overflow-x: auto;
+  tab-size: 4;
 }
 .reading pre code {
   padding: 0;

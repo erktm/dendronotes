@@ -14,6 +14,8 @@ import { drawingTitle, isDrawingPath } from '../drawing/paths'
 import { strings } from '../strings'
 import { livePreview, refreshDecorations, synapseHost, type SynapseHost } from './livePreview'
 import { presence, setPeers, type PeerCursor } from './presence'
+import { languages } from '@codemirror/language-data'
+import { codeHighlighter } from '../codeHighlight'
 import { inlineTitle, setTitle as setTitleEffect, type TitleSpec } from './inlineTitle'
 import { commentExtension, commentPositions, setCommentRanges, type CommentHost, type CommentRange } from './comments'
 import { SynapseSyntax } from './synapseSyntax'
@@ -184,8 +186,10 @@ export function createEditor(parent: HTMLElement, o: EditorOptions): EditorHandl
     indentOnInput(),
     highlightSpecialChars(),
     EditorView.lineWrapping,
-    markdown({ base: markdownLanguage, extensions: [SynapseSyntax] }),
+    // Fenced code is parsed by the language of its info string (loaded on demand).
+    markdown({ base: markdownLanguage, codeLanguages: languages, extensions: [SynapseSyntax] }),
     syntaxHighlighting(highlighter),
+    syntaxHighlighting(codeHighlighter),
     closeBrackets(),
     autocompletion({ override: [synapseCompletion(o.notes, o.embeddable), headingCompletion(o)], icons: false }),
     search({ top: true }),

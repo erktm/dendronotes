@@ -66,6 +66,14 @@
   --draw-violet-fill: #ede9fe;
   --draw-pink: #db2777;
   --draw-pink-fill: #fce7f3;
+  /* Code colors follow the drawing colors, light and dark. */
+  --code-keyword: var(--draw-violet);
+  --code-string: var(--draw-green);
+  --code-comment: var(--text-muted);
+  --code-literal: var(--draw-orange);
+  --code-type: var(--draw-teal);
+  --code-function: var(--draw-blue);
+  --code-property: var(--draw-pink);
 }
 
 @media (prefers-color-scheme: dark) {
