@@ -80,8 +80,13 @@ Files in a soma remain plain, Obsidian-compatible Markdown; the wiki link syntax
   the line color and width like shapes, suit light and dark, and lines stick to them. Each soma
   also has a library of uploaded pictures: everyone with access uses it, everyone who may create
   files adds PNG, JPEG, WebP, GIF or SVG pictures (scaled to at most 512 pixels; SVG only
-  without scripts or external references), and uploaders or editors delete them. A drawing
-  keeps its own copy of the uploaded pictures it uses. A field above the icons finds one by name.
+  without scripts or external references), and uploaders or editors delete them. A whole
+  **icon pack** comes as a ZIP of SVG and PNG pictures (at most 20 MB and 500 pictures); its
+  folders become **sections**. Sections can be made, renamed and ordered by everyone who may add
+  icons; a right-click on an icon moves it to another section; editors delete sections with their
+  icons. Admins fill a library for everyone (*Administration → Icons*), shown after the soma's
+  own. Every group folds away. A drawing keeps its own copy of the uploaded pictures it uses. A
+  field above the icons finds one by name.
 - **Downloading drawings** ("Download" in the drawing editor or the large view): the SVG file
   itself (any image viewer shows it, and it stays editable in dendronotes) or a PNG picture at
   twice its size, light or dark as the app is shown. Text in the PNG uses the fonts of the
@@ -236,6 +241,8 @@ up to `DENDRONOTES_MAX_UPLOAD_MB`. The content must match the extension.
     an optional time window. Banners appear at the top of the app at once, also in open tabs.
     A closed banner stays closed for the account on all devices (on the sign-in page: in that
     browser) until you change its text.
+  - *Icons*: the icon library for everyone, filled with single pictures or ZIP packs and
+    arranged in sections like a soma's.
   - *Sessions*: who is signed in from where; end single sessions.
   - *Server*: version, uptime, storage, open somas, a backup download, whether the OpenID
     Connect provider and the directory are reachable, the e-mail relay with waiting messages,

@@ -10,9 +10,10 @@
   import { router } from '../lib/router.svelte'
   import { strings } from '../lib/strings'
 
-  const tabs = ['users', 'groups', 'somas', 'banners', 'sessions', 'server', 'audit'] as const
+  const tabs = ['users', 'groups', 'somas', 'banners', 'icons', 'sessions', 'server', 'audit'] as const
   // Loaded on demand: the main bundle is close to its limit.
   const loadBanners = () => import('./AdminBanners.svelte')
+  const loadIcons = () => import('./AdminIcons.svelte')
   const tab = $derived((tabs as readonly string[]).includes(router.adminTab) ? router.adminTab : 'users')
 </script>
 
@@ -39,6 +40,10 @@
         <AdminSomas />
       {:else if tab === 'banners'}
         {#await loadBanners() then m}
+          <m.default />
+        {/await}
+      {:else if tab === 'icons'}
+        {#await loadIcons() then m}
           <m.default />
         {/await}
       {:else if tab === 'sessions'}

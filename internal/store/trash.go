@@ -278,7 +278,7 @@ func (s *Store) ForgetDeletedSoma(ctx context.Context, id string) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
-	for _, table := range []string{"trash", "notifications", "comments", "soma_icons", "folder_order", "share_links"} {
+	for _, table := range []string{"trash", "notifications", "comments", "soma_icons", "icon_sections", "folder_order", "share_links"} {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE soma_id = ?`, id); err != nil {
 			return err
 		}

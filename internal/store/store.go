@@ -350,6 +350,18 @@ var migrations = []string{
 		expires_at    INTEGER NOT NULL
 	);
 	CREATE INDEX pending_signups_email ON pending_signups(lower(email));`,
+	// 14: sections of icon libraries (a soma's, or the server's when soma_id
+	// is empty, which also holds the server-wide icons themselves); icons
+	// without a section are the plain uploads.
+	`CREATE TABLE icon_sections (
+		id         INTEGER PRIMARY KEY,
+		soma_id    TEXT NOT NULL,
+		name       TEXT NOT NULL,
+		position   INTEGER NOT NULL DEFAULT 0,
+		created_at INTEGER NOT NULL
+	);
+	CREATE INDEX icon_sections_soma ON icon_sections(soma_id);
+	ALTER TABLE soma_icons ADD COLUMN section_id INTEGER REFERENCES icon_sections(id) ON DELETE SET NULL;`,
 }
 
 // rebuilds are the migrations (by index) that recreate a table others refer

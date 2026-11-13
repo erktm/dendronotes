@@ -32,7 +32,8 @@ which a test keeps in sync with the server.
 | `GET /api/somas/{soma}/comments?path=`  | Comments on a note; `POST` adds one (or a reply), `PATCH`/`DELETE …/comments/{id}`, `POST …/{id}/resolve` |
 | `GET /api/me/notifications`             | Mentions and replies; `POST …/read` marks them read  |
 | `GET /api/somas/{soma}/drawings/{path}` | Read a drawing (`*.drawing.svg`, with `ETag`); `POST` creates an empty one, `PUT` saves (`If-Match`, `412` on conflict, checked SVG) |
-| `GET /api/somas/{soma}/icons`           | The icon library; `POST` adds a picture (raw body, `?name=`), `GET`/`DELETE …/icons/{id}` |
+| `GET /api/somas/{soma}/icons`           | The icon library with its sections and the server's; `POST` adds a picture (raw body, `?name=`, `?section=`), `POST …/icons/pack` a ZIP pack, `GET`/`PATCH`/`DELETE …/icons/{id}`, `…/icon-sections` to add, order, rename and delete sections |
+| `GET /api/icons/{id}`                   | A picture of the server's icon library (everyone signed in) |
 | `GET /api/somas/{soma}/files/{path}`    | Download a file (attachments, images, media)         |
 | `POST /api/somas/{soma}/files/{path}`   | Upload a file (raw body; `?unique=1` avoids name clashes) |
 | `GET /api/somas/{soma}/search?q=`       | Full-text search (words, "phrases", #tags)           |
@@ -47,7 +48,7 @@ which a test keeps in sync with the server.
 | `DELETE /api/somas/{soma}/membership`   | Leave a soma shared with you personally              |
 | `GET /api/users/search?q=`              | Find people to share with (two characters or more)   |
 | `GET /api/auth/methods`, `/api/auth/oidc/login`, `/api/auth/oidc/callback` | Sign-in options and the OpenID Connect flow |
-| `/api/admin/users`, `/groups`, `/somas`, `/banners`, `/signup`, `/sessions`, `/server`, `/sso/check`, `/mail/test`, `/audit` | Administration (admins only) |
+| `/api/admin/users`, `/groups`, `/somas`, `/banners`, `/signup`, `/icons`, `/icon-sections`, `/sessions`, `/server`, `/sso/check`, `/mail/test`, `/audit` | Administration (admins only) |
 
 **Personal API tokens** (profile → *API tokens*) let scripts use the API as their account:
 "Read" tokens only read, "Read and write" tokens also change notes and files. No token manages

@@ -183,6 +183,18 @@ paths:
         "404": { $ref: "#/components/responses/Error" }
         "409": { $ref: "#/components/responses/Error" }
         "429": { $ref: "#/components/responses/Error" }
+  /api/icons/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    get:
+      summary: A picture of the server's icon library (everyone signed in)
+      responses:
+        "200":
+          description: The picture, with the sandboxing CSP of files.
+          content:
+            image/png: { schema: { type: string, format: binary } }
+            image/svg+xml: { schema: { type: string } }
+        "404": { $ref: "#/components/responses/Error" }
   /api/public/{token}:
     parameters:
       - { name: token, in: path, required: true, schema: { type: string } }
@@ -973,22 +985,28 @@ paths:
     parameters:
       - $ref: "#/components/parameters/soma"
     get:
-      summary: The soma's icon library, by name
+      summary: The soma's icon library and the server's, by name
       responses:
         "200":
-          description: The icons (without their pictures).
+          description: The icons (without their pictures) and sections; `server` is the library admins fill for everyone.
           content:
             application/json:
-              schema: { type: object, properties: { icons: { type: array, items: { $ref: "#/components/schemas/Icon" } } } }
+              schema:
+                type: object
+                properties:
+                  icons: { type: array, items: { $ref: "#/components/schemas/Icon" } }
+                  sections: { type: array, items: { $ref: "#/components/schemas/IconSection" } }
+                  server: { $ref: "#/components/schemas/IconLibrary" }
     post:
       summary: Add an icon to the library (contributor)
       description: >
         The request body is the picture: PNG of at most 512×512 pixels (encoded
         anew, without metadata) or SVG that passes the same check as drawings.
-        At most 256 KiB and 300 icons per soma. The web app converts other
+        At most 256 KiB and 2000 icons per library. The web app converts other
         pictures to PNG first.
       parameters:
         - { name: name, in: query, schema: { type: string, maxLength: 80 } }
+        - { name: section, in: query, schema: { type: integer }, description: A section of the library; none when left out. }
       requestBody:
         required: true
         content:
@@ -999,6 +1017,81 @@ paths:
         "400": { description: Not a usable PNG or SVG (`invalid_icon`) or a bad name (`invalid_name`). }
         "409": { description: The library is full (`too_many_icons`). }
         "413": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/icons/pack:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+    post:
+      summary: Add an icon pack to the library (contributor)
+      description: >
+        A ZIP of SVG and PNG pictures, at most 20 MiB packed and unpacked and
+        500 pictures. Each picture is checked like a single upload. Folders
+        become sections (existing ones of the same name are used); one folder
+        around everything names the pictures directly in it.
+      requestBody:
+        required: true
+        content:
+          application/zip: { schema: { type: string, format: binary } }
+      parameters:
+        - { name: name, in: query, schema: { type: string }, description: The pack's file name; names the section of pictures not in a folder. }
+      responses:
+        "201":
+          description: What was added; files left out are listed with the reason (at most 50).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  added: { type: integer }
+                  sections: { type: array, items: { type: string } }
+                  skipped: { type: array, items: { type: object, properties: { file: { type: string }, reason: { type: string } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "413": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/icon-sections:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+    post:
+      summary: Add a section at the end of the library (contributor)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [name], properties: { name: { type: string, maxLength: 80 } } }
+      responses:
+        "201": { description: The section., content: { application/json: { schema: { $ref: "#/components/schemas/IconSection" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/icon-sections/order:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+    put:
+      summary: Order the library's sections (contributor)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { ids: { type: array, maxItems: 100, items: { type: integer } } } }
+      responses:
+        "204": { description: Ordered; sections not named follow. }
+  /api/somas/{soma}/icon-sections/{id}:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+      - $ref: "#/components/parameters/id"
+    patch:
+      summary: Rename a section (contributor)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [name], properties: { name: { type: string, maxLength: 80 } } }
+      responses:
+        "204": { description: Renamed. }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Remove a section with its icons (editor)
+      responses:
+        "200": { description: Removed with its icons (drawings keep their copies)., content: { application/json: { schema: { type: object, properties: { icons: { type: integer } } } } } }
+        "404": { $ref: "#/components/responses/Error" }
   /api/somas/{soma}/icons/{id}:
     parameters:
       - $ref: "#/components/parameters/soma"
@@ -1012,6 +1105,16 @@ paths:
           content:
             image/png: { schema: { type: string, format: binary } }
             image/svg+xml: { schema: { type: string } }
+        "404": { $ref: "#/components/responses/Error" }
+    patch:
+      summary: Put an icon into another section (contributor)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { sectionId: { type: integer, description: 0 for none. } } }
+      responses:
+        "200": { description: The icon., content: { application/json: { schema: { $ref: "#/components/schemas/Icon" } } } }
         "404": { $ref: "#/components/responses/Error" }
     delete:
       summary: Remove an icon from the library (its uploader; editors any)
@@ -1557,6 +1660,111 @@ paths:
         "200": { description: Shared. }
         "410": { $ref: "#/components/responses/Error" }
         "429": { $ref: "#/components/responses/Error" }
+  /api/admin/icons:
+    get:
+      summary: The server's icon library (everyone signed in sees it in drawings)
+      responses:
+        "200": { description: Icons and sections., content: { application/json: { schema: { $ref: "#/components/schemas/IconLibrary" } } } }
+    post:
+      summary: Add an icon to the server's library
+      parameters:
+        - { name: name, in: query, schema: { type: string, maxLength: 80 } }
+        - { name: section, in: query, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          image/png: { schema: { type: string, format: binary } }
+          image/svg+xml: { schema: { type: string } }
+      responses:
+        "201": { description: The icon., content: { application/json: { schema: { $ref: "#/components/schemas/Icon" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/admin/icons/pack:
+    post:
+      summary: Add an icon pack to the server's library
+      description: >
+        A ZIP of SVG and PNG pictures, at most 20 MiB packed and unpacked and
+        500 pictures. Each picture is checked like a single upload. Folders
+        become sections (existing ones of the same name are used); one folder
+        around everything names the pictures directly in it.
+      requestBody:
+        required: true
+        content:
+          application/zip: { schema: { type: string, format: binary } }
+      parameters:
+        - { name: name, in: query, schema: { type: string }, description: The pack's file name; names the section of pictures not in a folder. }
+      responses:
+        "201":
+          description: What was added; files left out are listed with the reason (at most 50).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  added: { type: integer }
+                  sections: { type: array, items: { type: string } }
+                  skipped: { type: array, items: { type: object, properties: { file: { type: string }, reason: { type: string } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "413": { $ref: "#/components/responses/Error" }
+  /api/admin/icons/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    patch:
+      summary: Put a server icon into another section
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { sectionId: { type: integer, description: 0 for none. } } }
+      responses:
+        "200": { description: The icon., content: { application/json: { schema: { $ref: "#/components/schemas/Icon" } } } }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Remove a server icon
+      responses:
+        "200": { description: Removed. }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/admin/icon-sections:
+    post:
+      summary: Add a section to the server's library
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [name], properties: { name: { type: string, maxLength: 80 } } }
+      responses:
+        "201": { description: The section., content: { application/json: { schema: { $ref: "#/components/schemas/IconSection" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/admin/icon-sections/order:
+    put:
+      summary: Order the server's sections
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { ids: { type: array, maxItems: 100, items: { type: integer } } } }
+      responses:
+        "204": { description: Ordered; sections not named follow. }
+  /api/admin/icon-sections/{id}:
+    parameters:
+      - $ref: "#/components/parameters/id"
+    patch:
+      summary: Rename a server section
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [name], properties: { name: { type: string, maxLength: 80 } } }
+      responses:
+        "204": { description: Renamed. }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      summary: Remove a server section with its icons
+      responses:
+        "200": { description: Removed with its icons (drawings keep their copies)., content: { application/json: { schema: { type: object, properties: { icons: { type: integer } } } } } }
+        "404": { $ref: "#/components/responses/Error" }
   /api/admin/signup:
     get:
       summary: The sign-up settings and whether this server can offer sign-ups
@@ -2220,8 +2428,20 @@ components:
         name: { type: string }
         mime: { type: string, enum: [image/png, image/svg+xml] }
         size: { type: integer }
+        sectionId: { type: integer, description: Left out for icons without a section. }
         createdBy: { type: integer }
         createdAt: { type: string, format: date-time }
+    IconSection:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        position: { type: integer }
+    IconLibrary:
+      type: object
+      properties:
+        icons: { type: array, items: { $ref: "#/components/schemas/Icon" } }
+        sections: { type: array, items: { $ref: "#/components/schemas/IconSection" } }
     SignupSettings:
       type: object
       properties:

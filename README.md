@@ -25,8 +25,8 @@ Kubernetes, also in an air gap.
 - **Editing together**: everyone in a note sees the others' changes and cursors at once;
   changes made on disk (Obsidian, git, a sync tool) are taken over live.
 - **Drawings**: shapes, arrows that stick to shapes, text, freehand strokes and built-in icons
-  for project management, software, cloud and networking; embedded in notes, downloadable as
-  SVG or PNG.
+  for project management, software, cloud and networking, plus icon packs (ZIP) in sections per
+  soma and for the whole server; embedded in notes, downloadable as SVG or PNG.
 - **File tree** with several entries moved or deleted at once, folders sorted by name, date or
   by hand for everyone, and whole folders dropped in from the computer.
 - **Links** to notes and drawings that keep working when they move, for people in the soma or

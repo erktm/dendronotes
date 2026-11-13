@@ -152,8 +152,8 @@ func TestIconLibrary(t *testing.T) {
 	}
 
 	// The library has a limit.
-	for range store.MaxIconsPerSoma - len(icons(admin)) {
-		if _, err := s.store.AddIcon(ctx, testSoma, "x", "image/svg+xml", []byte(star), 0); err != nil {
+	for range store.MaxIcons - len(icons(admin)) {
+		if _, err := s.store.AddIcon(ctx, testSoma, "x", "image/svg+xml", []byte(star), 0, 0); err != nil {
 			t.Fatal(err)
 		}
 	}
