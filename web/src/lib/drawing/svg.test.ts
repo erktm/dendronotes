@@ -13,9 +13,9 @@ const type = { font: 'sans', size: 20, align: 'center' } as const
 /** A drawing with every kind of element (the shared test file). */
 function sample(sketchy: boolean): Scene {
   const els: Element[] = [
-    { ...common, ...type, id: 'beds', type: 'rect', x: 0, y: 0, w: 160, h: 80, stroke: 'green', fill: 'green', rounded: true, text: 'Beds & <paths>' },
-    { ...common, ...type, id: 'pond', type: 'ellipse', x: 320, y: 0, w: 140, h: 90, stroke: 'blue', fill: 'none', rounded: false, text: 'Pond', dash: 'dashed' },
-    { ...common, ...type, id: 'gate', type: 'diamond', x: 160, y: 200, w: 120, h: 80, stroke: 'ink', fill: 'yellow', rounded: false, text: '' },
+    { ...common, ...type, id: 'beds', type: 'rect', x: 0, y: 0, w: 160, h: 80, stroke: 'green', fill: 'green', rounded: true, flip: false, text: 'Beds & <paths>' },
+    { ...common, ...type, id: 'pond', type: 'ellipse', x: 320, y: 0, w: 140, h: 90, stroke: 'blue', fill: 'none', rounded: false, flip: false, text: 'Pond', dash: 'dashed' },
+    { ...common, ...type, id: 'gate', type: 'diamond', x: 160, y: 200, w: 120, h: 80, stroke: 'ink', fill: 'yellow', rounded: false, flip: false, text: '' },
     {
       ...common, ...type, id: 'walk', type: 'arrow', points: [[0, 0], [1, 1]], elbow: false, start: { id: 'beds' }, end: { id: 'pond' },
       startHead: 'dot', endHead: 'triangle', stroke: 'ink', text: 'path',
@@ -28,6 +28,18 @@ function sample(sketchy: boolean): Scene {
     { ...common, id: 'tree', type: 'image', x: 340, y: 220, w: 48, h: 48, stroke: 'ink', file: 'f1' },
     { ...common, id: 'twig', type: 'pen', points: [[20, 420], [30, 425], [45, 418], [60, 430]], stroke: 'orange' },
     { ...common, id: 'db', type: 'icon', icon: 'database', x: 200, y: 360, w: 48, h: 48, stroke: 'teal' },
+    { ...common, ...type, id: 'seed', type: 'triangle', x: 0, y: 480, w: 100, h: 90, stroke: 'green', fill: 'green', rounded: false, flip: false, text: 'Seed' },
+    { ...common, ...type, id: 'root', type: 'triangle', x: 140, y: 480, w: 100, h: 90, stroke: 'orange', fill: 'none', rounded: false, flip: true, text: '' },
+    { ...common, ...type, id: 'hive', type: 'hexagon', x: 280, y: 480, w: 120, h: 90, stroke: 'yellow', fill: 'yellow', rounded: false, flip: false, text: 'Hive' },
+    { ...common, ...type, id: 'path', type: 'parallelogram', x: 440, y: 480, w: 140, h: 70, stroke: 'ink', fill: 'none', rounded: false, flip: false, text: 'Path' },
+    { ...common, ...type, id: 'back', type: 'parallelogram', x: 620, y: 480, w: 140, h: 70, stroke: 'ink', fill: 'none', rounded: false, flip: true, text: '', dash: 'dashed' },
+    { ...common, ...type, id: 'tank', type: 'cylinder', x: 0, y: 640, w: 100, h: 120, stroke: 'blue', fill: 'blue', rounded: false, flip: false, text: 'Rain' },
+    { ...common, ...type, id: 'sun', type: 'star', x: 160, y: 640, w: 120, h: 115, stroke: 'orange', fill: 'orange', rounded: false, flip: false, text: '' },
+    { ...common, ...type, id: 'sky', type: 'cloud', x: 340, y: 640, w: 180, h: 110, stroke: 'ink', fill: 'none', rounded: false, flip: false, text: 'Weather' },
+    {
+      ...common, ...type, id: 'rain', type: 'arrow', points: [[0, 0], [1, 1]], elbow: false, start: { id: 'sky' }, end: { id: 'tank' },
+      startHead: 'none', endHead: 'arrow', stroke: 'blue', text: '',
+    },
   ]
   const s = add({ ...emptyScene(), sketchy, files: { f1: { src: PNG, w: 1, h: 1 } } }, ...els)
   return s

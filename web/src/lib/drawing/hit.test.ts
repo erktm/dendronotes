@@ -5,7 +5,7 @@ import { type Element, type ShapeEl, add, emptyScene } from './scene'
 
 function shape(id: string, x: number, y: number, extra: Partial<ShapeEl> = {}): ShapeEl {
   return {
-    id, type: 'rect', x, y, w: 100, h: 100, stroke: 'ink', fill: 'none', width: 2, dash: 'solid', seed: 1, rounded: false,
+    id, type: 'rect', x, y, w: 100, h: 100, stroke: 'ink', fill: 'none', width: 2, dash: 'solid', seed: 1, rounded: false, flip: false,
     text: '', font: 'sans', size: 20, align: 'center', ...extra,
   }
 }

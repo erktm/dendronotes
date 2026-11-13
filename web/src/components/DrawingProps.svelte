@@ -116,6 +116,11 @@
             <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V11a6 6 0 0 1 6-6h8" stroke-width="2" /></svg>
           </button>
         {/if}
+        {#if keys.has('flip')}
+          <button type="button" class="opt" class:on={style.flip} title={s.flip} aria-label={s.flip} aria-pressed={style.flip} onclick={() => onstyle({ flip: !style.flip })}>
+            <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12h17M12 3.5l4.5 5h-9zM7.5 15.5h9l-4.5 5z" stroke-width="1.6" stroke-linejoin="round" /></svg>
+          </button>
+        {/if}
       </div>
     </fieldset>
   {/if}

@@ -3,7 +3,7 @@
 
 import type { Color, Fill } from './colors'
 import { type Measure, textBox } from './render'
-import { type Align, type Dash, type Element, type FontFamily, type Head, hasText, isLinear, isShape } from './scene'
+import { type Align, type Dash, type Element, type FontFamily, FLIPPABLE, type Head, hasText, isLinear, isShape } from './scene'
 
 export interface Style {
   stroke: Color
@@ -17,6 +17,7 @@ export interface Style {
   endHead: Head
   elbow: boolean
   rounded: boolean
+  flip: boolean
 }
 
 export const DEFAULT_STYLE: Style = {
@@ -31,6 +32,7 @@ export const DEFAULT_STYLE: Style = {
   endHead: 'arrow',
   elbow: false,
   rounded: true,
+  flip: false,
 }
 
 export type StyleKey = keyof Style
@@ -41,6 +43,7 @@ export function keysOf(el: Element): StyleKey[] {
   if (el.type !== 'image') keys.push('stroke')
   if (isShape(el)) keys.push('fill')
   if (el.type === 'rect') keys.push('rounded')
+  if (isShape(el) && FLIPPABLE.has(el.type)) keys.push('flip')
   if (isShape(el) || isLinear(el) || el.type === 'pen' || el.type === 'icon') keys.push('width')
   if (isShape(el) || isLinear(el)) keys.push('dash')
   if (hasText(el)) keys.push('font', 'size')

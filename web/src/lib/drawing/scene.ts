@@ -22,7 +22,10 @@ import {
   union,
 } from './geometry'
 
-export type ShapeType = 'rect' | 'ellipse' | 'diamond'
+export const SHAPE_TYPES = ['rect', 'ellipse', 'diamond', 'triangle', 'hexagon', 'parallelogram', 'cylinder', 'star', 'cloud'] as const
+export type ShapeType = (typeof SHAPE_TYPES)[number]
+/** Shapes that can be turned over: a triangle's tip down, a parallelogram leaning left. */
+export const FLIPPABLE: ReadonlySet<ShapeType> = new Set(['triangle', 'parallelogram'])
 export type LinearType = 'line' | 'arrow'
 export type ElementType = ShapeType | LinearType | 'pen' | 'text' | 'image' | 'icon'
 export type FontFamily = 'sans' | 'serif' | 'mono'
@@ -56,6 +59,8 @@ export interface ShapeEl extends Common, Box, TextStyle {
   type: ShapeType
   fill: Fill
   rounded: boolean
+  /** Triangles and parallelograms only (FLIPPABLE). */
+  flip: boolean
 }
 
 /** Free text; w and h are the measured size of its lines. */
@@ -121,7 +126,9 @@ export function emptyScene(): Scene {
 // ---------------------------------------------------------------------------
 // Kinds
 
-export const isShape = (e: Element): e is ShapeEl => e.type === 'rect' || e.type === 'ellipse' || e.type === 'diamond'
+const shapeTypes: ReadonlySet<string> = new Set(SHAPE_TYPES)
+export const isShapeType = (t: string): t is ShapeType => shapeTypes.has(t)
+export const isShape = (e: Element): e is ShapeEl => isShapeType(e.type)
 export const isLinear = (e: Element): e is LinearEl => e.type === 'line' || e.type === 'arrow'
 export const isBox = (e: Element): e is BoxEl => isShape(e) || e.type === 'text' || e.type === 'image' || e.type === 'icon'
 /** Elements with a label or text. */
@@ -129,7 +136,10 @@ export const hasText = (e: Element): e is ShapeEl | TextEl | LinearEl => isShape
 
 /** The outline lines stick to. */
 export function outlineOf(e: BoxEl): Outline {
-  return e.type === 'ellipse' || e.type === 'diamond' ? e.type : 'rect'
+  if (!isShape(e)) return 'rect'
+  if (e.type === 'triangle') return e.flip ? 'triangle-down' : 'triangle'
+  if (e.type === 'parallelogram') return e.flip ? 'parallelogram-flip' : 'parallelogram'
+  return e.type
 }
 
 export function newId(): string {
@@ -410,10 +420,17 @@ function sanitizeElement(v: unknown, files: Record<string, FileData>): Element |
     case 'rect':
     case 'ellipse':
     case 'diamond':
+    case 'triangle':
+    case 'hexagon':
+    case 'parallelogram':
+    case 'cylinder':
+    case 'star':
+    case 'cloud':
       return {
         ...base, ...box(o), ...textStyle(o), type: o.type,
         fill: o.fill === 'none' || !isColor(o.fill) ? 'none' : o.fill,
         rounded: o.rounded === true,
+        flip: o.flip === true && FLIPPABLE.has(o.type),
       }
     case 'text':
       return { ...base, ...box(o), ...textStyle(o), type: 'text', align: oneOf(o.align, ['left', 'center', 'right'] as const, 'left') }

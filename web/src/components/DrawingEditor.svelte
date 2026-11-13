@@ -22,7 +22,7 @@
   import { newIcon, newImage, newLine, newPen, newShape, newText } from '../lib/drawing/create'
   import { type Box, type Pt, boxFrom, center, dist, grow, simplify, snap } from '../lib/drawing/geometry'
   import { ALL_HANDLES, CORNERS, type Handle, bindTargetAt, elementsIn, handlePoint, hitTest, resizeBox, shapeAt } from '../lib/drawing/hit'
-  import { LINE_HEIGHT, midpoint, textBox } from '../lib/drawing/render'
+  import { LINE_HEIGHT, labelArea, midpoint, textBox } from '../lib/drawing/render'
   import {
     type LinearEl,
     type Order,
@@ -37,6 +37,7 @@
     isBox,
     isLinear,
     isShape,
+    isShapeType,
     move,
     newId,
     remove,
@@ -86,6 +87,12 @@
   let style = $state<Style>({ ...lastStyle })
   let grid = $state(readGrid())
   let iconsOpen = $state(false)
+  // The shapes beyond the first three sit in a group that opens below its button.
+  const MORE_SHAPES = ['triangle', 'hexagon', 'parallelogram', 'cylinder', 'star', 'cloud'] as const satisfies readonly ShapeType[]
+  type MoreShape = (typeof MORE_SHAPES)[number]
+  const isMoreShape = (t: Tool): t is MoreShape => (MORE_SHAPES as readonly string[]).includes(t)
+  let shapesOpen = $state(false)
+  let moreShape = $state<MoreShape>('triangle')
   let propsOpen = $state(typeof window === 'undefined' || window.innerWidth > 760)
   let pan = $state({ x: 40, y: 40 })
   let zoom = $state(1)
@@ -235,10 +242,8 @@
 
   const panelKeys = $derived.by((): ReadonlySet<StyleKey> => {
     if (selection.length) return new Set(selection.flatMap(keysOf))
+    if (isShapeType(tool)) return new Set(keysOf(newShape(tool, { x: 0, y: 0, w: 0, h: 0 }, style)))
     const probe: Record<string, StyleKey[]> = {
-      rect: ['stroke', 'fill', 'rounded', 'width', 'dash', 'font', 'size', 'align'],
-      ellipse: ['stroke', 'fill', 'width', 'dash', 'font', 'size', 'align'],
-      diamond: ['stroke', 'fill', 'width', 'dash', 'font', 'size', 'align'],
       line: ['stroke', 'width', 'dash', 'elbow', 'font', 'size'],
       arrow: ['stroke', 'width', 'dash', 'startHead', 'endHead', 'elbow', 'font', 'size'],
       pen: ['stroke', 'width'],
@@ -386,7 +391,13 @@
         return selectDown(e, p)
       case 'rect':
       case 'ellipse':
-      case 'diamond': {
+      case 'diamond':
+      case 'triangle':
+      case 'hexagon':
+      case 'parallelogram':
+      case 'cylinder':
+      case 'star':
+      case 'cloud': {
         const start = snapPt(p)
         const el = newShape(tool, { x: start[0], y: start[1], w: 0, h: 0 }, style)
         doc.preview(add(before, el))
@@ -696,11 +707,10 @@
       y = el.y
       w = widest + el.size
     } else if (isShape(el)) {
-      const k = el.type === 'ellipse' ? 0.72 : el.type === 'diamond' ? 0.5 : 1
-      w = Math.max(el.w * k - 16, el.size * 2)
-      const [cx, cy] = center(el)
-      x = cx - w / 2
-      y = cy - (lines * lh) / 2
+      const area = labelArea(el)
+      w = Math.max(area.w, el.size * 2)
+      x = area.x + area.w / 2 - w / 2
+      y = area.y + area.h / 2 - (lines * lh) / 2
     } else {
       const [mx, my] = midpoint(route(el, scene))
       w = Math.max(widest + el.size, 80)
@@ -994,6 +1004,40 @@
               <Icon name={t.icon} size={19} />
             </button>
           {/if}
+          {#if t.id === 'diamond' && mayEdit}
+            <button
+              type="button"
+              class="tool more"
+              class:on={isMoreShape(tool) && !shapesOpen}
+              title={s.tool.more}
+              aria-label={s.tool.more}
+              aria-expanded={shapesOpen}
+              onclick={() => (shapesOpen = !shapesOpen)}
+            >
+              <Icon name={shapesOpen ? 'chevron-down' : moreShape} size={19} />
+            </button>
+            {#if shapesOpen}
+              <div class="more-shapes" role="group" aria-label={s.tool.more}>
+                {#each MORE_SHAPES as m (m)}
+                  <button
+                    type="button"
+                    class="tool"
+                    class:on={tool === m}
+                    title={s.tool[m]}
+                    aria-label={s.tool[m]}
+                    aria-pressed={tool === m}
+                    onclick={() => {
+                      tool = m
+                      moreShape = m
+                      selected = new Set()
+                    }}
+                  >
+                    <Icon name={m} size={19} />
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          {/if}
         {/each}
         {#if mayEdit}
           <button type="button" class="tool" class:on={iconsOpen} title={s.tool.icons} aria-label={s.tool.icons} aria-pressed={iconsOpen} onclick={() => (iconsOpen = !iconsOpen)}>
@@ -1255,6 +1299,30 @@
   .tool:disabled {
     opacity: 0.4;
   }
+  /* A small corner mark: more tools behind this button. */
+  .tool.more {
+    position: relative;
+  }
+  .tool.more::after {
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    border-right: 4px solid currentColor;
+    border-top: 4px solid transparent;
+    content: '';
+    opacity: 0.7;
+  }
+  .tool.more[aria-expanded='true']::after {
+    display: none;
+  }
+  .more-shapes {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    gap: 2px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-hover);
+  }
   .sep {
     flex: none;
     height: 1px;
@@ -1286,6 +1354,12 @@
   .tool-rect .canvas,
   .tool-ellipse .canvas,
   .tool-diamond .canvas,
+  .tool-triangle .canvas,
+  .tool-hexagon .canvas,
+  .tool-parallelogram .canvas,
+  .tool-cylinder .canvas,
+  .tool-star .canvas,
+  .tool-cloud .canvas,
   .tool-line .canvas,
   .tool-arrow .canvas,
   .tool-pen .canvas {

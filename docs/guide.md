@@ -48,8 +48,9 @@ Files in a soma remain plain, Obsidian-compatible Markdown; the wiki link syntax
   (`![[Drawing 2026-11-10 1530.drawing.svg]]`) and opens it. To show an existing drawing in a
   note, type `![[` and pick it from the suggestions (they list drawings and images), or copy the
   line from "Embed in a note" in the drawing editor. The editor has
-  rectangles, ellipses, diamonds, lines and arrows, a pen, text, and icons; double-click a shape
-  to write in it. The ends of lines and arrows stick to shapes, text and icons and follow them
+  rectangles, ellipses, diamonds, lines and arrows, a pen, text, and icons; the button below the
+  diamond opens more shapes: triangle, hexagon, parallelogram, cylinder, star and cloud (triangles
+  and parallelograms can be flipped in the properties). Double-click a shape to write in it. The ends of lines and arrows stick to shapes, text and icons and follow them
   when they move; arrows can bend at right angles. Colors come from fixed slots that suit every
   palette, light and dark; strokes can be switched to a sketchy look per drawing. Changes save
   about a second after the last one ("Done" goes back to the note); if someone else saved the

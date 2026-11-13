@@ -3,7 +3,18 @@
 // app (dom.ts), so a drawing looks the same in both.
 
 import { type Color, PAPER_CLASS, solidClass, strokeClass, tintClass } from './colors'
-import { type Box, type Pt, center, diamondPoints, round } from './geometry'
+import {
+  type Box,
+  type Pt,
+  center,
+  cloudArcs,
+  cylinderRy,
+  hexagonInset,
+  outlinePolygon,
+  parallelogramSkew,
+  round,
+  starCenter,
+} from './geometry'
 import {
   type Dash,
   type Element,
@@ -14,9 +25,11 @@ import {
   type ShapeEl,
   type TextEl,
   type TextStyle,
+  isShape,
+  outlineOf,
   route,
 } from './scene'
-import { sketchEllipse, sketchLines, sketchRoundRect, smooth } from './sketch'
+import { sketchArc, sketchBumps, sketchEllipse, sketchLines, sketchRoundRect, smooth } from './sketch'
 import { builtinIcon } from './icons'
 
 export interface TextLine {
@@ -112,12 +125,46 @@ function textPrim(style: TextStyle, lines: string[], left: number, width: number
   }
 }
 
-/** The area inside a shape that its label may fill. */
-function labelArea(el: ShapeEl): Box {
-  const k = el.type === 'ellipse' ? 0.72 : el.type === 'diamond' ? 0.5 : 1
-  const w = Math.max(el.w * k - 2 * PADDING, el.size)
+/** The area inside a shape that its label may fill (centered where the text goes). */
+export function labelArea(el: ShapeEl): Box {
   const [cx, cy] = center(el)
-  return { x: cx - w / 2, y: cy - el.h / 2, w, h: el.h }
+  let w = el.w
+  let my = cy
+  switch (outlineOf(el)) {
+    case 'ellipse':
+      w = el.w * 0.72
+      break
+    case 'cloud':
+      w = el.w * 0.7
+      break
+    case 'diamond':
+      w = el.w * 0.5
+      break
+    case 'triangle':
+      w = el.w * 0.6
+      my = cy + el.h / 6
+      break
+    case 'triangle-down':
+      w = el.w * 0.6
+      my = cy - el.h / 6
+      break
+    case 'hexagon':
+      w = el.w - hexagonInset(el)
+      break
+    case 'parallelogram':
+    case 'parallelogram-flip':
+      w = el.w - parallelogramSkew(el)
+      break
+    case 'star':
+      w = el.w * 0.42
+      my = starCenter(el)[1]
+      break
+    case 'cylinder':
+      my = cy + cylinderRy(el)
+      break
+  }
+  const lw = Math.max(w - 2 * PADDING, el.size)
+  return { x: cx - lw / 2, y: my - el.h / 2, w: lw, h: el.h }
 }
 
 export function shapeLabel(el: ShapeEl, measure: Measure): Prim | null {
@@ -189,21 +236,70 @@ function polyline(points: readonly Pt[]): string {
 // ---------------------------------------------------------------------------
 // Elements
 
-/** The plain outline of a shape (tag and geometry). */
 const cornerRadius = (el: ShapeEl) => Math.min(16, Math.min(el.w, el.h) * 0.2)
 
+/** The plain outline of a shape (tag and geometry). */
 function outlinePrim(el: ShapeEl): Prim {
-  const r = el.rounded ? cornerRadius(el) : 0
-  if (el.type === 'rect') {
-    const attrs: Record<string, string> = { x: f(el.x), y: f(el.y), width: f(el.w), height: f(el.h) }
-    if (r) attrs.rx = f(r)
-    return { tag: 'rect', attrs }
+  switch (el.type) {
+    case 'rect': {
+      const r = el.rounded ? cornerRadius(el) : 0
+      const attrs: Record<string, string> = { x: f(el.x), y: f(el.y), width: f(el.w), height: f(el.h) }
+      if (r) attrs.rx = f(r)
+      return { tag: 'rect', attrs }
+    }
+    case 'ellipse': {
+      const [cx, cy] = center(el)
+      return { tag: 'ellipse', attrs: { cx: f(cx), cy: f(cy), rx: f(el.w / 2), ry: f(el.h / 2) } }
+    }
+    case 'cylinder': {
+      const ry = cylinderRy(el)
+      const arc = (x: number, y: number) => `A${f(el.w / 2)} ${f(ry)} 0 0 1 ${f(x)} ${f(y)}`
+      const [left, right, top, bottom] = [el.x, el.x + el.w, el.y + ry, el.y + el.h - ry]
+      // The body clockwise, then the front of the top the same way round, so
+      // the fill stays whole (nonzero) and the front shows only as a line.
+      const d = `M${f(left)} ${f(top)}${arc(right, top)}L${f(right)} ${f(bottom)}${arc(left, bottom)}Z` + `M${f(right)} ${f(top)}${arc(left, top)}`
+      return { tag: 'path', attrs: { 'stroke-linejoin': 'round', d } }
+    }
+    case 'cloud': {
+      const arcs = cloudArcs(el)
+      const d =
+        `M${f(arcs[0]!.from[0])} ${f(arcs[0]!.from[1])}` +
+        arcs.map((a) => `A${f(a.rx)} ${f(a.ry)} 0 ${a.large ? 1 : 0} 1 ${f(a.to[0])} ${f(a.to[1])}`).join('') +
+        'Z'
+      return { tag: 'path', attrs: { 'stroke-linejoin': 'round', d } }
+    }
+    default:
+      return { tag: 'path', attrs: { 'stroke-linejoin': 'round', d: polyline(outlinePolygon(el, outlineOf(el))!) + 'Z' } }
   }
-  if (el.type === 'ellipse') {
-    const [cx, cy] = center(el)
-    return { tag: 'ellipse', attrs: { cx: f(cx), cy: f(cy), rx: f(el.w / 2), ry: f(el.h / 2) } }
+}
+
+/** The hand-drawn strokes of a shape's outline. */
+function sketchOutline(el: ShapeEl): string {
+  const [cx, cy] = center(el)
+  switch (el.type) {
+    case 'rect': {
+      const r = el.rounded ? cornerRadius(el) : 0
+      if (r > 0) return sketchRoundRect(el.x, el.y, el.w, el.h, r, el.seed)
+      return sketchLines([[el.x, el.y], [el.x + el.w, el.y], [el.x + el.w, el.y + el.h], [el.x, el.y + el.h]], el.seed, true)
+    }
+    case 'ellipse':
+      return sketchEllipse(cx, cy, el.w / 2, el.h / 2, el.seed)
+    case 'cylinder': {
+      const ry = cylinderRy(el)
+      const rx = el.w / 2
+      const [left, right, top, bottom] = [el.x, el.x + el.w, el.y + ry, el.y + el.h - ry]
+      return (
+        sketchEllipse(cx, top, rx, ry, el.seed) +
+        sketchLines([[left, top], [left, bottom]], el.seed + 1) +
+        sketchLines([[right, top], [right, bottom]], el.seed + 2) +
+        sketchArc(cx, bottom, rx, ry, 0, Math.PI, el.seed + 3)
+      )
+    }
+    case 'cloud':
+      return sketchBumps(cloudArcs(el), el.seed)
+    default:
+      return sketchLines(outlinePolygon(el, outlineOf(el))!, el.seed, true)
   }
-  return { tag: 'path', attrs: { 'stroke-linejoin': 'round', d: polyline(diamondPoints(el)) + 'Z' } }
 }
 
 function shapePrims(el: ShapeEl, sketchy: boolean, measure: Measure): Prim[] {
@@ -216,20 +312,8 @@ function shapePrims(el: ShapeEl, sketchy: boolean, measure: Measure): Prim[] {
     else attrs.class = `${stroke.class} ${tintClass(el.fill)}`
     out.push({ tag: shape.tag, attrs })
   } else {
-    const [cx, cy] = center(el)
     if (el.fill !== 'none') out.push({ tag: shape.tag, attrs: { ...shape.attrs, class: tintClass(el.fill) } })
-    const corners: Pt[] =
-      el.type === 'diamond'
-        ? diamondPoints(el)
-        : [[el.x, el.y], [el.x + el.w, el.y], [el.x + el.w, el.y + el.h], [el.x, el.y + el.h]]
-    const r = el.rounded && el.type === 'rect' ? cornerRadius(el) : 0
-    const d =
-      el.type === 'ellipse'
-        ? sketchEllipse(cx, cy, el.w / 2, el.h / 2, el.seed)
-        : r > 0
-          ? sketchRoundRect(el.x, el.y, el.w, el.h, r, el.seed)
-          : sketchLines(corners, el.seed, true)
-    out.push({ tag: 'path', attrs: { ...stroke, fill: 'none', 'stroke-linecap': 'round', d } })
+    out.push({ tag: 'path', attrs: { ...stroke, fill: 'none', 'stroke-linecap': 'round', d: sketchOutline(el) } })
   }
   const label = shapeLabel(el, measure)
   if (label) out.push(label)
@@ -261,11 +345,8 @@ function textElPrims(el: TextEl): Prim[] {
 
 /** The primitives of one element. */
 export function primitives(el: Element, scene: Scene, measure: Measure): Prim[] {
+  if (isShape(el)) return shapePrims(el, scene.sketchy, measure)
   switch (el.type) {
-    case 'rect':
-    case 'ellipse':
-    case 'diamond':
-      return shapePrims(el, scene.sketchy, measure)
     case 'line':
     case 'arrow':
       return linearPrims(el, scene, scene.sketchy, measure)
@@ -311,7 +392,7 @@ export function usedColors(scene: Scene): Set<Color> {
   const out = new Set<Color>()
   for (const e of scene.elements) {
     out.add(e.stroke)
-    if ((e.type === 'rect' || e.type === 'ellipse' || e.type === 'diamond') && e.fill !== 'none') out.add(e.fill)
+    if (isShape(e) && e.fill !== 'none') out.add(e.fill)
   }
   return out
 }

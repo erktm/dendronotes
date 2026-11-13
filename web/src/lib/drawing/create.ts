@@ -13,6 +13,7 @@ import {
   type ShapeEl,
   type ShapeType,
   type TextEl,
+  FLIPPABLE,
   newId,
   newSeed,
 } from './scene'
@@ -24,6 +25,7 @@ export function newShape(type: ShapeType, box: Box, s: Style): ShapeEl {
   return {
     id: newId(), type, x: round(box.x), y: round(box.y), w: round(box.w), h: round(box.h),
     stroke: s.stroke, fill: s.fill, width: s.width, dash: s.dash, seed: newSeed(), rounded: type === 'rect' && s.rounded,
+    flip: FLIPPABLE.has(type) && s.flip,
     text: '', font: s.font, size: s.size, align: s.align,
   }
 }

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { BIND_GAP, type LinearEl, type Scene, type ShapeEl, add, copies, emptyScene, find, move, remove, reorder, route, sanitizeScene } from './scene'
-import { outlineDist } from './geometry'
+import { BIND_GAP, type LinearEl, SHAPE_TYPES, type Scene, type ShapeEl, add, copies, emptyScene, find, move, outlineOf, remove, reorder, route, sanitizeScene } from './scene'
+import { insideOutline, outlineDist } from './geometry'
 import { random, sketchEllipse, sketchLines } from './sketch'
 
 function rect(id: string, x: number, y: number, w = 100, h = 60): ShapeEl {
-  return { id, type: 'rect', x, y, w, h, stroke: 'ink', fill: 'none', width: 2, dash: 'solid', seed: 1, rounded: false, text: '', font: 'sans', size: 20, align: 'center' }
+  return { id, type: 'rect', x, y, w, h, stroke: 'ink', fill: 'none', width: 2, dash: 'solid', seed: 1, rounded: false, flip: false, text: '', font: 'sans', size: 20, align: 'center' }
 }
 
 function arrow(id: string, from: string | null, to: string | null, elbow = false): LinearEl {
@@ -44,6 +44,28 @@ describe('lines between shapes', () => {
     const [p, q] = line(s, 'l').points
     expect(near(outlineDist(p, d, 'diamond'))).toBe(true)
     expect(near(outlineDist(q, e, 'ellipse'))).toBe(true)
+  })
+
+  it('stick to the outline of every shape, from every side', () => {
+    for (const type of SHAPE_TYPES) {
+      for (const flip of [false, true]) {
+        const target = { ...rect('t', 0, 0, 140, 100), type, flip: flip && (type === 'triangle' || type === 'parallelogram') }
+        const o = outlineOf(target)
+        expect(insideOutline([70, 50], target, o), `${o} contains its middle`).toBe(true)
+        const corners: [number, number][] = [[1, 1], [139, 1], [139, 99], [1, 99]]
+        if (o !== 'rect') expect(corners.some((c) => !insideOutline(c, target, o)), `${o} leaves a corner free`).toBe(true)
+        for (let i = 0; i < 12; i++) {
+          const a = (i / 12) * Math.PI * 2
+          const from = rect('f', 70 + Math.cos(a) * 400 - 10, 50 + Math.sin(a) * 400 - 10, 20, 20)
+          const s = scene(target, from, arrow('l', 'f', 't'))
+          const q = line(s, 'l').points[1]
+          // The gap is kept along the line, so across slanted sides it is less.
+          const d = outlineDist(q, target, o)
+          expect(d > 1 && d <= BIND_GAP + 0.01, `${o} at ${i * 30}°: ${d}`).toBe(true)
+          expect(insideOutline(q, target, o), `${o} at ${i * 30}° outside`).toBe(false)
+        }
+      }
+    }
   })
 
   it('come loose when moved on their own, but not when moved along', () => {
@@ -116,6 +138,19 @@ describe('untrusted scenes', () => {
     const l = s.elements[1] as LinearEl
     expect([l.start, l.end, l.endHead]).toEqual([null, { id: 'a' }, 'arrow'])
     expect((s.elements[2] as { points: unknown }).points).toEqual([[0, 0], [1, 0]])
+  })
+
+  it('turn over only triangles and parallelograms', () => {
+    const s = sanitizeScene({
+      version: 1,
+      elements: ['triangle', 'parallelogram', 'hexagon', 'cloud'].map((type) => ({ id: type, type, x: 0, y: 0, w: 10, h: 10, flip: true })),
+    })!
+    expect(s.elements.map((e) => [e.type, (e as ShapeEl).flip])).toEqual([
+      ['triangle', true],
+      ['parallelogram', true],
+      ['hexagon', false],
+      ['cloud', false],
+    ])
   })
 
   it('keep pictures only as data:image URLs', () => {

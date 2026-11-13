@@ -89,6 +89,58 @@ export function sketchEllipse(cx: number, cy: number, rx: number, ry: number, se
   return d
 }
 
+/** A sketchy part of an ellipse from angle a0 to a1 (radians, y down), drawn twice. */
+export function sketchArc(cx: number, cy: number, rx: number, ry: number, a0: number, a1: number, seed: number, amount = 2): string {
+  const rnd = random(seed)
+  const n = Math.max(3, Math.ceil(Math.abs(a1 - a0) / (Math.PI / 6)))
+  let d = ''
+  for (let pass = 0; pass < 2; pass++) {
+    const pts: Pt[] = []
+    for (let i = 0; i <= n; i++) {
+      const t = a0 + ((a1 - a0) * i) / n
+      const k = 1 + (rnd() - 0.5) * (amount / Math.max(8, Math.min(rx, ry)))
+      pts.push([cx + Math.cos(t) * rx * k, cy + Math.sin(t) * ry * k])
+    }
+    d += smooth(pts)
+  }
+  return d
+}
+
+/** A bump of a cloud: part of an ellipse from angle a0 to a1 (radians, y down). */
+export interface Bump {
+  cx: number
+  cy: number
+  rx: number
+  ry: number
+  a0: number
+  a1: number
+}
+
+/**
+ * Sketchy bumps (a cloud), drawn twice: each bump its own slightly uneven
+ * stroke that runs a little past the dips, so they meet like pen strokes.
+ */
+export function sketchBumps(bumps: readonly Bump[], seed: number, amount = 2): string {
+  const rnd = random(seed)
+  let d = ''
+  for (let pass = 0; pass < 2; pass++) {
+    for (const b of bumps) {
+      const over = (b.a1 - b.a0) * 0.06
+      const a0 = b.a0 - over * rnd()
+      const a1 = b.a1 + over * rnd()
+      const pts: Pt[] = []
+      const n = 6
+      for (let i = 0; i <= n; i++) {
+        const t = a0 + ((a1 - a0) * i) / n
+        const k = 1 + (rnd() - 0.5) * (amount / Math.max(8, Math.min(b.rx, b.ry)))
+        pts.push([b.cx + Math.cos(t) * b.rx * k, b.cy + Math.sin(t) * b.ry * k])
+      }
+      d += smooth(pts)
+    }
+  }
+  return d
+}
+
 /** A smooth path through points (Catmull-Rom as cubic Béziers). */
 export function smooth(points: readonly Pt[]): string {
   if (points.length === 0) return ''
