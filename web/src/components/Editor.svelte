@@ -14,12 +14,62 @@
   import { findAnchor, makeAnchor } from '../lib/anchors'
   import { isDrawingPath } from '../lib/drawing/paths'
   import { strings } from '../lib/strings'
+  import { router } from '../lib/router.svelte'
+  import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
+  import Icon from './Icon.svelte'
+  import type { InsertKind } from '../lib/editor/markdownInsert'
 
   /** visible: false while the reading view is shown (the editor stays open). */
   let { session, visible = true }: { session: NoteSession; visible?: boolean } = $props()
 
   let host: HTMLDivElement | undefined = $state()
   let handle = $state.raw<EditorHandle | null>(null)
+  /** Where the right-click menu opened. */
+  let menu = $state<{ x: number; y: number } | null>(null)
+  const m = strings.insertMenu
+
+  function insert(kind: InsertKind) {
+    menu = null
+    handle?.insertMarkdown(kind)
+  }
+
+  async function clipboard(what: 'cut' | 'copy' | 'paste') {
+    const view = handle?.view
+    if (!view) return
+    const sel = view.state.selection.main
+    try {
+      if (what === 'paste') {
+        const text = await navigator.clipboard.readText()
+        view.dispatch(view.state.replaceSelection(text), { userEvent: 'input.paste', scrollIntoView: true })
+      } else {
+        await navigator.clipboard.writeText(view.state.sliceDoc(sel.from, sel.to))
+        if (what === 'cut') view.dispatch({ changes: { from: sel.from, to: sel.to }, userEvent: 'delete.cut' })
+      }
+    } catch {
+      if (what === 'paste') app.toast(m.pasteFailed)
+    }
+    view.focus()
+  }
+
+  const blocks: [InsertKind, MenuItem['icon']][] = [
+    ['bullet', 'list-bullet'],
+    ['numbered', 'list-numbered'],
+    ['task', 'task'],
+    ['quote', 'quote'],
+    ['codeblock', 'code'],
+    ['table', 'table'],
+    ['rule', 'rule'],
+  ]
+  const menuItems = $derived.by((): MenuItem[] => {
+    const empty = !handle || handle.view.state.selection.main.empty
+    void menu
+    const items: MenuItem[] = blocks.map(([kind, icon]) => ({ label: m[kind], icon, action: () => insert(kind) }))
+    if (!empty) items.push({ label: m.cut, icon: 'cut', separator: true, action: () => void clipboard('cut') })
+    if (!empty) items.push({ label: m.copy, icon: 'copy', action: () => void clipboard('copy') })
+    items.push({ label: m.paste, icon: 'paste', separator: empty, action: () => void clipboard('paste') })
+    items.push({ label: m.cheatSheet, icon: 'book', separator: true, action: () => router.goTutorials('markdown') })
+    return items
+  })
 
   onMount(() => {
     if (!host) return
@@ -49,6 +99,7 @@
       },
       onVimMode: (mode) => (editorStatus.vimMode = mode),
       onFiles: (files, pos) => void embedFiles(files, pos),
+      onContextMenu: (x, y) => (menu = { x, y }),
       comments: {
         label: strings.comments.add,
         comment: (from, to) => {
@@ -187,9 +238,63 @@
   bind:this={host}
 ></div>
 
+{#snippet tools()}
+  <div class="md-tools" role="group" aria-label={m.label}>
+    <button type="button" class="tool" title={m.h1} aria-label={m.h1} onclick={() => insert('h1')}>H1</button>
+    <button type="button" class="tool" title={m.h2} aria-label={m.h2} onclick={() => insert('h2')}>H2</button>
+    <button type="button" class="tool" title={m.h3} aria-label={m.h3} onclick={() => insert('h3')}>H3</button>
+    <span class="gap"></span>
+    <button type="button" class="tool bold" title={m.bold} aria-label={m.bold} onclick={() => insert('bold')}>B</button>
+    <button type="button" class="tool italic" title={m.italic} aria-label={m.italic} onclick={() => insert('italic')}>I</button>
+    <button type="button" class="tool mono" title={m.code} aria-label={m.code} onclick={() => insert('code')}>{'</>'}</button>
+    <span class="gap"></span>
+    <button type="button" class="tool" title={m.link} aria-label={m.link} onclick={() => insert('link')}><Icon name="link" size={15} /></button>
+    <button type="button" class="tool mono" title={m.synapse} aria-label={m.synapse} onclick={() => insert('synapse')}>[[ ]]</button>
+  </div>
+{/snippet}
+
+{#if menu}
+  <ContextMenu x={menu.x} y={menu.y} items={menuItems} onclose={() => (menu = null)} header={tools} />
+{/if}
+
 <style>
   .editor-host {
     height: 100%;
     min-height: 0;
+  }
+  .md-tools {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .gap {
+    width: 6px;
+  }
+  .tool {
+    display: grid;
+    place-items: center;
+    min-width: 28px;
+    height: 28px;
+    padding: 0 6px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .tool:hover,
+  .tool:focus-visible {
+    background: var(--bg-hover);
+    outline: none;
+  }
+  .italic {
+    font-style: italic;
+    font-weight: 500;
+  }
+  .mono {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
   }
 </style>

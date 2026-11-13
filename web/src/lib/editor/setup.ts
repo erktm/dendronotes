@@ -1,6 +1,6 @@
 // Builds the CodeMirror editor for a note.
 
-import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
+import { autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap, startCompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { indentOnInput, syntaxHighlighting } from '@codemirror/language'
@@ -17,6 +17,7 @@ import { presence, setPeers, type PeerCursor } from './presence'
 import { languages } from '@codemirror/language-data'
 import { codeHighlighter } from '../codeHighlight'
 import { inlineTitle, setTitle as setTitleEffect, type TitleSpec } from './inlineTitle'
+import { type InsertKind, markdownInsert } from './markdownInsert'
 import { commentExtension, commentPositions, setCommentRanges, type CommentHost, type CommentRange } from './comments'
 import { SynapseSyntax } from './synapseSyntax'
 
@@ -45,6 +46,8 @@ export interface EditorOptions {
   onFiles: (files: File[], pos: number) => void
   /** Commenting on selected text, and threads clicked in the text. */
   comments: CommentHost
+  /** A right-click in the text (not with Shift, which keeps the browser's menu). */
+  onContextMenu?: (x: number, y: number) => void
 }
 
 export interface EditorHandle {
@@ -73,6 +76,8 @@ export interface EditorHandle {
   remeasure(): void
   /** The note's title above the text (see inlineTitle.ts). */
   setTitle(spec: TitleSpec): void
+  /** Puts common Markdown at the selection (the right-click menu). */
+  insertMarkdown(kind: InsertKind): void
   destroy(): void
 }
 
@@ -213,6 +218,17 @@ export function createEditor(parent: HTMLElement, o: EditorOptions): EditorHandl
         o.onFiles(files, view.state.selection.main.head)
         return true
       },
+      // The right-click menu inserts Markdown where the click was (or at the
+      // selection, when the click is inside it).
+      contextmenu(event, view) {
+        if (event.shiftKey || view.state.readOnly || !o.onContextMenu) return false
+        event.preventDefault()
+        const pos = view.posAtCoords({ x: event.clientX, y: event.clientY })
+        const sel = view.state.selection.main
+        if (pos !== null && (pos < sel.from || pos > sel.to)) view.dispatch({ selection: { anchor: pos } })
+        o.onContextMenu(event.clientX, event.clientY)
+        return true
+      },
       drop(event, view) {
         const files = [...(event.dataTransfer?.files ?? [])]
         if (files.length === 0 || view.state.readOnly) return false
@@ -268,6 +284,13 @@ export function createEditor(parent: HTMLElement, o: EditorOptions): EditorHandl
     },
     focus() {
       view.focus()
+    },
+    insertMarkdown(kind) {
+      if (view.state.readOnly) return
+      view.dispatch({ ...markdownInsert(view.state, kind), userEvent: 'input', scrollIntoView: true })
+      view.focus()
+      // A synapse offers the notes at once.
+      if (kind === 'synapse') startCompletion(view)
     },
     insertAt(pos, text) {
       const at = Math.min(Math.max(pos, 0), view.state.doc.length)

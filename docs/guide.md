@@ -20,7 +20,9 @@ Files in a soma remain plain, Obsidian-compatible Markdown; the wiki link syntax
 
 - **Edit and Read.** The editor renders Markdown as you type (live preview); the line with
   the cursor shows its syntax. The reading view shows the finished note. Switch with the
-  toggle in the top bar or ⌘E / Ctrl+E.
+  toggle in the top bar or ⌘E / Ctrl+E. A right-click in the text inserts headings, bold and
+  italic text, code, links, synapses, lists, tasks, quotes, code blocks, tables and lines, so
+  you need not know the syntax; Shift with a right-click keeps the browser's own menu.
 - **Synapses.** Type `[[` for suggestions from the soma, and `[[Note#` for the headings of
   that note (`[[#` for this note's own). Click a synapse to open the note;
   in the editor, on the line you are editing, hold ⌘ / Ctrl while clicking. A synapse whose
@@ -159,8 +161,8 @@ Alt-drag moves a copy.
 GitHub; the sign-in page links there too.
 
 **Tutorials** (the book above the settings in the left rail): short step-by-step guides to
-the essentials: the first note, synapses, the file tree, drawings, working together, links,
-search and export.
+the essentials (the first note, synapses, the file tree, drawings, working together, links,
+search and export) and a Markdown cheat sheet.
 
 **Settings** (stored in the browser, never in the soma): live preview, Vim key bindings,
 readable line length, note font (sans or serif), theme (system, light, dark), color palette,

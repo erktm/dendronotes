@@ -41,7 +41,7 @@
     <article aria-labelledby="topic-title">
       <h2 id="topic-title">{topic.title}</h2>
       <p class="summary">{topic.summary}</p>
-      <ol class="steps">
+      <ol class="steps" class:none={topic.steps.length === 0}>
         {#each topic.steps as step, i (i)}
           <li>
             <span class="step-num" aria-label={t.stepOf(i + 1, topic.steps.length)}>{i + 1}</span>
@@ -49,6 +49,18 @@
           </li>
         {/each}
       </ol>
+      {#if 'rows' in topic && topic.rows}
+        <table class="sheet">
+          <tbody>
+            {#each topic.rows as [syntax, meaning] (syntax)}
+              <tr>
+                <td><code>{syntax}</code></td>
+                <td>{meaning}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      {/if}
       {#if 'tip' in topic && topic.tip}
         <aside class="tip"><strong>{t.tip}:</strong> {@render rich(topic.tip)}</aside>
       {/if}
@@ -161,6 +173,12 @@
     padding: 0;
     list-style: none;
   }
+  .steps.none {
+    display: none;
+  }
+  .sheet:first-of-type {
+    margin-top: var(--space-4);
+  }
   .steps li {
     display: flex;
     align-items: flex-start;
@@ -178,6 +196,28 @@
     font-family: var(--font-mono);
     font-size: 0.88em;
     white-space: nowrap;
+  }
+  .sheet {
+    width: 100%;
+    margin-bottom: var(--space-4);
+    border-collapse: collapse;
+    font-size: var(--text-sm);
+  }
+  .sheet td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  .sheet td:first-child {
+    width: 38%;
+    white-space: nowrap;
+  }
+  .sheet code {
+    padding: 2px 6px;
+    border-radius: 5px;
+    background: var(--bg-sunken);
+    font-family: var(--font-mono);
+    font-size: 0.92em;
   }
   .tip {
     padding: 12px 14px;
