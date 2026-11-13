@@ -184,6 +184,18 @@ up to `DENDRONOTES_MAX_UPLOAD_MB`. The content must match the extension.
 - **Profile** (your picture at the top right, which also signs you out): profile picture,
   display name, e-mail and, for accounts with a password, a new password. Changing it signs
   out your other sessions.
+- **E-mail** (when the server has an SMTP relay, see [installation](installation.md#e-mail)):
+  - With an address in your profile you get an e-mail when someone shares a soma with you, and
+    one when a mention or a reply to your comments is still unread after a few minutes. Several
+    at once come as one e-mail. Who reads them in dendronotes in time gets no e-mail. Both
+    can be turned off under *E-mail notifications* in the profile.
+  - Security notices always come: when your password was changed (by you, an admin or a
+    reset link), when an API token was created for you, and when your e-mail address was
+    changed (to the old address).
+  - *Forgot password?* on the sign-in page sends a link to set a new password to the address
+    of your account. It works once and for one hour; afterwards all your sessions end. Only
+    accounts that sign in with a password of their own in dendronotes get one (not single
+    sign-on or directory accounts).
 - **Profile pictures**: design one from a color, a pattern (dendrite, myelin rings, vesicles)
   and your initials, or upload a photo and place it in a circle. The browser crops the photo to
   a small square; the server stores it in `state.db`, encoded anew without metadata, and shows
@@ -192,7 +204,9 @@ up to `DENDRONOTES_MAX_UPLOAD_MB`. The content must match the extension.
 - **Administration** (the shield in the left rail, admins only):
   - *Users*: create accounts, change role, disable, set a new password, sign out everywhere,
     delete. A deleted account's somas go to an account you choose or to the trash. The last
-    admin can be neither demoted, disabled nor deleted.
+    admin can be neither demoted, disabled nor deleted. With e-mail configured, *Send a welcome
+    e-mail* tells a new account its user name; leave the password empty and the e-mail carries
+    a link (valid for 7 days) to choose one.
   - *Groups*: create, rename and delete groups and choose their members. The group
     *Everyone* is built in and contains every account, also future ones; share a soma with it
     to open it to the whole server. Groups taken over from Active Directory are marked as such;
@@ -202,8 +216,9 @@ up to `DENDRONOTES_MAX_UPLOAD_MB`. The content must match the extension.
     to another owner or delete it.
   - *Sessions*: who is signed in from where; end single sessions.
   - *Server*: version, uptime, storage, open somas, a backup download, whether the OpenID
-    Connect provider and the directory are reachable, and the effective configuration
-    (secrets show only whether they are set).
+    Connect provider and the directory are reachable, the e-mail relay with waiting messages,
+    the last error and a test e-mail, and the effective configuration (secrets show only
+    whether they are set).
   - *Audit log*: sign-ins (failed ones too), account and soma changes.
 
 Disabling an account, setting its password or ending its sessions takes effect at once; open

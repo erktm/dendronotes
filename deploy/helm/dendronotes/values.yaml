@@ -49,6 +49,21 @@ auth:
   # existingSecret set ldapBindPasswordKey instead.
   ldapBindPassword: ""
   ldapBindPasswordKey: ""
+  # Password at the SMTP relay (key smtp-password; Mailjet: the secret key);
+  # with existingSecret set smtpPasswordKey instead.
+  smtpPassword: ""
+  smtpPasswordKey: ""
+
+# E-mail through an SMTP relay: shared somas, unread mentions and replies,
+# security notices, welcome e-mails and "forgot password". Off while host is
+# empty; needs DENDRONOTES_PUBLIC_URL in config.
+mail:
+  host: ""          # e.g. in-v3.mailjet.com
+  port: 587
+  tls: starttls     # starttls, tls (implicit, port 465) or none
+  username: ""      # Mailjet: the API key
+  from: ""          # e.g. "dendronotes <no-reply@example.org>"
+  digestDelay: 10m  # how long a mention may stay unread before it is mailed
 
 persistence:
   # The notes: one folder per soma. Plain files; back them up as such.

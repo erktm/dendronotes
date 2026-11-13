@@ -13,6 +13,9 @@ DEV_PASSWORD := $(CURDIR)/dev/password
 # dev/soma (the single soma of earlier versions) becomes the admin's first soma.
 DEV_ENV       = DENDRONOTES_SOMAS_DIR=$(DEV_SOMAS) DENDRONOTES_SOMA_DIR=$(DEV_SOMA) DENDRONOTES_DATA_DIR=$(DEV_DATA) \
                 DENDRONOTES_ADMIN_PASSWORD_FILE=$(DEV_PASSWORD) DENDRONOTES_LOG_FORMAT=text DENDRONOTES_LOG_LEVEL=debug
+# Optional e-mail settings for development (DENDRONOTES_SMTP_*, DENDRONOTES_MAIL_*,
+# DENDRONOTES_PUBLIC_URL=http://localhost:5173); dev/ is not committed.
+DEV_MAIL_ENV  = if [ -f dev/mail.env ]; then set -a; . ./dev/mail.env; set +a; echo "e-mail settings from dev/mail.env"; fi;
 
 NPM_DEPS := web/node_modules/.package-lock.json
 
@@ -55,13 +58,13 @@ dev-ports:
 	done
 
 dev: $(NPM_DEPS) dev-ports dev-setup ## Run Go server (:8080) and Vite dev server (:5173) together
-	@trap 'kill 0' INT TERM EXIT; \
+	@trap 'kill 0' INT TERM EXIT; $(DEV_MAIL_ENV) \
 	  $(DEV_ENV) go run ./cmd/dendronotes & \
 	  (cd web && npm run dev) & \
 	  wait
 
 dev-api: dev-setup ## Run only the Go server with the dev soma
-	$(DEV_ENV) go run ./cmd/dendronotes
+	@$(DEV_MAIL_ENV) $(DEV_ENV) go run ./cmd/dendronotes
 
 dev-web: $(NPM_DEPS) ## Run only the Vite dev server
 	cd web && npm run dev

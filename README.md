@@ -201,6 +201,8 @@ make help         # all targets
 
 `make dev` creates a random password for the account `admin` in `dev/password` on first start
 and prints it.
+To try e-mail in development, put the `DENDRONOTES_SMTP_*` and `DENDRONOTES_MAIL_*` settings
+and `DENDRONOTES_PUBLIC_URL=http://localhost:5173` into `dev/mail.env`; `make dev` reads it.
 
 ## License
 

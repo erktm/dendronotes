@@ -55,6 +55,10 @@ app.kubernetes.io/component: server
 {{- if .Values.auth.existingSecret }}{{ .Values.auth.oidcClientSecretKey }}{{ else if .Values.auth.oidcClientSecret }}oidc-client-secret{{ end }}
 {{- end }}
 
+{{- define "dendronotes.smtpKey" -}}
+{{- if .Values.auth.existingSecret }}{{ .Values.auth.smtpPasswordKey }}{{ else if .Values.auth.smtpPassword }}smtp-password{{ end }}
+{{- end }}
+
 {{- define "dendronotes.ldapKey" -}}
 {{- if .Values.auth.existingSecret }}{{ .Values.auth.ldapBindPasswordKey }}{{ else if .Values.auth.ldapBindPassword }}ldap-bind-password{{ end }}
 {{- end }}

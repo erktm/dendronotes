@@ -1,6 +1,7 @@
 {{- $adminKey := include "dendronotes.adminKey" . }}
 {{- $oidcKey := include "dendronotes.oidcKey" . }}
 {{- $ldapKey := include "dendronotes.ldapKey" . }}
+{{- $smtpKey := include "dendronotes.smtpKey" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -69,6 +70,26 @@ spec:
             {{- with $ldapKey }}
             - name: DENDRONOTES_LDAP_BIND_PASSWORD_FILE
               value: /run/secrets/dendronotes/{{ . }}
+            {{- end }}
+            {{- if .Values.mail.host }}
+            - name: DENDRONOTES_SMTP_HOST
+              value: {{ .Values.mail.host | quote }}
+            - name: DENDRONOTES_SMTP_PORT
+              value: {{ .Values.mail.port | toString | quote }}
+            - name: DENDRONOTES_SMTP_TLS
+              value: {{ .Values.mail.tls | quote }}
+            {{- with .Values.mail.username }}
+            - name: DENDRONOTES_SMTP_USERNAME
+              value: {{ . | quote }}
+            {{- end }}
+            - name: DENDRONOTES_MAIL_FROM
+              value: {{ required "mail.from is required with mail.host" .Values.mail.from | quote }}
+            - name: DENDRONOTES_MAIL_DIGEST_DELAY
+              value: {{ .Values.mail.digestDelay | quote }}
+            {{- with $smtpKey }}
+            - name: DENDRONOTES_SMTP_PASSWORD_FILE
+              value: /run/secrets/dendronotes/{{ . }}
+            {{- end }}
             {{- end }}
             {{- if .Values.metrics.enabled }}
             - name: DENDRONOTES_METRICS_PORT

@@ -56,11 +56,14 @@ flowchart TB
       collab[internal/collab<br/>live documents]
     end
     hist[internal/history<br/>versions of notes]
+    mail[internal/mail<br/>templates, SMTP]
   end
+  relay[(SMTP relay)]
   ui -- JSON / SSE --> http
   http --> auth --> store
   http --> mgr --> rt
   http --> hist
+  http -- outbox in state.db --> mail --> relay
   collab --> fs
   w --> idx
   w --> hub
@@ -83,6 +86,7 @@ flowchart TB
 | `internal/drawing`, `internal/attach`, `internal/avatar` | What may be stored: drawings and icons (SVG allow list), uploads (type allow list), profile photos (re-encoded) |
 | `internal/watch`, `internal/events` | File system events and periodic rescans; fan-out of live updates to connected browsers |
 | `internal/metrics`, `internal/backup` | Prometheus text on its own port; consistent ZIP copies of `state.db` and the histories |
+| `internal/mail` | E-mail: messages from fixed templates (text and HTML), sent through an SMTP relay with STARTTLS or TLS |
 | `web/` | The Svelte 5 single-page app, built with Vite and embedded into the binary |
 
 ## Data
@@ -91,7 +95,7 @@ flowchart TB
 |-------|------|------|
 | `SOMAS_DIR/<soma>/…` | The notes, attachments and drawings (`*.drawing.svg`) | Source of truth: plain files |
 | `SOMAS_DIR/<soma>/.trash/` | Deleted files and folders (the place Obsidian uses too) | Files, records in `state.db` |
-| `DATA_DIR/state.db` | Accounts, sessions (hashed), API tokens (hashed), somas, members, groups, comments, notifications, trash records, icon library, profile photos, audit log | Not a cache: back it up |
+| `DATA_DIR/state.db` | Accounts, sessions (hashed), API tokens and password links (hashed), somas, members, groups, comments, notifications, trash records, icon library, profile photos, e-mails waiting to be sent, audit log | Not a cache: back it up |
 | `DATA_DIR/history/<soma id>.db` | Earlier versions of notes | Not a cache: back it up |
 | `DATA_DIR/index/<soma id>/index.db` | Synapses, file references, tags, full-text index | Cache: deleted, it is rebuilt |
 
@@ -99,6 +103,11 @@ flowchart TB
 migrating, the store copies the file. The index carries a schema version and is rebuilt when it
 differs. dendronotes never creates folders in a soma on its own; the only folder it manages
 there is `.trash`.
+
+E-mails never hold up a request: handlers render a message and put it into the outbox table
+of `state.db`; one worker hands the messages to the relay, retries with growing pauses and
+deletes them once sent. Every minute it also turns comment notifications that stayed unread for
+`DENDRONOTES_MAIL_DIGEST_DELAY` into one e-mail per person and marks them as handled.
 
 ## A request
 
@@ -238,6 +247,7 @@ internal/index/    SQLite cache per soma: versions, synapses, tags, full-text se
 internal/history/  earlier versions of notes, one SQLite database per soma (not a cache)
 internal/backup/   consistent copies of state.db and the histories as a ZIP
 internal/metrics/  Prometheus metrics on a port of their own
+internal/mail/     e-mail templates (text and HTML), MIME messages, the SMTP client
 internal/watch/    file system events (fsnotify) for changes made outside dendronotes
 internal/events/   fan-out of live updates to connected browsers
 internal/relink/   rewrites synapses when notes are renamed or moved

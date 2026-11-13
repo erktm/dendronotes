@@ -232,6 +232,52 @@ dendronotes speaks plain HTTP; TLS belongs to the proxy, ingress or gateway in f
 A minimal Caddy configuration does all of this: `notes.example.org { reverse_proxy
 localhost:8080 }`.
 
+## E-mail
+
+With an SMTP relay, dendronotes sends e-mails: to people a soma was shared with, about
+mentions and replies that are still unread after a while (bundled into one message), security
+notices (password changed, new API token, e-mail address changed, sent to the old address),
+welcome e-mails for accounts an admin creates, and the links of "forgot password". Without
+`DENDRONOTES_SMTP_HOST` all of this stays off and invisible. `DENDRONOTES_PUBLIC_URL` is
+required with it, for the links.
+
+An example with Mailjet (port 587 with STARTTLS; the API key is the user name, the secret key
+the password):
+
+```bash
+DENDRONOTES_PUBLIC_URL=https://notes.example.org
+DENDRONOTES_SMTP_HOST=in-v3.mailjet.com
+DENDRONOTES_SMTP_PORT=587
+DENDRONOTES_SMTP_TLS=starttls
+DENDRONOTES_SMTP_USERNAME=<API key>
+DENDRONOTES_SMTP_PASSWORD_FILE=/run/secrets/smtp-password
+DENDRONOTES_MAIL_FROM="dendronotes <no-reply@example.org>"
+```
+
+With Helm, the same goes into `mail` and the password into the Secret:
+
+```yaml
+mail:
+  host: in-v3.mailjet.com
+  username: <API key>
+  from: "dendronotes <no-reply@example.org>"
+auth:
+  smtpPassword: <secret key>   # or existingSecret with smtpPasswordKey: smtp-password
+```
+
+The relay must accept the sender: confirm the address or the whole domain at your provider and
+publish its SPF and DKIM records in DNS, otherwise the messages are refused or end up as spam.
+Other relays work the same way; `DENDRONOTES_SMTP_TLS=tls` is for implicit TLS (port 465),
+`none` only for a relay without a password in your own network.
+
+Messages wait in an outbox in `state.db` until the relay took them; failed attempts are
+repeated after 1, 5 and 30 minutes, then hourly, and given up after a day (or at once when the
+relay refuses a recipient for good). Sent messages are deleted. *Admin → Server → E-mail* shows
+the relay, the waiting messages and the last error, and sends a test e-mail to your own address.
+Everyone chooses in the profile which notifications they also get by e-mail; security notices
+always go out. `DENDRONOTES_MAIL_DIGEST_DELAY` (10 minutes) sets how long a mention may stay
+unread before it is mailed.
+
 ## Operation
 
 **Backups** need both: the somas directory and what in `/data` is not a cache, namely `state.db`

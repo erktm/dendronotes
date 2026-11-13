@@ -47,6 +47,20 @@ are described under [supply chain](#supply-chain).
   result with DOMPurify (no scripts, event handlers, style attributes, forms, frames, SVG or
   `javascript:` URLs). External links open with `rel="noopener noreferrer"`. A test corpus of
   XSS payloads guards this.
+- "Forgot password" and welcome links carry a token of 256 random bits; `state.db` keeps only
+  its SHA-256. A token works once, for one hour (a welcome link for seven days), and a new one
+  ends the older ones. Only accounts that sign in with a password of their own in dendronotes
+  get one, at most every five minutes, and requests are limited per client address. The
+  answer to a request is the same whether the account exists or not. The token travels in the
+  URL fragment (`/reset-password#…`), so it never reaches a server log or a `Referer` header,
+  and the page removes it from the address bar at once. Setting the password ends every
+  session of the account and sends a security notice.
+- E-mails are rendered from fixed templates; names and comment texts are escaped in the HTML
+  part, header values with line breaks are refused, and addresses are checked before
+  sending. Passwords for the relay only travel over TLS (STARTTLS or implicit TLS with a
+  verified certificate). Messages wait in an outbox in `state.db` and are deleted once the
+  relay took them. Security notices (password, API tokens, e-mail address) cannot be turned
+  off.
 
 ## Supply chain
 
