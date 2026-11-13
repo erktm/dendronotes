@@ -37,8 +37,10 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	_ = rc.SetWriteDeadline(time.Time{})
 	h := w.Header()
 	h.Set("Content-Type", "text/event-stream")
-	h.Set("Cache-Control", "no-store")
-	h.Set("X-Accel-Buffering", "no") // nginx ingress: do not buffer the stream
+	// no-transform: proxies and CDNs (Cloudflare) must neither compress nor
+	// hold back the stream; X-Accel-Buffering does the same for nginx.
+	h.Set("Cache-Control", "no-store, no-transform")
+	h.Set("X-Accel-Buffering", "no")
 	w.WriteHeader(http.StatusOK)
 
 	send := func(e events.Event) bool {

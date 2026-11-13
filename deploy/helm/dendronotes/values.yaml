@@ -116,6 +116,11 @@ httpRoute:
   #    sectionName: https
   hostnames: []
   #  - notes.example.org
+  # Gateways such as Envoy end every request after 15 s by default, which
+  # cuts the live updates (Server-Sent Events), slow uploads and backup
+  # downloads. "0s" turns that limit off; dendronotes has its own timeouts.
+  timeouts:
+    request: "0s"
 
 resources:
   requests:

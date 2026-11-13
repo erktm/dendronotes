@@ -225,8 +225,14 @@ dendronotes speaks plain HTTP; TLS belongs to the proxy, ingress or gateway in f
   proxy's address range, so client addresses and HTTPS are recognized (cookies are then sent
   with `Secure` and the `__Host-` prefix).
 - The live updates are Server-Sent Events on `/api/somas/{soma}/events`: no buffering for that
-  path and idle reads of at least 30 seconds (a heartbeat comes every 25 seconds).
-  dendronotes sets `X-Accel-Buffering: no`, which nginx honors.
+  path, idle reads of at least 30 seconds (a heartbeat comes every 25 seconds) and no limit on
+  the whole request. dendronotes sets `X-Accel-Buffering: no` (nginx) and
+  `Cache-Control: no-transform` (CDNs such as Cloudflare must not compress or hold back the
+  stream).
+- Gateways with a total request timeout end the stream when it runs out: Envoy (also Envoy
+  Gateway and Istio) uses 15 seconds unless the route says otherwise. The Helm chart's HTTPRoute
+  sets `timeouts.request: "0s"`; do the same in a route of your own. If the status in the app
+  keeps switching to "Connecting", this is the first thing to check.
 - Uploads are limited by `DENDRONOTES_MAX_UPLOAD_MB` (25 MB); allow at least that body size.
 
 A minimal Caddy configuration does all of this: `notes.example.org { reverse_proxy

@@ -215,6 +215,10 @@ func TestEventStream(t *testing.T) {
 	if resp.StatusCode != 200 || resp.Header.Get("Content-Type") != "text/event-stream" {
 		t.Fatalf("status %d, type %q", resp.StatusCode, resp.Header.Get("Content-Type"))
 	}
+	// Proxies and CDNs must pass the stream through unchanged and at once.
+	if cc := resp.Header.Get("Cache-Control"); !strings.Contains(cc, "no-transform") || resp.Header.Get("X-Accel-Buffering") != "no" {
+		t.Errorf("stream headers: Cache-Control %q, X-Accel-Buffering %q", cc, resp.Header.Get("X-Accel-Buffering"))
+	}
 	lines := bufio.NewScanner(resp.Body)
 	readUntil := func(prefix string) string {
 		t.Helper()
