@@ -10,6 +10,7 @@ which a test keeps in sync with the server.
 | `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | Session handling         |
 | `GET /api/auth/banners`, `GET /api/me/banners`, `POST /api/me/banners/{id}/dismiss` | Banners on the sign-in page and in the app; closing one |
 | `POST /api/auth/password/forgot`, `POST /api/auth/password/reset` | "Forgot password": a link by e-mail; setting a password with its token (also from welcome e-mails) |
+| `POST /api/auth/signup`, `POST /api/auth/signup/confirm` | Sign up (when allowed): a link to confirm by e-mail, then the account with a first soma |
 | `PATCH /api/me`, `POST /api/me/password` | Own profile (with the e-mail notifications) and password |
 | `PUT /api/me/avatar`, `PUT`/`DELETE /api/me/avatar/photo`, `GET /api/users/{id}/avatar` | Profile picture: design, photo |
 | `GET /api/somas`, `POST /api/somas`     | The account's somas; create one                      |
@@ -46,7 +47,7 @@ which a test keeps in sync with the server.
 | `DELETE /api/somas/{soma}/membership`   | Leave a soma shared with you personally              |
 | `GET /api/users/search?q=`              | Find people to share with (two characters or more)   |
 | `GET /api/auth/methods`, `/api/auth/oidc/login`, `/api/auth/oidc/callback` | Sign-in options and the OpenID Connect flow |
-| `/api/admin/users`, `/groups`, `/somas`, `/banners`, `/sessions`, `/server`, `/sso/check`, `/mail/test`, `/audit` | Administration (admins only) |
+| `/api/admin/users`, `/groups`, `/somas`, `/banners`, `/signup`, `/sessions`, `/server`, `/sso/check`, `/mail/test`, `/audit` | Administration (admins only) |
 
 **Personal API tokens** (profile → *API tokens*) let scripts use the API as their account:
 "Read" tokens only read, "Read and write" tokens also change notes and files. No token manages

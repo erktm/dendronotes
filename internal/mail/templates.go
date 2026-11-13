@@ -23,10 +23,15 @@ const (
 	KindWelcome         = "welcome"
 	KindReset           = "reset"
 	KindTest            = "test"
+	KindSignupConfirm   = "signup-confirm"
+	KindSignupExists    = "signup-exists"
 )
 
 // Kinds lists every kind (the renderer parses them all at start).
-var Kinds = []string{KindShared, KindDigest, KindPasswordChanged, KindTokenCreated, KindEmailChanged, KindWelcome, KindReset, KindTest}
+var Kinds = []string{
+	KindShared, KindDigest, KindPasswordChanged, KindTokenCreated, KindEmailChanged, KindWelcome, KindReset, KindTest,
+	KindSignupConfirm, KindSignupExists,
+}
 
 // Data fills the templates. Common fields come first; the others belong to
 // single kinds. Everything is escaped in the HTML part.
@@ -45,7 +50,7 @@ type Data struct {
 	TokenName, Scope string // token-created
 	NewEmail         string // email-changed
 	SetPasswordURL   string // welcome (optional)
-	Expires          string // welcome, reset
+	Expires          string // welcome, reset, signup-confirm
 	Host             string // test
 
 	Subject string // set by Render for the HTML title

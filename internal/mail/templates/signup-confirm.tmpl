@@ -1,0 +1,7 @@
+{{define "subject"}}Confirm your dendronotes account{{end}}
+{{define "button"}}Confirm your account{{end}}
+{{define "text"}}Someone, hopefully you, signed up for a dendronotes account with this address and the user name {{.Username}}. Confirm it with the link below to create the account. The link is valid for {{.Expires}} and works once.
+
+If this was not you, ignore this email: no account is created.{{end}}
+{{define "html"}}<p style="margin:0 0 12px;">Someone, hopefully you, signed up for a dendronotes account with this address and the user name <strong>{{.Username}}</strong>. Confirm it with the button below to create the account. The link is valid for {{.Expires}} and works once.</p>
+<p style="margin:0;">If this was not you, ignore this email: no account is created.</p>{{end}}

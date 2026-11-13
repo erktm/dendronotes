@@ -4,6 +4,7 @@
   import Login from './components/Login.svelte'
   import Logo from './components/Logo.svelte'
   import ResetPassword from './components/ResetPassword.svelte'
+  import ConfirmAccount from './components/ConfirmAccount.svelte'
   import Shell from './components/Shell.svelte'
   import Toasts from './components/Toasts.svelte'
   import { app } from './lib/state/app.svelte'
@@ -13,10 +14,11 @@
   // The page of reset and welcome links works without (and apart from) a
   // session, and so does the page of a public link (/p/<token>).
   const resetPage = location.pathname === RESET_PATH
+  const confirmPage = location.pathname === '/confirm-account'
   const publicToken = /^\/p\/([A-Za-z0-9_-]{32,64})\/?$/.exec(location.pathname)?.[1] ?? ''
 
   onMount(() => {
-    if (!resetPage && !publicToken) void app.init()
+    if (!resetPage && !confirmPage && !publicToken) void app.init()
   })
 </script>
 
@@ -27,6 +29,8 @@
   {/await}
 {:else if resetPage}
   <ResetPassword />
+{:else if confirmPage}
+  <ConfirmAccount />
 {:else if app.auth === 'checking'}
   <div class="splash" aria-label={strings.app.loading}><Logo size={40} /></div>
 {:else if app.auth === 'anonymous'}

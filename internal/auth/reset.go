@@ -52,6 +52,24 @@ func (a *Authenticator) limitResets(w http.ResponseWriter, r *http.Request) bool
 	return true
 }
 
+// LimitSignup applies the limits of sign-ups: per client IP and, when an
+// address is given, per e-mail address. False means the answer was written.
+func (a *Authenticator) LimitSignup(w http.ResponseWriter, r *http.Request, email string) bool {
+	ip := a.ips.ClientIP(r).String()
+	ok, wait := a.signups.allow(ip)
+	if ok && email != "" {
+		ok, wait = a.addresses.allow(strings.ToLower(email))
+	}
+	if !ok {
+		secs := int(math.Ceil(wait.Seconds()))
+		w.Header().Set("Retry-After", strconv.Itoa(secs))
+		a.log.Warn("sign-up rate limited", "ip", ip)
+		httpx.WriteJSON(w, http.StatusTooManyRequests, map[string]any{"error": "rate_limited", "retryAfter": secs})
+		return false
+	}
+	return true
+}
+
 // LimitShared applies the per-IP limit for public share links (pages and
 // the files on them); false means the answer was written.
 func (a *Authenticator) LimitShared(w http.ResponseWriter, r *http.Request) bool {

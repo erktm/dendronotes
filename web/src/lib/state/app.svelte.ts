@@ -178,6 +178,11 @@ class App {
     this.signedIn(await api.login(username, password))
   }
 
+  /** Signs in with a confirmed sign-up (the confirmation page). */
+  async confirmSignup(token: string): Promise<void> {
+    this.signedIn(await api.confirmSignup(token))
+  }
+
   async logout(): Promise<void> {
     await this.note?.flush()
     let logoutUrl = this.logoutUrl

@@ -36,6 +36,8 @@ func (s *Server) routes() []route {
 		{"GET", "/api/auth/methods", s.auth.HandleMethods, public},
 		{"POST", "/api/auth/password/forgot", s.auth.HandleForgotPassword, public},
 		{"POST", "/api/auth/password/reset", s.auth.HandleResetPassword, public},
+		{"POST", "/api/auth/signup", s.handleSignup, public},
+		{"POST", "/api/auth/signup/confirm", s.handleConfirmSignup, public},
 		{"GET", "/api/auth/banners", s.handleLoginBanners, public},
 		{"GET", "/api/me/banners", s.handleMyBanners, signedIn},
 		{"POST", "/api/me/banners/{id}/dismiss", s.handleDismissBanner, signedIn},
@@ -114,6 +116,8 @@ func (s *Server) routes() []route {
 		{"GET", "/api/somas/{soma}/collab/pull", s.handleCollabPull, somaViewer},
 		{"POST", "/api/somas/{soma}/collab/presence", s.handleCollabPresence, somaViewer},
 
+		{"GET", "/api/admin/signup", s.handleAdminSignup, adminOnly},
+		{"PUT", "/api/admin/signup", s.handleAdminSetSignup, adminOnly},
 		{"GET", "/api/admin/users", s.handleAdminUsers, adminOnly},
 		{"POST", "/api/admin/users", s.handleAdminCreateUser, adminOnly},
 		{"PATCH", "/api/admin/users/{id}", s.handleAdminUpdateUser, adminOnly},

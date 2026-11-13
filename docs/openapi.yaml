@@ -140,6 +140,49 @@ paths:
                 type: object
                 properties:
                   banners: { type: array, items: { $ref: "#/components/schemas/ShownBanner" } }
+  /api/auth/signup:
+    post:
+      summary: Sign up for an account (when the admins allow it)
+      description: >
+        Needs e-mail and local passwords for everyone. Nothing is created yet:
+        the address gets a link to confirm (valid 24 hours). The answer is the
+        same when the address already has an account; that address then gets
+        an e-mail saying so. Limited per client address and per e-mail address.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, email, password]
+              properties:
+                username: { type: string }
+                displayName: { type: string }
+                email: { type: string }
+                password: { type: string, minLength: 10 }
+      responses:
+        "202": { description: The e-mail is on its way. }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+  /api/auth/signup/confirm:
+    post:
+      summary: Confirm a sign-up with the token from the e-mail
+      description: Creates the account with a first soma and signs it in (like a sign-in). The token works once.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [token], properties: { token: { type: string } } }
+      responses:
+        "200": { description: Signed in; the session cookie is set. }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
   /api/public/{token}:
     parameters:
       - { name: token, in: path, required: true, schema: { type: string } }
@@ -1514,6 +1557,33 @@ paths:
         "200": { description: Shared. }
         "410": { $ref: "#/components/responses/Error" }
         "429": { $ref: "#/components/responses/Error" }
+  /api/admin/signup:
+    get:
+      summary: The sign-up settings and whether this server can offer sign-ups
+      responses:
+        "200":
+          description: Settings.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SignupSettings" }
+    put:
+      summary: Open or close sign-ups and set the allowed e-mail domains
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                open: { type: boolean }
+                domains: { type: array, maxItems: 100, items: { type: string }, description: Empty means any domain. }
+      responses:
+        "200":
+          description: The stored settings.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SignupSettings" }
+        "400": { $ref: "#/components/responses/Error" }
   /api/admin/users:
     get:
       summary: All accounts (admin)
@@ -2152,6 +2222,14 @@ components:
         size: { type: integer }
         createdBy: { type: integer }
         createdAt: { type: string, format: date-time }
+    SignupSettings:
+      type: object
+      properties:
+        open: { type: boolean }
+        domains: { type: array, items: { type: string } }
+        possible: { type: boolean, description: E-mail is configured and everyone signs in with a local password. }
+        mail: { type: boolean }
+        localLogin: { type: boolean }
     ShareLink:
       type: object
       required: [id, path, kind, createdAt]

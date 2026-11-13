@@ -37,6 +37,8 @@ Kubernetes, also in an air gap.
   read yet, security notices, welcome emails and "forgot password".
 - **Banners** for announcements such as updates or maintenance, on the sign-in page and in the
   app, for everyone, the admins or a group, with an optional time window; closable or not.
+- **Sign-up** when the admins allow it, confirmed by e-mail and optionally limited to some
+  e-mail domains.
 - **Accounts and sharing**: every account has its own somas, shared with people and groups in
   five roles; sign-in with passwords, Keycloak or another OpenID Connect provider, Active
   Directory / LDAP, or an authenticating proxy; personal API tokens.

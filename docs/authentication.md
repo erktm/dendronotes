@@ -13,7 +13,17 @@ variables. Create a hash for it and pass it as a secret:
 docker run --rm -it dendronotes:<version> hash-password
 ```
 
-Further accounts are created by an admin in the administration area. People sign in with user
+Further accounts are created by an admin in the administration area, or by the people
+themselves when an admin allows it (*Administration → Server → Sign-up*, optionally limited to
+some e-mail domains). Sign-up needs e-mail (`DENDRONOTES_SMTP_HOST`) and password sign-in for
+everyone (`DENDRONOTES_LOCAL_LOGIN`, the default). The account exists only after its owner
+opened the link sent to the address (valid 24 hours, once); until then nothing is reserved.
+The answer to a sign-up is the same whether the address already has an account or not; that
+address gets an e-mail naming the existing account instead. A user name that is taken is
+reported at once (user names are visible in the app anyway). Sign-ups are rate-limited per
+client IP and per address.
+
+People sign in with user
 name or e-mail address and password (at least 10 characters) and can change the password in
 their profile. An e-mail address only works when exactly one account with a password has it.
 Passwords are stored as argon2id hashes. Sign-in attempts are rate-limited per client IP, per

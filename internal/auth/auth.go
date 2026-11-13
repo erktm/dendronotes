@@ -79,6 +79,9 @@ type Config struct {
 	OnLogin func(via string, ok bool)
 	// MailEnabled tells clients that email is configured.
 	MailEnabled bool
+	// SignupOpen reports whether people may create accounts themselves now
+	// (nil: never).
+	SignupOpen func(ctx context.Context) bool
 	// SendResetLink emails the link to reset a password (reset.go); nil
 	// turns "forgot password" off.
 	SendResetLink func(ctx context.Context, u store.User, token string)
@@ -108,6 +111,8 @@ type Authenticator struct {
 	starts    *rateLimiter // SSO sign-in attempts per client IP
 	resets    *rateLimiter // password reset requests and attempts per client IP
 	shared    *rateLimiter // requests for public share links per client IP
+	signups   *rateLimiter // sign-ups and confirmations per client IP
+	addresses *rateLimiter // sign-up e-mails per address
 	allowed   map[string]bool
 	sem       chan struct{} // bounds concurrent argon2 computations (memory)
 	dummy     *Hash         // verified for unknown users, so timing reveals nothing
@@ -129,6 +134,8 @@ func New(cfg Config, st *store.Store, ips *clientip.Resolver, log *slog.Logger) 
 		starts:    newRateLimiter(3*time.Second, 20, 20*time.Millisecond, 500),
 		resets:    newRateLimiter(30*time.Second, 10, 200*time.Millisecond, 50),
 		shared:    newRateLimiter(250*time.Millisecond, 120, 2*time.Millisecond, 2000),
+		signups:   newRateLimiter(10*time.Second, 10, 200*time.Millisecond, 50),
+		addresses: newRateLimiter(5*time.Minute, 2, time.Millisecond, 1<<30),
 		sem:       make(chan struct{}, 2),
 	}
 	enc, err := HashPassword("not a real password", cfg.HashParams)
@@ -419,13 +426,15 @@ type MethodsResponse struct {
 	} `json:"sso"`
 	// PasswordReset offers "forgot password" (email is configured).
 	PasswordReset bool `json:"passwordReset"`
+	// Signup offers creating an account (confirmed by e-mail).
+	Signup bool `json:"signup"`
 }
 
 // HandleMethods lists the ways to sign in (public).
 func (a *Authenticator) HandleMethods(w http.ResponseWriter, r *http.Request) {
 	// The password form is for local accounts and for the directory.
 	m := MethodsResponse{Mode: a.cfg.Mode, Local: a.cfg.Mode == ModeLocal && (!a.cfg.PasswordsAdminOnly || a.cfg.Directory != nil),
-		PasswordReset: a.resetEnabled()}
+		PasswordReset: a.resetEnabled(), Signup: a.signupOpen(r.Context())}
 	if a.cfg.Mode == ModeLocal && a.cfg.SSO != nil {
 		m.SSO = &struct {
 			Label string `json:"label"`
@@ -526,6 +535,17 @@ func (a *Authenticator) counted(via string, ok bool) {
 	if a.cfg.OnLogin != nil {
 		a.cfg.OnLogin(via, ok)
 	}
+}
+
+// signupOpen reports whether accounts can be created by their owners: only
+// with local passwords for everyone and when the admins opened it.
+func (a *Authenticator) signupOpen(ctx context.Context) bool {
+	return a.cfg.Mode == ModeLocal && !a.cfg.PasswordsAdminOnly && a.cfg.SignupOpen != nil && a.cfg.SignupOpen(ctx)
+}
+
+// StartSession signs in an account that just confirmed its sign-up.
+func (a *Authenticator) StartSession(w http.ResponseWriter, r *http.Request, u store.User) {
+	a.startSession(w, r, u, a.ips.ClientIP(r).String(), "signup")
 }
 
 // startSession signs an account in after its password was checked: refused

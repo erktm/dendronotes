@@ -226,6 +226,17 @@ export const deleteBanner = (id: number) => request<{ id: number }>('DELETE', `/
 /** Sends a test e-mail to the admin's own address at once. */
 export const testMail = () => request<{ ok: boolean }>('POST', '/api/admin/mail/test')
 
+export interface SignupSettings {
+  open: boolean
+  domains: string[]
+  /** E-mail is configured and everyone signs in with a password. */
+  possible: boolean
+}
+
+export const signupSettings = () => request<SignupSettings>('GET', '/api/admin/signup')
+export const setSignupSettings = (open: boolean, domains: string[]) =>
+  request<SignupSettings>('PUT', '/api/admin/signup', { body: { open, domains } })
+
 export const audit = (before = 0, limit = 100) =>
   request<{ entries: AuditEntry[] }>('GET', `/api/admin/audit?limit=${limit}${before ? `&before=${before}` : ''}`).then((r) => r.entries)
 

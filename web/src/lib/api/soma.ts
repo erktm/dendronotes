@@ -197,6 +197,8 @@ export interface AuthMethods {
   sso: { label: string } | null
   /** "Forgot password" is offered (e-mail is configured). */
   passwordReset?: boolean
+  /** People may create accounts themselves (confirmed by e-mail). */
+  signup?: boolean
 }
 
 export const authMethods = () => request<AuthMethods>('GET', '/api/auth/methods')
@@ -221,6 +223,13 @@ export const dismissBanner = (id: number) => request<{ ok: boolean }>('POST', `/
 
 /** Asks for a reset link; the answer is the same whether the account exists or not. */
 export const forgotPassword = (login: string) => request<{ ok: boolean }>('POST', '/api/auth/password/forgot', { body: { login } })
+
+/** Asks for an account: the address gets a link to confirm it. */
+export const signup = (body: { username: string; displayName: string; email: string; password: string }) =>
+  request<{ status: string }>('POST', '/api/auth/signup', { body })
+
+/** Creates the account of a confirmed sign-up and signs it in. */
+export const confirmSignup = (token: string) => request<Me>('POST', '/api/auth/signup/confirm', { body: { token } })
 
 /** Sets a password with the token from a reset or welcome e-mail. */
 export const resetPassword = (token: string, password: string) =>
