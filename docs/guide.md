@@ -35,9 +35,16 @@ Files in a soma remain plain, Obsidian-compatible Markdown; the wiki link syntax
   `#garden/beds`; case and accents are ignored. A result opens the note at the matching line.
   With an empty search field, the panel lists all tags.
 - **Tags.** `#tag` anywhere in the text (not in code) or a `tags:` list in the front matter.
+- **File tree.** Drag entries onto a folder to move them. ⌘-click (Ctrl-click) picks several
+  entries and Shift-click a range; the bar above the tree moves them to another folder or
+  deletes them together, and dragging one of them takes them all along. "Sort by" in a
+  folder's context menu (the tree's own for the top level) orders it by name, last change,
+  creation or by hand; the order is the same for everyone in the soma, and in a folder sorted
+  by hand you drag entries into place. Folders always come first.
 - **Attachments.** Paste an image or drop files into the editor: they are uploaded next to the
   note and embedded as `![[photo.png]]`. Files dropped on a folder in the tree (or picked with
-  the upload button) go into that folder. Embeds show images (`![[photo.png|300]]` sets the
+  the upload button) go into that folder; whole folders from the Finder or Explorer arrive
+  with everything in them. Embeds show images (`![[photo.png|300]]` sets the
   width), audio and video players; other files, such as PDFs, become links that open them.
   Standard Markdown works too: `![alt](photo.png)`, `[report](report.pdf)`. Clicking a file in
   the tree shows it with its size and a download button. Images from other hosts are never

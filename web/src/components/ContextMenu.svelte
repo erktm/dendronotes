@@ -6,6 +6,10 @@
     icon: IconName
     action: () => void
     danger?: boolean
+    /** One of several choices: shows a check when chosen (the icon is not shown). */
+    checked?: boolean
+    /** Starts a new group (a line above). */
+    separator?: boolean
   }
 </script>
 
@@ -73,14 +77,22 @@
   {#each items as item (item.label)}
     <button
       type="button"
-      role="menuitem"
+      role={item.checked === undefined ? 'menuitem' : 'menuitemradio'}
+      aria-checked={item.checked}
       class:danger={item.danger}
+      class:sep={item.separator}
       onclick={() => {
         onclose()
         item.action()
       }}
     >
-      <Icon name={item.icon} size={16} />
+      {#if item.checked === undefined}
+        <Icon name={item.icon} size={16} />
+      {:else if item.checked}
+        <Icon name="check" size={16} />
+      {:else}
+        <span class="blank"></span>
+      {/if}
       {item.label}
     </button>
   {/each}
@@ -118,6 +130,22 @@
   }
   .danger {
     color: var(--err);
+  }
+  .sep {
+    position: relative;
+    margin-top: 9px;
+  }
+  .sep::before {
+    position: absolute;
+    top: -5px;
+    right: 4px;
+    left: 4px;
+    border-top: 1px solid var(--line);
+    content: '';
+  }
+  .blank {
+    flex: none;
+    width: 16px;
   }
   .header {
     margin: 0 0 5px;

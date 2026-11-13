@@ -19,7 +19,8 @@ import {
 import { router } from '../router.svelte'
 import { strings } from '../strings'
 import { newNotePath, normalizePath, resolveFile, resolveSynapse } from '../synapses'
-import { buildTree } from '../tree'
+import { type FolderOrder, type Orders, type SortMode, type TreeNode, buildTree, outermost, reorder, visiblePaths } from '../tree'
+import { readDropped } from '../dropped'
 import { isDrawingPath, withDrawingExtension } from '../drawing/paths'
 import * as drawingsApi from '../api/drawings'
 import { NoteSession } from './note.svelte'
@@ -85,6 +86,9 @@ function storage(key: string, value?: string): string | null {
   }
 }
 
+/** Most files one drop from the computer uploads. */
+const MAX_DROP_FILES = 1000
+
 class App {
   auth = $state<AuthState>('checking')
   mode = $state<'local' | 'proxy'>('local')
@@ -105,7 +109,12 @@ class App {
   canEdit = $derived(this.can.write)
 
   entries = $state.raw<Entry[]>([])
-  tree = $derived(buildTree(this.entries))
+  /** How folders are sorted, for everyone with access. */
+  orders = $state.raw<Orders>({})
+  tree = $derived(buildTree(this.entries, this.orders))
+  /** Entries picked with ⌘/Ctrl- or Shift-click, to move or delete together. */
+  selected = new SvelteSet<string>()
+  private selectAnchor: string | null = null
   treeLoaded = $state(false)
   expanded = new SvelteSet<string>()
   edit = $state<TreeEdit | null>(null)
@@ -396,8 +405,15 @@ class App {
 
   async refresh(): Promise<void> {
     try {
-      this.entries = await api.getTree()
+      const t = await api.getTree()
+      this.entries = t.entries
+      this.orders = t.orders
       this.treeLoaded = true
+      // Entries gone meanwhile leave the selection.
+      if (this.selected.size) {
+        const have = new Set(t.entries.map((e) => e.path))
+        for (const p of [...this.selected]) if (!have.has(p)) this.selected.delete(p)
+      }
     } catch (err) {
       if (!(err instanceof ApiError && err.status === 401)) this.toast(errorMessage(err))
     }
@@ -458,16 +474,112 @@ class App {
     return this.moveTo(path, to)
   }
 
-  async moveInto(path: string, targetDir: string): Promise<void> {
+  async moveInto(path: string, targetDir: string): Promise<boolean> {
     if (isInside(targetDir, path)) {
       if (targetDir !== path) this.toast(strings.tree.moveIntoSelf)
-      return
+      return false
     }
     const to = join(targetDir, basename(path))
-    if (to === path) return
-    if (await this.moveTo(path, to)) {
-      if (targetDir) this.expanded.add(targetDir)
+    if (to === path) return false
+    if (!(await this.moveTo(path, to))) return false
+    if (targetDir) this.expanded.add(targetDir)
+    return true
+  }
+
+  /** Moves entries into a folder, one after another (a folder takes its own entries along). */
+  async moveMany(paths: Iterable<string>, targetDir: string): Promise<number> {
+    if (!this.may('organize')) return 0
+    const list = outermost(paths).filter((p) => dirname(p) !== targetDir)
+    if (list.length > 2) this.toast(strings.tree.moving(list.length), 'info')
+    let moved = 0
+    for (const p of list) if (await this.moveInto(p, targetDir)) moved++
+    this.clearSelection()
+    if (list.length > 1 && moved) this.toast(strings.tree.moved(moved), 'info')
+    return moved
+  }
+
+  /** Drops entries into a folder sorted by hand, in front of `before` (moving them there first). */
+  async dropInOrder(paths: readonly string[], folder: string, before: string | null): Promise<void> {
+    if (!this.may('organize')) return
+    const names: string[] = []
+    for (const p of outermost(paths)) {
+      if (dirname(p) === folder || (await this.moveInto(p, folder))) names.push(basename(p))
     }
+    this.clearSelection()
+    if (names.length) await this.placeInOrder(folder, names, before)
+  }
+
+  // --- Sorting and selection ---------------------------------------------
+
+  /** How a folder is sorted ("" is the top level). */
+  orderOf(folder: string): FolderOrder {
+    return this.orders[folder] ?? { mode: 'name' }
+  }
+
+  /** The entries of a folder as the tree shows them. */
+  childrenOf(folder: string): TreeNode[] {
+    if (folder === '') return this.tree
+    let nodes = this.tree
+    for (;;) {
+      const next = nodes.find((n) => n.type === 'dir' && isInside(folder, n.path))
+      if (!next) return []
+      if (next.path === folder) return next.children
+      nodes = next.children
+    }
+  }
+
+  /** Sorts a folder for everyone; sorting by hand starts from the order shown now. */
+  async setSort(folder: string, mode: SortMode): Promise<void> {
+    if (!this.may('organize')) return
+    await this.saveOrder(folder, mode === 'manual' ? { mode, names: this.childrenOf(folder).map((n) => n.name) } : { mode })
+  }
+
+  /** Puts entries of a folder in front of `before` (at the end when it is null), by hand. */
+  async placeInOrder(folder: string, names: readonly string[], before: string | null): Promise<void> {
+    if (!this.may('organize')) return
+    const current = this.childrenOf(folder).map((n) => n.name)
+    await this.saveOrder(folder, { mode: 'manual', names: reorder(current, names, before) })
+  }
+
+  private async saveOrder(folder: string, order: FolderOrder): Promise<void> {
+    const before = this.orders
+    // Shown at once; the change event brings the stored order to everyone.
+    const next = { ...before, [folder]: order }
+    if (order.mode === 'name') delete next[folder]
+    this.orders = next
+    try {
+      await api.setOrder(folder, order)
+    } catch (err) {
+      this.orders = before
+      this.toast(errorMessage(err))
+    }
+  }
+
+  /** ⌘/Ctrl-click: adds or removes one entry (the open note joins the first time). */
+  toggleSelected(path: string): void {
+    const open = router.notePath
+    if (this.selected.size === 0 && open && open !== path && this.entries.some((e) => e.path === open)) this.selected.add(open)
+    if (this.selected.has(path)) this.selected.delete(path)
+    else this.selected.add(path)
+    this.selectAnchor = path
+  }
+
+  /** Shift-click: every row shown between the last picked entry (or the open note) and this one. */
+  selectRange(path: string): void {
+    const rows = visiblePaths(this.tree, this.expanded)
+    const from = rows.indexOf(this.selectAnchor ?? router.notePath ?? '')
+    const to = rows.indexOf(path)
+    if (from < 0 || to < 0) {
+      this.toggleSelected(path)
+      return
+    }
+    const [a, b] = from < to ? [from, to] : [to, from]
+    for (const p of rows.slice(a, b + 1)) this.selected.add(p)
+  }
+
+  clearSelection(): void {
+    this.selected.clear()
+    this.selectAnchor = null
   }
 
   private async moveTo(from: string, to: string): Promise<boolean> {
@@ -543,6 +655,42 @@ class App {
     for (const p of [...this.expanded]) if (isInside(p, path)) this.expanded.delete(p)
     await this.refresh()
     this.toast(strings.toasts.movedToTrash(displayName(path)), 'info')
+  }
+
+  /** Moves entries to the trash after one question (a folder takes its own entries along). */
+  async removeMany(paths: Iterable<string>): Promise<void> {
+    if (!this.may('organize')) return
+    const list = outermost(paths)
+    if (list.length <= 1) {
+      if (list[0]) await this.remove(list[0])
+      this.clearSelection()
+      return
+    }
+    const ok = await this.ask({
+      title: strings.tree.deleteManyTitle(list.length),
+      message: strings.tree.deleteManyMessage(list.length),
+      confirmLabel: strings.dialogs.moveToTrash,
+      danger: true,
+    })
+    if (!ok) return
+    let done = 0
+    for (const p of list) {
+      try {
+        await api.trash(p)
+        done++
+      } catch (err) {
+        this.toast(`${displayName(p)}: ${errorMessage(err)}`)
+        continue
+      }
+      if (this.note && isInside(this.note.path, p)) {
+        this.closeNote()
+        router.go(null, true)
+      }
+      for (const e of [...this.expanded]) if (isInside(e, p)) this.expanded.delete(e)
+    }
+    this.clearSelection()
+    await this.refresh()
+    if (done) this.toast(strings.tree.movedManyToTrash(done), 'info')
   }
 
   // --- Navigation -------------------------------------------------------
@@ -625,6 +773,68 @@ class App {
     if (stored.length) this.toast(strings.files.uploaded(stored.length), 'info')
     // A single file opens right away.
     if (stored.length === 1 && files.length === 1) await this.navigate(stored[0]!)
+  }
+
+  /**
+   * Uploads what was dropped from the computer, folders included: their
+   * structure is created in folder (existing folders are used), the files go
+   * into it. Problems are collected into one message.
+   */
+  async uploadDropped(entries: readonly FileSystemEntry[], folder: string): Promise<void> {
+    if (!this.may('create')) return
+    const dropped = await readDropped(entries, MAX_DROP_FILES)
+    if (dropped.truncated) this.toast(strings.tree.tooManyFiles(MAX_DROP_FILES))
+    if (dropped.files.length > 1) this.toast(strings.files.uploading(dropped.files.length), 'info')
+    let skipped = 0
+    let reason = ''
+    const skip = (name: string, why: string) => {
+      skipped++
+      reason ||= `${name}: ${why}`
+    }
+    // Folders that could not be made: nothing goes into them.
+    const failed: string[] = []
+    const blocked = (dir: string) => failed.some((f) => isInside(dir, f))
+    let made = 0
+    for (const raw of dropped.folders) {
+      const rel = raw.normalize('NFC')
+      if (blocked(rel)) continue
+      const problem = nameProblem(basename(rel))
+      if (problem) {
+        failed.push(rel)
+        skip(rel, problem)
+        continue
+      }
+      try {
+        await api.createFolder(join(folder, rel))
+        made++
+      } catch (err) {
+        if (err instanceof ApiError && err.code === 'exists') continue
+        failed.push(rel)
+        skip(rel, errorMessage(err))
+      }
+    }
+    let stored = 0
+    for (const { dir, file } of dropped.files) {
+      const rel = dir.normalize('NFC')
+      const name = file.name.normalize('NFC')
+      if (rel && blocked(rel)) continue
+      const problem = nameProblem(name)
+      if (problem) {
+        skip(name, problem)
+        continue
+      }
+      try {
+        await api.uploadFile(join(join(folder, rel), name), file)
+        stored++
+      } catch (err) {
+        skip(name, errorMessage(err))
+      }
+    }
+    if (folder) this.expanded.add(folder)
+    for (const f of dropped.folders) if (!f.includes('/') && !blocked(f.normalize('NFC'))) this.expanded.add(join(folder, f.normalize('NFC')))
+    await this.refresh()
+    if (stored || made) this.toast(strings.tree.uploadedFolders(stored, made), 'info')
+    if (skipped) this.toast(strings.tree.skippedFiles(skipped, reason))
   }
 
   /** How a stored file is best written in a note: its name, or its path if the name is ambiguous. */

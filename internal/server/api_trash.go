@@ -46,12 +46,15 @@ func (s *Server) recordTrash(r *http.Request, somaID, p, dst string, dir bool) {
 	}
 }
 
-// follow lets what dendronotes keeps about a note or folder – history and
-// comments – go along when it moves (rename, trash, restore).
+// follow lets what dendronotes keeps about a note or folder – history,
+// comments and sort orders – go along when it moves (rename, trash, restore).
 func (s *Server) follow(rt *somas.Runtime, from, to string) {
 	rt.MoveHistory(from, to)
 	if err := s.store.MoveComments(context.Background(), rt.ID, from, to); err != nil {
 		s.log.Error("moving comments failed", "from", from, "to", to, "err", err)
+	}
+	if err := s.store.MoveFolderOrder(context.Background(), rt.ID, from, to); err != nil {
+		s.log.Error("moving sort orders failed", "from", from, "to", to, "err", err)
 	}
 }
 
@@ -60,6 +63,9 @@ func (s *Server) forget(rt *somas.Runtime, p string) {
 	rt.RemoveHistory(p)
 	if err := s.store.RemoveComments(context.Background(), rt.ID, p); err != nil {
 		s.log.Error("removing comments failed", "path", p, "err", err)
+	}
+	if err := s.store.RemoveFolderOrder(context.Background(), rt.ID, p); err != nil {
+		s.log.Error("removing sort orders failed", "path", p, "err", err)
 	}
 }
 

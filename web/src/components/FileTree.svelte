@@ -1,13 +1,18 @@
 <script lang="ts">
-  import TreeItem, { DRAG_TYPE } from './TreeItem.svelte'
+  import TreeItem, { DRAG_TYPE, droppedPaths } from './TreeItem.svelte'
   import TreeInput from './TreeInput.svelte'
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
+  import MoveDialog from './MoveDialog.svelte'
+  import Icon from './Icon.svelte'
   import { app, entryKind, type NewEntryKind } from '../lib/state/app.svelte'
+  import { droppedEntries, hasFolder } from '../lib/dropped'
   import { strings } from '../lib/strings'
-  import type { TreeNode } from '../lib/tree'
+  import { SORT_MODES, type TreeNode } from '../lib/tree'
 
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null)
   let rootDrop = $state(false)
+  /** The entries the "Move to" dialog moves. */
+  let moving = $state<string[] | null>(null)
 
   const creatingAtRoot = $derived(app.edit && app.edit.kind !== 'rename' && app.edit.parent === '' ? app.edit : null)
   const startCreate = (kind: NewEntryKind, parent: string) => app.startCreate(kind, parent)
@@ -23,6 +28,16 @@
       y = r.bottom
     }
     const items: MenuItem[] = []
+    // On a selected entry the menu is about the whole selection.
+    if (node && app.can.organize && app.selected.has(node.path) && app.selected.size > 1) {
+      const paths = [...app.selected]
+      items.push(
+        { label: strings.tree.moveTo, icon: 'folder-open', action: () => (moving = paths) },
+        { label: strings.tree.deleteMany(paths.length), icon: 'trash', danger: true, action: () => void app.removeMany(paths) },
+      )
+      menu = { x, y, items }
+      return
+    }
     const folder = node ? (node.type === 'dir' ? node.path : null) : ''
     if (folder !== null && app.can.create) {
       items.push(
@@ -42,6 +57,18 @@
         },
       )
     }
+    if (folder !== null && app.can.organize) {
+      const mode = app.orderOf(folder).mode
+      items.push(
+        ...SORT_MODES.map((m, i) => ({
+          label: strings.tree.sortModes[m]!,
+          icon: 'check' as const,
+          checked: mode === m,
+          separator: i === 0 && items.length > 0,
+          action: () => void app.setSort(folder, m),
+        })),
+      )
+    }
     if (items.length) menu = { x, y, items } // every entry changes the soma
   }
 
@@ -58,13 +85,25 @@
   function ondrop(e: DragEvent) {
     e.preventDefault()
     rootDrop = false
+    const entries = droppedEntries(e.dataTransfer)
+    if (hasFolder(entries)) {
+      void app.uploadDropped(entries, '')
+      return
+    }
     const files = [...(e.dataTransfer?.files ?? [])]
     if (files.length) {
       void app.uploadInto(files, '')
       return
     }
-    const from = e.dataTransfer?.getData(DRAG_TYPE)
-    if (from) void app.moveInto(from, '')
+    const paths = droppedPaths(e)
+    if (paths.length) void app.moveMany(paths, '')
+  }
+
+  function onkeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape' && app.selected.size) {
+      e.preventDefault()
+      app.clearSelection()
+    }
   }
 
   const empty = $derived(app.treeLoaded && app.tree.length === 0 && !creatingAtRoot)
@@ -75,13 +114,28 @@
   class:drop={rootDrop}
   role="presentation"
   oncontextmenu={(e) => openMenu(e, null)}
+  {onkeydown}
   {ondragover}
   ondragleave={(e) => {
     if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) rootDrop = false
   }}
   {ondrop}
 >
-  <ul role="tree" aria-label={strings.soma.treeLabel}>
+  {#if app.selected.size && app.can.organize}
+    <div class="selection" role="toolbar" aria-label={strings.tree.selectionLabel}>
+      <span class="count">{strings.tree.selected(app.selected.size)}</span>
+      <button type="button" title={strings.tree.moveTo} aria-label={strings.tree.moveTo} onclick={() => (moving = [...app.selected])}>
+        <Icon name="folder-open" size={16} />
+      </button>
+      <button type="button" class="danger" title={strings.tree.delete} aria-label={strings.tree.delete} onclick={() => void app.removeMany([...app.selected])}>
+        <Icon name="trash" size={16} />
+      </button>
+      <button type="button" title={strings.tree.clearSelection} aria-label={strings.tree.clearSelection} onclick={() => app.clearSelection()}>
+        <Icon name="close" size={16} />
+      </button>
+    </div>
+  {/if}
+  <ul role="tree" aria-label={strings.soma.treeLabel} aria-multiselectable={app.can.organize}>
     {#if creatingAtRoot}
       <li>
         <TreeInput
@@ -112,6 +166,10 @@
   <ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />
 {/if}
 
+{#if moving}
+  <MoveDialog paths={moving} onclose={() => (moving = null)} />
+{/if}
+
 <style>
   .tree {
     flex: 1;
@@ -122,6 +180,43 @@
   .tree.drop {
     box-shadow: inset 0 0 0 1.5px var(--accent);
     background: color-mix(in srgb, var(--accent-soft) 40%, transparent);
+  }
+  .selection {
+    position: sticky;
+    z-index: 1;
+    top: calc(-1 * var(--space-2));
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) var(--space-2);
+    padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
+    border-bottom: 1px solid var(--line);
+    background: var(--bg-raised);
+  }
+  .count {
+    flex: 1;
+    color: var(--text);
+    font-size: var(--text-sm);
+    font-weight: 550;
+  }
+  .selection button {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .selection button:hover {
+    background: var(--bg-hover);
+    color: var(--text);
+  }
+  .selection button.danger:hover {
+    color: var(--err);
   }
   ul {
     margin: 0;

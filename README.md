@@ -27,6 +27,8 @@ Kubernetes, also in an air gap.
 - **Drawings**: shapes, arrows that stick to shapes, text, freehand strokes and built-in icons
   for project management, software, cloud and networking; embedded in notes, downloadable as
   SVG or PNG.
+- **File tree** with several entries moved or deleted at once, folders sorted by name, date or
+  by hand for everyone, and whole folders dropped in from the computer.
 - **Search** across all notes with phrases and `#tags`.
 - **Comments** with `@mentions`, a **history** of every note, a **trash** with restore.
 - **Email** through any SMTP relay: somas shared with you, mentions and replies you have not

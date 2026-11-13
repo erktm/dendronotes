@@ -80,6 +80,7 @@ func (s *Server) routes() []route {
 		{"DELETE", "/api/somas/{soma}/icons/{id}", s.handleDeleteIcon, somaViewer},
 		{"POST", "/api/somas/{soma}/move", s.handleMove, somaEditor},
 		{"DELETE", "/api/somas/{soma}/entries/{path...}", s.handleTrash, somaEditor},
+		{"PUT", "/api/somas/{soma}/order", s.handleSetOrder, somaEditor},
 		{"GET", "/api/somas/{soma}/export", s.handleExport, somaViewer},
 		{"GET", "/api/somas/{soma}/comments", s.handleComments, somaViewer},
 		{"POST", "/api/somas/{soma}/comments", s.handleAddComment, somaViewer},
@@ -166,7 +167,17 @@ func (s *Server) handleTree(w http.ResponseWriter, r *http.Request) {
 		s.somaError(w, r, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"entries": entries})
+	orders, err := s.store.FolderOrders(r.Context(), rt.ID)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "internal")
+		return
+	}
+	for folder := range orders {
+		if folder == soma.TrashDir || strings.HasPrefix(folder, soma.TrashDir+"/") {
+			delete(orders, folder)
+		}
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"entries": entries, "orders": orders})
 }
 
 func (s *Server) handleReadNote(w http.ResponseWriter, r *http.Request) {

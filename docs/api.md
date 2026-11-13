@@ -14,7 +14,8 @@ which a test keeps in sync with the server.
 | `PUT /api/me/avatar`, `PUT`/`DELETE /api/me/avatar/photo`, `GET /api/users/{id}/avatar` | Profile picture: design, photo |
 | `GET /api/somas`, `POST /api/somas`     | The account's somas; create one                      |
 | `PATCH /api/somas/{soma}`, `DELETE /api/somas/{soma}` | Rename, hand over or delete a soma (owner) |
-| `GET /api/somas/{soma}/tree`            | All visible files and folders                        |
+| `GET /api/somas/{soma}/tree`            | All visible files and folders, and how folders are sorted (`orders`) |
+| `PUT /api/somas/{soma}/order`           | Sort a folder for everyone: `{"folder": …, "mode": "name"\|"modified"\|"created"\|"manual", "names": […]}` (editor) |
 | `GET /api/somas/{soma}/notes/{path}`    | Read a note (with `ETag`)                            |
 | `PUT /api/somas/{soma}/notes/{path}`    | Save a note; requires `If-Match`, `412` on conflict  |
 | `POST /api/somas/{soma}/notes/{path}`   | Create a note                                        |

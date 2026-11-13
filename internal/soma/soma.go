@@ -49,11 +49,13 @@ type Soma struct {
 
 // Entry is a file or folder in the tree.
 type Entry struct {
-	Path     string `json:"path"`
-	Type     string `json:"type"` // "file" or "dir"
-	Size     int64  `json:"size,omitempty"`
-	MTime    int64  `json:"mtime"` // Unix milliseconds
-	ReadOnly bool   `json:"readOnly,omitempty"`
+	Path  string `json:"path"`
+	Type  string `json:"type"` // "file" or "dir"
+	Size  int64  `json:"size,omitempty"`
+	MTime int64  `json:"mtime"` // Unix milliseconds
+	// When the entry was created, where the system knows it (Tree only).
+	CTime    int64 `json:"ctime,omitempty"`
+	ReadOnly bool  `json:"readOnly,omitempty"`
 }
 
 // Note is an editable text file with its content and version.
@@ -130,6 +132,8 @@ func (s *Soma) Ignored(name string) bool {
 // (no cycles), escaping symlinks are hidden.
 func (s *Soma) Tree() ([]Entry, error) {
 	out := []Entry{}
+	born := births{root: s.root}
+	defer born.close()
 	err := fs.WalkDir(s.root.FS(), ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if p == "." {
@@ -150,15 +154,15 @@ func (s *Soma) Tree() ([]Entry, error) {
 		case d.Type()&fs.ModeSymlink != 0:
 			st, err := s.root.Stat(p) // follows the link, confined to the root
 			if err == nil && st.Mode().IsRegular() {
-				out = append(out, Entry{Path: p, Type: "file", Size: st.Size(), MTime: st.ModTime().UnixMilli(), ReadOnly: true})
+				out = append(out, Entry{Path: p, Type: "file", Size: st.Size(), MTime: st.ModTime().UnixMilli(), CTime: born.of(p, st), ReadOnly: true})
 			}
 		case d.IsDir():
 			if info, err := d.Info(); err == nil {
-				out = append(out, Entry{Path: p, Type: "dir", MTime: info.ModTime().UnixMilli()})
+				out = append(out, Entry{Path: p, Type: "dir", MTime: info.ModTime().UnixMilli(), CTime: born.of(p, info)})
 			}
 		case d.Type().IsRegular():
 			if info, err := d.Info(); err == nil {
-				out = append(out, Entry{Path: p, Type: "file", Size: info.Size(), MTime: info.ModTime().UnixMilli()})
+				out = append(out, Entry{Path: p, Type: "file", Size: info.Size(), MTime: info.ModTime().UnixMilli(), CTime: born.of(p, info)})
 			}
 		}
 		return nil

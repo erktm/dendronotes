@@ -2,12 +2,15 @@ import { request } from './client'
 import type { ShareRole, SomaRole } from '../roles'
 import { encodePath } from '../paths'
 import { somaBase } from './base'
+import type { FolderOrder, Orders } from '../tree'
 
 export interface Entry {
   path: string
   type: 'file' | 'dir'
   size?: number
   mtime: number
+  /** When it was created, where the server knows it (tree only). */
+  ctime?: number
   readOnly?: boolean
 }
 
@@ -104,7 +107,12 @@ export interface Group {
 
 const file = (p: string) => `${somaBase()}/notes/${encodePath(p)}`
 
-export const getTree = () => request<{ entries: Entry[] }>('GET', `${somaBase()}/tree`).then((r) => r.entries)
+export const getTree = () =>
+  request<{ entries: Entry[]; orders?: Orders }>('GET', `${somaBase()}/tree`).then((r) => ({ entries: r.entries, orders: r.orders ?? {} }))
+
+/** Sorts a folder for everyone (editor). */
+export const setOrder = (folder: string, order: FolderOrder) =>
+  request<void>('PUT', `${somaBase()}/order`, { body: { folder, mode: order.mode, names: order.names ?? [] } })
 
 export const readNote = (path: string) => request<Note>('GET', file(path))
 

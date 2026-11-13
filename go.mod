@@ -15,6 +15,7 @@ require (
 	github.com/ncruces/go-sqlite3 v0.36.0
 	golang.org/x/crypto v0.58.0
 	golang.org/x/oauth2 v0.37.0
+	golang.org/x/sys v0.49.0
 	golang.org/x/term v0.47.0
 	golang.org/x/text v0.43.0
 	golang.org/x/time v0.16.0
@@ -26,5 +27,4 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/ncruces/go-sqlite3-wasm/v6 v6.4.35401 // indirect
 	github.com/ncruces/julianday v1.0.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
 )

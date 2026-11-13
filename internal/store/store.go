@@ -307,6 +307,14 @@ var migrations = []string{
 		dismissed_at INTEGER NOT NULL,
 		PRIMARY KEY (banner_id, user_id)
 	);`,
+	// 11: how the entries of a folder are sorted (folder '' is the top level).
+	`CREATE TABLE folder_order (
+		soma_id TEXT NOT NULL REFERENCES somas(id) ON DELETE CASCADE,
+		folder  TEXT NOT NULL,
+		mode    TEXT NOT NULL,
+		names   TEXT NOT NULL DEFAULT '[]',
+		PRIMARY KEY (soma_id, folder)
+	);`,
 }
 
 // rebuilds are the migrations (by index) that recreate a table others refer
