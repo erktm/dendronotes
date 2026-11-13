@@ -98,6 +98,9 @@ class App {
   /** E-mail is configured on the server (the profile offers its settings). */
   mailEnabled = $state(false)
   isAdmin = $derived(this.user?.role === 'admin')
+  /** The version of dendronotes (the about dialog). */
+  version = $state('')
+  aboutOpen = $state(false)
 
   /** The somas the account can open, and the one that is open. */
   somas = $state.raw<Membership[]>([])
@@ -214,6 +217,7 @@ class App {
     this.mode = me.mode
     this.logoutUrl = me.logoutUrl ?? ''
     this.mailEnabled = me.mail ?? false
+    this.version = me.version ?? ''
     this.auth = 'authenticated'
     void this.loadSomas()
   }

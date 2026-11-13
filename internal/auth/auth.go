@@ -79,6 +79,8 @@ type Config struct {
 	OnLogin func(via string, ok bool)
 	// MailEnabled tells clients that email is configured.
 	MailEnabled bool
+	// Version is dendronotes' version, told to signed-in people (the about dialog).
+	Version string
 	// SignupOpen reports whether people may create accounts themselves now
 	// (nil: never).
 	SignupOpen func(ctx context.Context) bool
@@ -393,6 +395,8 @@ type MeResponse struct {
 	LogoutURL string     `json:"logoutUrl,omitempty"`
 	// Mail tells whether email is configured (the profile offers its settings).
 	Mail bool `json:"mail"`
+	// Version of dendronotes (only for signed-in people).
+	Version string `json:"version,omitempty"`
 }
 
 // HandleMe reports who is signed in (401 if nobody).
@@ -402,7 +406,7 @@ func (a *Authenticator) HandleMe(w http.ResponseWriter, r *http.Request) {
 		a.unauthorized(w)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, MeResponse{User: id.user, Mode: a.cfg.Mode, LogoutURL: a.logoutURL(id.user), Mail: a.cfg.MailEnabled})
+	httpx.WriteJSON(w, http.StatusOK, MeResponse{User: id.user, Mode: a.cfg.Mode, LogoutURL: a.logoutURL(id.user), Mail: a.cfg.MailEnabled, Version: a.cfg.Version})
 }
 
 // logoutURL is where the browser goes after signing out of dendronotes: the
@@ -572,7 +576,7 @@ func (a *Authenticator) startSession(w http.ResponseWriter, r *http.Request, u s
 	a.counted(via, true)
 	a.log.Info("login", "ip", ip, "user", u.Username, "via", via)
 	a.store.Audit(r.Context(), store.AuditEntry{ActorID: u.ID, Actor: u.Username, Action: "login", Detail: via, IP: ip})
-	httpx.WriteJSON(w, http.StatusOK, MeResponse{User: u, Mode: a.cfg.Mode})
+	httpx.WriteJSON(w, http.StatusOK, MeResponse{User: u, Mode: a.cfg.Mode, Mail: a.cfg.MailEnabled, Version: a.cfg.Version})
 }
 
 // HandleLogout ends the session. In proxy mode it returns the URL the

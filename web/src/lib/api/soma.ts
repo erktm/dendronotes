@@ -70,6 +70,8 @@ export interface Me {
   logoutUrl?: string
   /** E-mail is configured on the server. */
   mail?: boolean
+  /** The version of dendronotes. */
+  version?: string
 }
 
 export type { ShareRole, SomaRole } from '../roles'

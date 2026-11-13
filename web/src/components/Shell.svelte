@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick, untrack } from 'svelte'
   import LinkDialog from './LinkDialog.svelte'
+  import AboutDialog from './AboutDialog.svelte'
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
   import { saveFile } from '../lib/download'
   import { markdownWithTitle } from '../lib/noteExport'
@@ -465,6 +466,10 @@
     </div>
   </main>
 </div>
+
+{#if app.aboutOpen}
+  <AboutDialog />
+{/if}
 
 {#if app.linkDialog}
   <LinkDialog path={app.linkDialog} />

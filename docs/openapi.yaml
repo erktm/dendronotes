@@ -2282,6 +2282,7 @@ components:
         mode: { type: string, enum: [local, proxy] }
         logoutUrl: { type: string }
         mail: { type: boolean, description: Email is configured. }
+        version: { type: string, description: The version of dendronotes (signed in only). }
     User:
       type: object
       properties:

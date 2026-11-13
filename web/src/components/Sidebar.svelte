@@ -121,6 +121,7 @@
 
   <footer class="foot">
     <StatusChip state={shownState} />
+    <button type="button" class="about" title={strings.about.title} onclick={() => (app.aboutOpen = true)}>{strings.about.open}</button>
     {#if app.sidebarView !== 'search' && app.can.organize}
       <button type="button" class="trash" aria-label={strings.trash.open} title={strings.trash.open} onclick={() => (app.trashOpen = true)}>
         <Icon name="trash" size={16} />
@@ -171,6 +172,16 @@
   }
   .trash {
     margin-left: auto;
+  }
+  /* A quiet text link next to the connection state. */
+  button.about {
+    width: auto;
+    padding: 0 var(--space-2);
+    color: var(--text-faint);
+    font-size: var(--text-xs);
+  }
+  button.about:hover {
+    color: var(--text);
   }
   .split {
     display: flex;

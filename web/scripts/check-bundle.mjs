@@ -13,6 +13,8 @@ const allowed = [
   // markdown-it's linkify builds "http://${host}" for bare domains in notes;
   // a template in code, never a request.
   /^https?:\/\/\$\{[\w.]+\}$/,
+  // The link to the source code in the about dialog: opened by people, never fetched.
+  /^https:\/\/github\.com\/erktm\/dendronotes$/,
 ]
 const urlPattern = /\bhttps?:\/\/[^\s"'`<>)\\]+/g
 const textFile = /\.(html|js|css|svg|json|txt|webmanifest)$/

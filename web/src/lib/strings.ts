@@ -8,6 +8,8 @@ export const brand = {
   /** The wordmark is drawn as an accented first part plus the rest. */
   wordmark: { accent: 'dendro', rest: 'notes' },
   tagline: 'Self-hosted Markdown notes',
+  /** Where the source code lives (a link people open, never fetched by the app). */
+  repository: 'https://github.com/erktm/dendronotes',
 } as const
 
 /** The platform's main modifier key, for shortcut hints. */
@@ -845,6 +847,16 @@ export const strings = {
     noEntries: 'No entries yet.',
   },
 
+  about: {
+    open: 'About',
+    title: `About ${brand.name}`,
+    version: (v: string) => `Version ${v}`,
+    text: `${brand.name} keeps your notes as plain Markdown files in folders you own, connects them with synapses, draws diagrams and lets people write together, all on your own server.`,
+    license: 'Free and open source software under the Apache License 2.0.',
+    source: 'Source code on GitHub',
+    footer: `${brand.name} is open source.`,
+    close: 'Close',
+  },
   tutorials: {
     title: 'Tutorials',
     open: 'Tutorials',

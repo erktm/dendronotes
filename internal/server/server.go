@@ -133,6 +133,7 @@ func New(cfg config.Config, log *slog.Logger, webFS fs.FS, version string) (*Ser
 		ProxyAllowed:           cfg.Auth.ProxyAllowed,
 		ProxyLogoutURL:         cfg.Auth.ProxyLogoutURL,
 		OnProvision:            s.welcome,
+		Version:                version,
 		SignupOpen: func(ctx context.Context) bool {
 			_, open := s.signupOpen(ctx)
 			return open
