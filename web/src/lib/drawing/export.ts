@@ -5,21 +5,13 @@ import type { Scheme } from './colors'
 import { measureText } from './dom'
 import type { Scene } from './scene'
 import { canvasBox, toSVG } from './svg'
+import { saveFile } from '../download'
+
+export { saveFile }
 
 /** Largest side of an exported picture in pixels. */
 const MAX_PNG = 8000
 
-/** Offers a blob as a download. */
-export function saveFile(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  document.body.append(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 2000)
-}
 
 export function svgBlob(scene: Scene): Blob {
   return new Blob([toSVG(scene, measureText())], { type: 'image/svg+xml' })

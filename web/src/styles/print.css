@@ -1,0 +1,67 @@
+/*
+ * Printing a note (Export, "Print or save as PDF"): only the title and the
+ * reading view, on white paper, across as many pages as it takes.
+ */
+
+@media print {
+  :root,
+  :root [data-palette] {
+    color-scheme: light;
+    --bg: #ffffff;
+    --bg-raised: #ffffff;
+    --bg-sunken: #f4f4f2;
+    --text: #1c1c1b;
+    --text-muted: #55554f;
+    --text-faint: #77776f;
+    --line: #d9d9d4;
+    --code-bg: #f4f4f2;
+  }
+  html,
+  body {
+    height: auto !important;
+    background: #ffffff !important;
+  }
+  .rail,
+  .sidebar-slot,
+  .scrim,
+  .topbar,
+  .panel,
+  .statusbar,
+  .banners,
+  .toasts,
+  .comment-on,
+  .edit {
+    display: none !important;
+  }
+  .frame,
+  .frame-main,
+  .shell,
+  .main,
+  .workspace,
+  .content,
+  .note,
+  .scroll {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+  .note-title.in-reading,
+  .reading {
+    max-width: none;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .note-title.in-reading {
+    padding-top: 0;
+  }
+  .reading {
+    padding-bottom: 0;
+  }
+  .reading :is(pre, table, img, svg, blockquote, .drawing-embed) {
+    break-inside: avoid;
+  }
+  .reading :is(h1, h2, h3, h4) {
+    break-after: avoid;
+  }
+}

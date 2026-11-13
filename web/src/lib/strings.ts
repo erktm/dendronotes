@@ -32,6 +32,12 @@ export const strings = {
     hideDetails: 'Hide details panel',
   },
 
+  exportNote: {
+    open: 'Export note',
+    markdown: 'Download as Markdown',
+    print: 'Print or save as PDF',
+  },
+
   editor: {
     toggleTask: 'Toggle task',
     openSynapseHint: `${modKey}click to open`,

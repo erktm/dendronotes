@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { untrack } from 'svelte'
+  import { tick, untrack } from 'svelte'
+  import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
+  import { saveFile } from '../lib/download'
+  import { markdownWithTitle } from '../lib/noteExport'
   import Rail from './Rail.svelte'
   import Sidebar from './Sidebar.svelte'
   import NoteView from './NoteView.svelte'
@@ -165,6 +168,47 @@
   /** An editable note is open (not loading, missing or an attachment). */
   const noteReady = $derived(app.note?.status === 'ready')
 
+  // --- Export: Markdown with the title on top, or the reading view printed
+  let exportMenu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null)
+
+  function openExport(e: MouseEvent) {
+    const note = app.note
+    if (!note) return
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    exportMenu = {
+      x: r.right - 220,
+      y: r.bottom + 6,
+      items: [
+        { label: strings.exportNote.markdown, icon: 'download', action: () => downloadMarkdown() },
+        { label: strings.exportNote.print, icon: 'note', action: () => void printNote() },
+      ],
+    }
+  }
+
+  function downloadMarkdown() {
+    const note = app.note
+    if (!note) return
+    const title = displayName(note.path)
+    saveFile(new Blob([markdownWithTitle(title, note.content)], { type: 'text/markdown;charset=utf-8' }), `${title}.md`)
+  }
+
+  /** Prints the reading view (title, text, drawings); the browser saves it as PDF. */
+  async function printNote() {
+    const note = app.note
+    if (!note) return
+    const view = settings.view
+    const title = document.title
+    settings.view = 'read'
+    // The PDF is named after the page title.
+    document.title = displayName(note.path)
+    await tick()
+    // Drawings and code colors are drawn after the text.
+    await new Promise((r) => setTimeout(r, 500))
+    window.print()
+    document.title = title
+    settings.view = view
+  }
+
   // One panel beside the note at a time: comments take the place of the
   // details (outline, synapses) while they are open.
   const detailsShown = $derived(settings.showDetails && !app.commentsOpen)
@@ -328,6 +372,16 @@
           <button
             type="button"
             class="icon-btn"
+            aria-label={strings.exportNote.open}
+            title={strings.exportNote.open}
+            aria-haspopup="menu"
+            onclick={openExport}
+          >
+            <Icon name="download" size={18} />
+          </button>
+          <button
+            type="button"
+            class="icon-btn"
             aria-label={strings.history.open}
             title={strings.history.open}
             onclick={() => (app.historyOpen = true)}
@@ -378,6 +432,10 @@
     </div>
   </main>
 </div>
+
+{#if exportMenu}
+  <ContextMenu x={exportMenu.x} y={exportMenu.y} items={exportMenu.items} onclose={() => (exportMenu = null)} />
+{/if}
 
 <ConfirmDialog />
 <PromptDialog />

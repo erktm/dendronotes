@@ -7,6 +7,7 @@ import './styles/base.css'
 import './styles/editor.css'
 import './styles/admin.css'
 import './styles/drawing.css'
+import './styles/print.css'
 
 import { mount } from 'svelte'
 import App from './App.svelte'
