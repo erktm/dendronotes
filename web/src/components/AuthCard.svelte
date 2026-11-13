@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
+  import LoginBanners from './LoginBanners.svelte'
   import Logo from './Logo.svelte'
   import Wordmark from './Wordmark.svelte'
 
@@ -8,6 +9,7 @@
 </script>
 
 <main class="screen">
+  <LoginBanners />
   <div class="card auth-card">
     <div class="brand">
       <Logo size={44} />
@@ -19,8 +21,11 @@
 
 <style>
   .screen {
-    display: grid;
-    place-items: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-4);
     min-height: 100%;
     padding: var(--space-6) var(--space-4);
     background:

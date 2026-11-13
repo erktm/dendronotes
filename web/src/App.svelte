@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import AppBanners from './components/AppBanners.svelte'
   import Login from './components/Login.svelte'
   import Logo from './components/Logo.svelte'
   import ResetPassword from './components/ResetPassword.svelte'
@@ -25,12 +26,24 @@
 {:else if app.auth === 'anonymous'}
   <Login />
 {:else}
-  <Shell />
+  <div class="frame">
+    <AppBanners />
+    <div class="frame-main"><Shell /></div>
+  </div>
 {/if}
 
 <Toasts />
 
 <style>
+  .frame {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  .frame-main {
+    flex: 1;
+    min-height: 0;
+  }
   .splash {
     display: grid;
     place-items: center;

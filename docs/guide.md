@@ -214,6 +214,13 @@ up to `DENDRONOTES_MAX_UPLOAD_MB`. The content must match the extension.
   - *Somas*: every soma with owner, members, groups, size and folder; create a soma for any
     account (optionally shared with a group right away, for example *Everyone*), hand a soma
     to another owner or delete it.
+  - *Banners*: announcements such as updates or maintenance. Each banner has a short text
+    (Markdown: **bold**, _italic_, `code` and links), a kind (info, warning, critical), where
+    it shows (in the app, on the sign-in page or both), for whom (everyone, the admins or a
+    group; the sign-in page shows only banners for everyone), whether people can close it, and
+    an optional time window. Banners appear at the top of the app at once, also in open tabs.
+    A closed banner stays closed for the account on all devices (on the sign-in page: in that
+    browser) until you change its text.
   - *Sessions*: who is signed in from where; end single sessions.
   - *Server*: version, uptime, storage, open somas, a backup download, whether the OpenID
     Connect provider and the directory are reachable, the e-mail relay with waiting messages,

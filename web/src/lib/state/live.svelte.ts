@@ -36,6 +36,8 @@ class Live {
   commentsChanged = $state.raw<{ path: string; n: number }>({ path: '', n: 0 })
   /** Increases when this account got a notification. */
   notificationVersion = $state(0)
+  /** Grows when the admins change banners. */
+  bannersVersion = $state(0)
   /** The id the server gave this stream ("hello"); notes are joined with it. */
   stream = $state('')
 
@@ -119,6 +121,7 @@ class Live {
       }
     })
     es.addEventListener('notification', () => this.notificationVersion++)
+    es.addEventListener('banners', () => this.bannersVersion++)
     es.onerror = () => {
       if (this.source !== es) return
       if (es.readyState === EventSource.CLOSED) {

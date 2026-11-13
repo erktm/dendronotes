@@ -182,6 +182,47 @@ export const server = () => request<ServerInfo>('GET', '/api/admin/server')
 export const checkSSO = () => request<SSOStatus>('POST', '/api/admin/sso/check')
 export const checkLDAP = () => request<LDAPStatus>('POST', '/api/admin/ldap/check')
 export const syncLDAP = () => request<LDAPSyncStatus>('POST', '/api/admin/ldap/sync')
+export type BannerKind = 'info' | 'warning' | 'critical'
+export type BannerAudience = 'everyone' | 'admins' | 'group'
+
+/** What the administration sends for a new or changed banner. */
+export interface BannerInput {
+  message: string
+  kind: BannerKind
+  onLogin: boolean
+  inApp: boolean
+  audience: BannerAudience
+  groupId?: number
+  dismissible: boolean
+  /** ISO times; null: from now on / until deleted. */
+  startsAt: string | null
+  endsAt: string | null
+}
+
+export interface Banner {
+  id: number
+  message: string
+  kind: BannerKind
+  onLogin: boolean
+  inApp: boolean
+  audience: BannerAudience
+  groupId?: number
+  groupName?: string
+  dismissible: boolean
+  /** Zero time (year 1) when open. */
+  startsAt: string
+  endsAt: string
+  revision: number
+  createdBy?: { id: number; username: string; displayName: string }
+  createdAt: string
+  updatedAt: string
+}
+
+export const banners = () => request<{ banners: Banner[] }>('GET', '/api/admin/banners').then((r) => r.banners)
+export const createBanner = (b: BannerInput) => request<Banner>('POST', '/api/admin/banners', { body: b })
+export const updateBanner = (id: number, b: BannerInput) => request<Banner>('PATCH', `/api/admin/banners/${id}`, { body: b })
+export const deleteBanner = (id: number) => request<{ id: number }>('DELETE', `/api/admin/banners/${id}`)
+
 /** Sends a test e-mail to the admin's own address at once. */
 export const testMail = () => request<{ ok: boolean }>('POST', '/api/admin/mail/test')
 

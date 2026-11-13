@@ -95,7 +95,7 @@ flowchart TB
 |-------|------|------|
 | `SOMAS_DIR/<soma>/…` | The notes, attachments and drawings (`*.drawing.svg`) | Source of truth: plain files |
 | `SOMAS_DIR/<soma>/.trash/` | Deleted files and folders (the place Obsidian uses too) | Files, records in `state.db` |
-| `DATA_DIR/state.db` | Accounts, sessions (hashed), API tokens and password links (hashed), somas, members, groups, comments, notifications, trash records, icon library, profile photos, e-mails waiting to be sent, audit log | Not a cache: back it up |
+| `DATA_DIR/state.db` | Accounts, sessions (hashed), API tokens and password links (hashed), somas, members, groups, comments, notifications, trash records, icon library, profile photos, e-mails waiting to be sent, banners and who closed them, audit log | Not a cache: back it up |
 | `DATA_DIR/history/<soma id>.db` | Earlier versions of notes | Not a cache: back it up |
 | `DATA_DIR/index/<soma id>/index.db` | Synapses, file references, tags, full-text index | Cache: deleted, it is rebuilt |
 

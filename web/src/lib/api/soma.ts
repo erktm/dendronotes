@@ -193,6 +193,24 @@ export interface AuthMethods {
 
 export const authMethods = () => request<AuthMethods>('GET', '/api/auth/methods')
 
+/** A banner as people see it (text is short Markdown, see lib/bannerText.ts). */
+export interface ShownBanner {
+  id: number
+  message: string
+  kind: 'info' | 'warning' | 'critical'
+  dismissible: boolean
+  /** Grows when the text changes; a closing counts for one revision. */
+  revision: number
+}
+
+/** The banners of the sign-in page. */
+export const loginBanners = () =>
+  request<{ banners: ShownBanner[] }>('GET', '/api/auth/banners').then((r) => r.banners)
+/** The banners the signed-in account sees now. */
+export const myBanners = () => request<{ banners: ShownBanner[] }>('GET', '/api/me/banners').then((r) => r.banners)
+/** Closes a banner for the account until its text changes. */
+export const dismissBanner = (id: number) => request<{ ok: boolean }>('POST', `/api/me/banners/${id}/dismiss`)
+
 /** Asks for a reset link; the answer is the same whether the account exists or not. */
 export const forgotPassword = (login: string) => request<{ ok: boolean }>('POST', '/api/auth/password/forgot', { body: { login } })
 
