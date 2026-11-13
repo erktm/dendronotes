@@ -2,10 +2,6 @@
   /** Data type used when dragging tree entries (paths, one per line). */
   export const DRAG_TYPE = 'application/x-dendronotes-path'
 
-  // The entries being dragged in this tab: drag-over events cannot read the
-  // drag data, but placing them by hand needs to know what moves.
-  let dragging: string[] = []
-
   /** The paths a drop of tree entries carries. */
   export function droppedPaths(e: DragEvent): string[] {
     const data = e.dataTransfer?.getData(DRAG_TYPE) ?? ''
@@ -24,6 +20,7 @@
   import { dirname, displayName, isNote } from '../lib/paths'
   import { droppedEntries, hasFolder } from '../lib/dropped'
   import { outermost } from '../lib/tree'
+  import { treeDrag } from '../lib/treeDrag.svelte'
   import { strings } from '../lib/strings'
   import type { TreeNode } from '../lib/tree'
 
@@ -39,9 +36,9 @@
   const renaming = $derived(app.edit?.kind === 'rename' && app.edit.path === node.path)
   const creating = $derived(app.edit && app.edit.kind !== 'rename' && app.edit.parent === node.path ? app.edit : null)
   const selected = $derived(app.selected.has(node.path))
-  let dropTarget = $state(false)
-  /** Where a dragged entry would land in a folder sorted by hand. */
-  let place = $state<'before' | 'after' | null>(null)
+  // Where a drop would land: this folder, or before or after this row.
+  const dropTarget = $derived(isDir && treeDrag.into === node.path)
+  const place = $derived(treeDrag.place?.path === node.path ? treeDrag.place.at : null)
   const parent = $derived(dirname(node.path))
 
   function onclick(e: MouseEvent) {
@@ -89,21 +86,22 @@
   function ondragstart(e: DragEvent) {
     if (!e.dataTransfer) return
     // A selected entry takes the whole selection along.
-    dragging = selected && app.selected.size > 1 ? outermost(app.selected) : [node.path]
-    e.dataTransfer.setData(DRAG_TYPE, dragging.join('\n'))
+    treeDrag.paths = selected && app.selected.size > 1 ? outermost(app.selected) : [node.path]
+    e.dataTransfer.setData(DRAG_TYPE, treeDrag.paths.join('\n'))
     e.dataTransfer.effectAllowed = 'move'
   }
 
   function ondragend() {
-    dragging = []
+    treeDrag.reset()
   }
 
   /**
-   * In a folder sorted by hand, entries dragged over a row go before or after
-   * it (the upper or lower part); a folder's middle still takes them in.
+   * Sorted by hand, entries dragged over a row go before or after it (the
+   * upper or lower part); a folder's middle still takes them in.
    */
   function placeAt(e: DragEvent): 'before' | 'after' | null {
-    if (!app.can.organize || app.orderOf(parent).mode !== 'manual' || dragging.length === 0 || dragging.includes(node.path)) return null
+    const moving = treeDrag.paths
+    if (!app.can.organize || app.sortMode !== 'manual' || moving.length === 0 || moving.includes(node.path)) return null
     const row = (e.currentTarget as HTMLElement).querySelector(':scope > .row')
     if (!row) return null
     const r = row.getBoundingClientRect()
@@ -116,37 +114,29 @@
 
   // Folders accept drops on themselves and on everything inside them:
   // entries of the tree (moved) and files and folders from the computer
-  // (uploaded). Notes pass drops on to their folder, unless it is sorted by hand.
+  // (uploaded). Notes pass drops on to their folder, unless sorted by hand.
   function ondragover(e: DragEvent) {
     const types = e.dataTransfer?.types ?? []
     const files = types.includes('Files')
     if (!e.dataTransfer || !(files ? app.can.create : types.includes(DRAG_TYPE) && app.can.organize)) return
-    place = files ? null : placeAt(e)
-    if (place) {
+    const at = files ? null : placeAt(e)
+    if (at) {
       e.preventDefault()
       e.stopPropagation()
       e.dataTransfer.dropEffect = 'move'
-      dropTarget = false
+      treeDrag.show(null, { path: node.path, at })
       return
     }
     if (!isDir) return
     e.preventDefault()
     e.stopPropagation()
     e.dataTransfer.dropEffect = files ? 'copy' : 'move'
-    dropTarget = true
-  }
-
-  function ondragleave(e: DragEvent) {
-    const li = e.currentTarget as HTMLElement
-    if (!li.contains(e.relatedTarget as Node | null)) {
-      dropTarget = false
-      place = null
-    }
+    treeDrag.show(node.path, null)
   }
 
   function ondrop(e: DragEvent) {
     const at = place
-    place = null
+    treeDrag.clear()
     if (at) {
       e.preventDefault()
       e.stopPropagation()
@@ -161,7 +151,6 @@
     if (!isDir) return
     e.preventDefault()
     e.stopPropagation()
-    dropTarget = false
     const entries = droppedEntries(e.dataTransfer)
     if (hasFolder(entries)) {
       void app.uploadDropped(entries, node.path)
@@ -185,7 +174,6 @@
   class:place-before={place === 'before'}
   class:place-after={place === 'after'}
   {ondragover}
-  {ondragleave}
   {ondrop}
 >
   {#if renaming}

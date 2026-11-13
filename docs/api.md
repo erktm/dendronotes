@@ -15,8 +15,8 @@ which a test keeps in sync with the server.
 | `PUT /api/me/avatar`, `PUT`/`DELETE /api/me/avatar/photo`, `GET /api/users/{id}/avatar` | Profile picture: design, photo |
 | `GET /api/somas`, `POST /api/somas`     | The account's somas; create one                      |
 | `PATCH /api/somas/{soma}`, `DELETE /api/somas/{soma}` | Rename, hand over or delete a soma (owner) |
-| `GET /api/somas/{soma}/tree`            | All visible files and folders, and how folders are sorted (`orders`) |
-| `PUT /api/somas/{soma}/order`           | Sort a folder for everyone: `{"folder": …, "mode": "name"\|"modified"\|"created"\|"manual", "names": […]}` (editor) |
+| `GET /api/somas/{soma}/tree`            | All visible files and folders, and the orders made by hand (`orders`) |
+| `PUT /api/somas/{soma}/order`           | The order of a folder made by hand, for everyone: `{"folder": …, "names": […]}` (editor) |
 | `POST /api/somas/{soma}/links`, `GET …/links/{id}` | The internal link of a file (everyone with access); where it points now |
 | `GET`/`POST /api/somas/{soma}/shares`, `DELETE …/shares/{id}` | Public read-only links to notes and drawings (editor, no API tokens); the token is in the answer once |
 | `GET /api/public/{token}`, `GET /api/public/{token}/files/{path}` | What a public link shows, without sign-in (limited per client address) |

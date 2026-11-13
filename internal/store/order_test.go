@@ -14,13 +14,13 @@ func TestFolderOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	const id = "soma000001"
-	set := func(folder string, o FolderOrder) {
+	set := func(folder string, names ...string) {
 		t.Helper()
-		if err := s.SetFolderOrder(ctx, id, folder, o); err != nil {
+		if err := s.SetFolderOrder(ctx, id, folder, names); err != nil {
 			t.Fatal(err)
 		}
 	}
-	get := func() map[string]FolderOrder {
+	get := func() map[string][]string {
 		t.Helper()
 		m, err := s.FolderOrders(ctx, id)
 		if err != nil {
@@ -29,18 +29,13 @@ func TestFolderOrder(t *testing.T) {
 		return m
 	}
 
-	set("", FolderOrder{Mode: SortManual, Names: []string{"Beds", "Plan.md", "Ideas.md"}})
-	set("Beds", FolderOrder{Mode: SortModified, Names: []string{"ignored"}})
-	set("Beds/North", FolderOrder{Mode: SortManual, Names: []string{"b.md", "a.md"}})
-	set("Other", FolderOrder{Mode: SortCreated})
-	if err := s.SetFolderOrder(ctx, id, "x", FolderOrder{Mode: "random"}); err == nil {
-		t.Error("an unknown mode was stored")
-	}
-	want := map[string]FolderOrder{
-		"":           {Mode: SortManual, Names: []string{"Beds", "Plan.md", "Ideas.md"}},
-		"Beds":       {Mode: SortModified, Names: []string{}},
-		"Beds/North": {Mode: SortManual, Names: []string{"b.md", "a.md"}},
-		"Other":      {Mode: SortCreated, Names: []string{}},
+	set("", "Beds", "Plan.md", "Ideas.md")
+	set("Beds/North", "b.md", "a.md")
+	set("Other", "x.md")
+	want := map[string][]string{
+		"":           {"Beds", "Plan.md", "Ideas.md"},
+		"Beds/North": {"b.md", "a.md"},
+		"Other":      {"x.md"},
 	}
 	if got := get(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("orders = %v, want %v", got, want)
@@ -54,25 +49,19 @@ func TestFolderOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := get()
-	if o := got[""]; !reflect.DeepEqual(o.Names, []string{"Garden beds", "Plan.md", "Ideas.md"}) {
-		t.Errorf("top level after rename = %v", o.Names)
+	if !reflect.DeepEqual(got[""], []string{"Garden beds", "Plan.md", "Ideas.md"}) {
+		t.Errorf("top level after rename = %v", got[""])
 	}
-	if _, ok := got["Beds"]; ok {
-		t.Error("the old folder kept its order")
-	}
-	if o := got["Garden beds/North"]; !reflect.DeepEqual(o.Names, []string{"b.md", "a.md"}) {
-		t.Errorf("subfolder after rename = %v", o)
-	}
-	if o := got["Garden beds"]; o.Mode != SortModified {
-		t.Errorf("folder after rename = %v", o)
+	if _, ok := got["Beds/North"]; ok || !reflect.DeepEqual(got["Garden beds/North"], []string{"b.md", "a.md"}) {
+		t.Errorf("subfolder after rename = %v", got)
 	}
 
-	// Sorting by name again forgets the folder; removing a folder its subfolders.
-	set("Other", FolderOrder{Mode: SortName})
+	// No names forgets the folder; removing a folder its subfolders.
+	set("Other")
 	if err := s.RemoveFolderOrder(ctx, id, "Garden beds"); err != nil {
 		t.Fatal(err)
 	}
-	if got := get(); len(got) != 1 || got[""].Mode != SortManual {
+	if got := get(); len(got) != 1 || len(got[""]) != 3 {
 		t.Errorf("after removing: %v", got)
 	}
 	if err := s.RemoveFolderOrder(ctx, id, ""); err != nil {

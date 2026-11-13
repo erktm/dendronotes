@@ -682,29 +682,32 @@ paths:
                     items: { $ref: "#/components/schemas/Entry" }
                   orders:
                     type: object
-                    description: How folders are sorted, by folder path ("" is the top level). Folders not listed are sorted by name.
-                    additionalProperties: { $ref: "#/components/schemas/FolderOrder" }
+                    description: >
+                      The orders made by hand, by folder path ("" is the top level): the
+                      names of the folder's entries in order. Entries not listed follow by
+                      name. Whether the tree shows them or sorts by name or date each person
+                      chooses in the app.
+                    additionalProperties: { type: array, items: { type: string } }
         "401": { $ref: "#/components/responses/Unauthorized" }
   /api/somas/{soma}/order:
     parameters:
       - $ref: "#/components/parameters/soma"
     put:
-      summary: Set how a folder's entries are sorted
+      summary: Store the order of a folder's entries made by hand (editor)
       description: >
-        For everyone with access to the soma (editor and above). Folders always
-        come first. Sorting by name is the default; in manual mode `names` lists
-        the entries of the folder in order, and entries not listed follow by
-        name. The order follows the folder when it is renamed or moved.
+        For everyone with access to the soma. `names` lists the entries of the
+        folder in order; entries not listed follow by name; no names removes the
+        order. Folders always come first. The order follows the folder when it
+        is renamed or moved.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [folder, mode]
+              required: [folder]
               properties:
                 folder: { type: string, description: The folder; empty for the top level. }
-                mode: { type: string, enum: [name, modified, created, manual] }
                 names:
                   type: array
                   maxItems: 10000
@@ -2535,12 +2538,6 @@ components:
         mtime: { type: integer, description: Unix milliseconds }
         ctime: { type: integer, description: "When the entry was created (Unix milliseconds), where the system keeps it; otherwise the time of the last change." }
         readOnly: { type: boolean, description: True for symbolic links inside the soma. }
-    FolderOrder:
-      type: object
-      required: [mode]
-      properties:
-        mode: { type: string, enum: [modified, created, manual] }
-        names: { type: array, items: { type: string }, description: Manual mode only. }
     Note:
       type: object
       required: [path, content, etag, size, mtime]

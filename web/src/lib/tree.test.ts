@@ -20,17 +20,18 @@ describe('the tree', () => {
     expect(names(t[1]!.children)).toEqual(['East.md', 'North.md', 'South.md'])
   })
 
-  it('sorts each folder its own way', () => {
-    const t = buildTree(entries, { '': { mode: 'modified' }, Beds: { mode: 'created' } })
-    expect(names(t)).toEqual(['Archive', 'Beds', 'Plan 9.md', 'Plan 10.md'])
-    expect(names(t[1]!.children)).toEqual(['North.md', 'East.md', 'South.md'])
+  it('sorts by name, last change or creation', () => {
+    expect(names(buildTree(entries, {}, 'modified'))).toEqual(['Archive', 'Beds', 'Plan 9.md', 'Plan 10.md'])
+    expect(names(buildTree(entries, {}, 'created')[1]!.children)).toEqual(['North.md', 'East.md', 'South.md'])
     // Without a creation time the last change stands in.
-    expect(names(buildTree(entries, { '': { mode: 'created' } }))).toEqual(['Archive', 'Beds', 'Plan 9.md', 'Plan 10.md'])
+    expect(names(buildTree(entries, {}, 'created'))).toEqual(['Archive', 'Beds', 'Plan 9.md', 'Plan 10.md'])
   })
 
   it('keeps a manual order, with new entries after it by name', () => {
-    const t = buildTree(entries, { Beds: { mode: 'manual', names: ['South.md', 'Gone.md', 'North.md'] } })
-    expect(names(t[1]!.children)).toEqual(['South.md', 'North.md', 'East.md'])
+    const orders = { Beds: ['South.md', 'Gone.md', 'North.md'] }
+    expect(names(buildTree(entries, orders, 'manual')[1]!.children)).toEqual(['South.md', 'North.md', 'East.md'])
+    // Other modes leave the order alone; it is back when sorting by hand again.
+    expect(names(buildTree(entries, orders, 'name')[1]!.children)).toEqual(['East.md', 'North.md', 'South.md'])
   })
 
   it('moves names in a manual order', () => {

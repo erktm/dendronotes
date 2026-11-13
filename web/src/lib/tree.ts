@@ -12,25 +12,18 @@ export interface TreeNode {
   children: TreeNode[]
 }
 
-/** How a folder's entries are sorted; folders always come first. */
+/** How the tree is sorted (each person chooses); folders always come first. */
 export type SortMode = 'name' | 'modified' | 'created' | 'manual'
 export const SORT_MODES: readonly SortMode[] = ['name', 'modified', 'created', 'manual']
 
-/** A folder's sort order; in manual mode names lists its entries in order. */
-export interface FolderOrder {
-  mode: SortMode
-  names?: string[]
-}
-
-/** Sort orders by folder path ("" is the top level); folders not listed sort by name. */
-export type Orders = Record<string, FolderOrder>
+/** The orders made by hand, by folder path ("" is the top level): names in order. */
+export type Orders = Record<string, string[]>
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })
 
-/** Sorts the entries of one folder (in place) the way its order says. */
-export function sortNodes(nodes: TreeNode[], order: FolderOrder | undefined): TreeNode[] {
-  const mode = order?.mode ?? 'name'
-  const rank = new Map((mode === 'manual' ? (order?.names ?? []) : []).map((n, i) => [n, i]))
+/** Sorts the entries of one folder (in place); names is its order made by hand. */
+export function sortNodes(nodes: TreeNode[], mode: SortMode, names: readonly string[] = []): TreeNode[] {
+  const rank = new Map(mode === 'manual' ? names.map((n, i) => [n, i]) : [])
   const byName = (a: TreeNode, b: TreeNode) => collator.compare(a.name, b.name)
   return nodes.sort((a, b) => {
     if (a.type !== b.type) return a.type === 'dir' ? -1 : 1
@@ -51,8 +44,8 @@ export function sortNodes(nodes: TreeNode[], order: FolderOrder | undefined): Tr
   })
 }
 
-/** Builds the sorted tree (folders first, each folder in its order) from the flat list. */
-export function buildTree(entries: Entry[], orders: Orders = {}): TreeNode[] {
+/** Builds the sorted tree (folders first) from the flat list. */
+export function buildTree(entries: Entry[], orders: Orders = {}, mode: SortMode = 'name'): TreeNode[] {
   const root: TreeNode[] = []
   const dirs = new Map<string, TreeNode>()
   // The server lists parents before their children.
@@ -73,7 +66,7 @@ export function buildTree(entries: Entry[], orders: Orders = {}): TreeNode[] {
     if (e.type === 'dir') dirs.set(e.path, node)
   }
   const sort = (nodes: TreeNode[], folder: string) => {
-    sortNodes(nodes, orders[folder])
+    sortNodes(nodes, mode, orders[folder])
     for (const n of nodes) if (n.children.length) sort(n.children, n.path)
   }
   sort(root, '')

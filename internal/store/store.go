@@ -307,9 +307,10 @@ var migrations = []string{
 		dismissed_at INTEGER NOT NULL,
 		PRIMARY KEY (banner_id, user_id)
 	);`,
-	// 11: how the entries of a folder are sorted (folder '' is the top level).
-	// Like comments, the orders outlive their soma row (a deleted soma can be
-	// restored); a purge removes them.
+	// 11: the order of a folder's entries made by hand (folder '' is the top
+	// level; names in order; mode is always 'manual'). Like comments, the
+	// orders outlive their soma row (a deleted soma can be restored); a purge
+	// removes them.
 	`CREATE TABLE folder_order (
 		soma_id TEXT NOT NULL,
 		folder  TEXT NOT NULL,

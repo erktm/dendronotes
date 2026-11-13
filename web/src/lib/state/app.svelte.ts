@@ -19,7 +19,7 @@ import {
 import { router } from '../router.svelte'
 import { strings } from '../strings'
 import { newNotePath, normalizePath, resolveFile, resolveSynapse } from '../synapses'
-import { type FolderOrder, type Orders, type SortMode, type TreeNode, buildTree, outermost, reorder, visiblePaths } from '../tree'
+import { type Orders, SORT_MODES, type SortMode, type TreeNode, buildTree, outermost, reorder, visiblePaths } from '../tree'
 import { readDropped } from '../dropped'
 import { isDrawingPath, withDrawingExtension } from '../drawing/paths'
 import * as drawingsApi from '../api/drawings'
@@ -67,6 +67,7 @@ export interface ConfirmRequest {
 
 const EXPANDED_KEY = 'dendronotes.expanded'
 const LAST_SOMA_KEY = 'dendronotes.lastSoma'
+const SORT_KEY = 'dendronotes.sort'
 
 /** Open folders are remembered per soma. */
 function loadExpanded(soma: string): string[] {
@@ -113,9 +114,11 @@ class App {
   canEdit = $derived(this.can.write)
 
   entries = $state.raw<Entry[]>([])
-  /** How folders are sorted, for everyone with access. */
+  /** The orders made by hand, the same for everyone with access. */
   orders = $state.raw<Orders>({})
-  tree = $derived(buildTree(this.entries, this.orders))
+  /** How this person sorts the tree of the open soma (kept in the browser). */
+  sortMode = $state<SortMode>('name')
+  tree = $derived(buildTree(this.entries, this.orders, this.sortMode))
   /** Entries picked with ⌘/Ctrl- or Shift-click, to move or delete together. */
   selected = new SvelteSet<string>()
   private selectAnchor: string | null = null
@@ -265,6 +268,8 @@ class App {
     this.expanded.clear()
     if (!id) return
     for (const p of loadExpanded(id)) this.expanded.add(p)
+    const mode = storage(`${SORT_KEY}.${id}`)
+    this.sortMode = SORT_MODES.includes(mode as SortMode) ? (mode as SortMode) : 'name'
     storage(LAST_SOMA_KEY, id)
     void this.refresh()
     live.start({
@@ -538,11 +543,6 @@ class App {
 
   // --- Sorting and selection ---------------------------------------------
 
-  /** How a folder is sorted ("" is the top level). */
-  orderOf(folder: string): FolderOrder {
-    return this.orders[folder] ?? { mode: 'name' }
-  }
-
   /** The entries of a folder as the tree shows them. */
   childrenOf(folder: string): TreeNode[] {
     if (folder === '') return this.tree
@@ -555,29 +555,24 @@ class App {
     }
   }
 
-  /** Sorts a folder for everyone; sorting by hand starts from the order shown now. */
-  async setSort(folder: string, mode: SortMode): Promise<void> {
-    if (!this.may('organize')) return
-    await this.saveOrder(folder, mode === 'manual' ? { mode, names: this.childrenOf(folder).map((n) => n.name) } : { mode })
+  /** Sorts the tree for this person; sorting by hand shows the order made by hand. */
+  setSort(mode: SortMode): void {
+    this.sortMode = mode
+    if (this.somaId) storage(`${SORT_KEY}.${this.somaId}`, mode)
   }
 
   /** Puts entries of a folder in front of `before` (at the end when it is null), by hand. */
   async placeInOrder(folder: string, names: readonly string[], before: string | null): Promise<void> {
     if (!this.may('organize')) return
     const current = this.childrenOf(folder).map((n) => n.name)
-    await this.saveOrder(folder, { mode: 'manual', names: reorder(current, names, before) })
-  }
-
-  private async saveOrder(folder: string, order: FolderOrder): Promise<void> {
-    const before = this.orders
+    const next = reorder(current, names, before)
+    const prev = this.orders
     // Shown at once; the change event brings the stored order to everyone.
-    const next = { ...before, [folder]: order }
-    if (order.mode === 'name') delete next[folder]
-    this.orders = next
+    this.orders = { ...prev, [folder]: next }
     try {
-      await api.setOrder(folder, order)
+      await api.setOrder(folder, next)
     } catch (err) {
-      this.orders = before
+      this.orders = prev
       this.toast(errorMessage(err))
     }
   }

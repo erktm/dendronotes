@@ -3,68 +3,41 @@ package store
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"path"
 	"slices"
 )
 
-// Sort modes of a folder. Folders always come first; "name" is the default
-// and is not stored.
-const (
-	SortName     = "name"
-	SortModified = "modified"
-	SortCreated  = "created"
-	SortManual   = "manual"
-)
-
-// SortModes are the modes a folder can have.
-var SortModes = []string{SortName, SortModified, SortCreated, SortManual}
-
 // MaxOrderNames is how many names a manual order keeps.
 const MaxOrderNames = 10000
 
-// FolderOrder is how a folder's entries are sorted; in manual mode Names
-// lists them in order (entries not listed follow by name).
-type FolderOrder struct {
-	Mode  string   `json:"mode"`
-	Names []string `json:"names,omitempty"`
-}
-
-// FolderOrders returns the sort orders of a soma's folders by folder path.
-func (s *Store) FolderOrders(ctx context.Context, somaID string) (map[string]FolderOrder, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT folder, mode, names FROM folder_order WHERE soma_id = ?`, somaID)
+// FolderOrders returns the orders people made by hand, by folder (” is the
+// top level): the names of a folder's entries in order. How the tree is
+// sorted (by name, date or this order) each person chooses in the app.
+func (s *Store) FolderOrders(ctx context.Context, somaID string) (map[string][]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT folder, names FROM folder_order WHERE soma_id = ?`, somaID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	out := map[string]FolderOrder{}
+	out := map[string][]string{}
 	for rows.Next() {
-		var folder, mode, names string
-		if err := rows.Scan(&folder, &mode, &names); err != nil {
+		var folder, raw string
+		if err := rows.Scan(&folder, &raw); err != nil {
 			return nil, err
 		}
-		o := FolderOrder{Mode: mode}
-		if err := json.Unmarshal([]byte(names), &o.Names); err != nil {
-			o.Names = nil
+		var names []string
+		if json.Unmarshal([]byte(raw), &names) == nil && len(names) > 0 {
+			out[folder] = names
 		}
-		out[folder] = o
 	}
 	return out, rows.Err()
 }
 
-// SetFolderOrder stores how folder is sorted. Sorting by name is the default
-// and removes the entry; names count only in manual mode.
-func (s *Store) SetFolderOrder(ctx context.Context, somaID, folder string, o FolderOrder) error {
-	if !slices.Contains(SortModes, o.Mode) {
-		return fmt.Errorf("unknown sort mode %q", o.Mode)
-	}
-	if o.Mode == SortName {
+// SetFolderOrder stores the order of a folder made by hand; no names removes it.
+func (s *Store) SetFolderOrder(ctx context.Context, somaID, folder string, names []string) error {
+	if len(names) == 0 {
 		_, err := s.db.ExecContext(ctx, `DELETE FROM folder_order WHERE soma_id = ? AND folder = ?`, somaID, folder)
 		return err
-	}
-	names := o.Names
-	if o.Mode != SortManual || names == nil {
-		names = []string{}
 	}
 	if len(names) > MaxOrderNames {
 		names = names[:MaxOrderNames]
@@ -73,9 +46,9 @@ func (s *Store) SetFolderOrder(ctx context.Context, somaID, folder string, o Fol
 	if err != nil {
 		return err
 	}
-	_, err = s.db.ExecContext(ctx, `INSERT INTO folder_order (soma_id, folder, mode, names) VALUES (?, ?, ?, ?)
-		ON CONFLICT (soma_id, folder) DO UPDATE SET mode = excluded.mode, names = excluded.names`,
-		somaID, folder, o.Mode, string(data))
+	_, err = s.db.ExecContext(ctx, `INSERT INTO folder_order (soma_id, folder, mode, names) VALUES (?, ?, 'manual', ?)
+		ON CONFLICT (soma_id, folder) DO UPDATE SET mode = 'manual', names = excluded.names`,
+		somaID, folder, string(data))
 	return err
 }
 

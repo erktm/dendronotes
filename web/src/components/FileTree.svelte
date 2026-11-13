@@ -7,10 +7,11 @@
   import { app, entryKind, type NewEntryKind } from '../lib/state/app.svelte'
   import { droppedEntries, hasFolder } from '../lib/dropped'
   import { strings } from '../lib/strings'
-  import { SORT_MODES, type TreeNode } from '../lib/tree'
+  import type { TreeNode } from '../lib/tree'
+  import { treeDrag } from '../lib/treeDrag.svelte'
 
   let menu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null)
-  let rootDrop = $state(false)
+  const rootDrop = $derived(treeDrag.into === '')
   /** The entries the "Move to" dialog moves. */
   let moving = $state<string[] | null>(null)
 
@@ -60,18 +61,6 @@
         },
       )
     }
-    if (folder !== null && app.can.organize) {
-      const mode = app.orderOf(folder).mode
-      items.push(
-        ...SORT_MODES.map((m, i) => ({
-          label: strings.tree.sortModes[m]!,
-          icon: 'check' as const,
-          checked: mode === m,
-          separator: i === 0 && items.length > 0,
-          action: () => void app.setSort(folder, m),
-        })),
-      )
-    }
     if (items.length) menu = { x, y, items } // every entry changes the soma
   }
 
@@ -82,12 +71,12 @@
     if (!e.dataTransfer || !(files ? app.can.create : types.includes(DRAG_TYPE) && app.can.organize)) return
     e.preventDefault()
     e.dataTransfer.dropEffect = files ? 'copy' : 'move'
-    rootDrop = true
+    treeDrag.show('', null)
   }
 
   function ondrop(e: DragEvent) {
     e.preventDefault()
-    rootDrop = false
+    treeDrag.clear()
     const entries = droppedEntries(e.dataTransfer)
     if (hasFolder(entries)) {
       void app.uploadDropped(entries, '')
@@ -120,7 +109,8 @@
   {onkeydown}
   {ondragover}
   ondragleave={(e) => {
-    if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) rootDrop = false
+    // Leaving the tree: nothing would land anywhere.
+    if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) treeDrag.clear()
   }}
   {ondrop}
 >
@@ -164,6 +154,9 @@
     <p class="loading">{strings.soma.loading}</p>
   {/if}
 </div>
+
+<!-- A drag can end anywhere (dropped elsewhere, Escape): nothing stays marked. -->
+<svelte:window ondragend={() => treeDrag.reset()} />
 
 {#if menu}
   <ContextMenu x={menu.x} y={menu.y} items={menu.items} onclose={() => (menu = null)} />

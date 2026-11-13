@@ -2,7 +2,6 @@ package server
 
 import (
 	"net/http"
-	"slices"
 	"strings"
 
 	"dendronotes/internal/httpx"
@@ -11,13 +10,13 @@ import (
 	"dendronotes/internal/store"
 )
 
-// handleSetOrder sets how a folder's entries are sorted for everyone with
-// access: by name, by date, or in the order of names (manual).
+// handleSetOrder stores the order of a folder's entries made by hand, for
+// everyone with access. How the tree is sorted each person chooses in the
+// app; this order shows when they sort by hand.
 func (s *Server) handleSetOrder(w http.ResponseWriter, r *http.Request) {
 	rt := runtimeOf(r)
 	var body struct {
 		Folder string   `json:"folder"`
-		Mode   string   `json:"mode"`
 		Names  []string `json:"names"`
 	}
 	if err := httpx.DecodeJSON(w, r, &body, 1<<20); err != nil {
@@ -42,10 +41,6 @@ func (s *Server) handleSetOrder(w http.ResponseWriter, r *http.Request) {
 		}
 		folder = clean
 	}
-	if !slices.Contains(store.SortModes, body.Mode) {
-		httpx.Error(w, http.StatusBadRequest, "invalid_mode")
-		return
-	}
 	if len(body.Names) > store.MaxOrderNames {
 		httpx.Error(w, http.StatusBadRequest, "too_many_names")
 		return
@@ -56,7 +51,7 @@ func (s *Server) handleSetOrder(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := s.store.SetFolderOrder(r.Context(), rt.ID, folder, store.FolderOrder{Mode: body.Mode, Names: body.Names}); err != nil {
+	if err := s.store.SetFolderOrder(r.Context(), rt.ID, folder, body.Names); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "internal")
 		return
 	}

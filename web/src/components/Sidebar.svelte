@@ -13,6 +13,7 @@
   import Wordmark from './Wordmark.svelte'
   import { UPLOAD_EXTENSIONS } from '../lib/files'
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
+  import { SORT_MODES } from '../lib/tree'
 
   let serverState = $state<ServerState>('checking')
 
@@ -44,6 +45,21 @@
 
   // The arrow next to "New note" offers the other kinds.
   let newMenu = $state<{ x: number; y: number; items: MenuItem[] } | null>(null)
+
+  // How this person sorts the tree; sorting by hand shows the shared order.
+  function openSortMenu(e: MouseEvent) {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    newMenu = {
+      x: r.left,
+      y: r.bottom + 4,
+      items: SORT_MODES.map((m) => ({
+        label: strings.tree.sortModes[m]!,
+        icon: 'check' as const,
+        checked: app.sortMode === m,
+        action: () => app.setSort(m),
+      })),
+    }
+  }
 
   function openNewMenu(e: MouseEvent) {
     const r = (e.currentTarget as HTMLElement).closest('.split')!.getBoundingClientRect()
@@ -108,6 +124,9 @@
         }}
       />
       {/if}
+      <button type="button" aria-label={strings.tree.sortBy} title={strings.tree.sortBy} aria-haspopup="menu" onclick={openSortMenu}>
+        <Icon name="sort" size={18} />
+      </button>
     </div>
   </header>
 
