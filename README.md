@@ -206,6 +206,13 @@ and prints it.
 To try e-mail in development, put the `DENDRONOTES_SMTP_*` and `DENDRONOTES_MAIL_*` settings
 and `DENDRONOTES_PUBLIC_URL=http://localhost:5173` into `dev/mail.env`; `make dev` reads it.
 
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/), and
+releases follow from them: on every push to `main`, semantic-release reads the commits since
+the last tag (`feat:` gives a new minor version, `fix:` a patch, a `BREAKING CHANGE` a major
+one), tags the version and writes its GitHub release with the notes. The workflow then
+publishes the binaries, the image and the chart for it. Commits such as `docs:`, `ci:` or
+`chore:` release nothing.
+
 ## License
 
 dendronotes is licensed under the [Apache License 2.0](LICENSE). The third-party components it
