@@ -1,10 +1,10 @@
 {
   "bomFormat": "CycloneDX",
   "specVersion": "1.6",
-  "serialNumber": "urn:uuid:6d7644f8-87bb-51a9-bc00-a31bb2bd7d05",
+  "serialNumber": "urn:uuid:e1f1f529-ae21-5c12-bb77-8bdb7a0422a0",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-11-10T09:29:17Z",
+    "timestamp": "2026-11-13T09:19:33Z",
     "tools": {
       "components": [
         {
@@ -15,9 +15,9 @@
     },
     "component": {
       "type": "application",
-      "bom-ref": "pkg:github/erktm/dendronotes@v0.1.0",
+      "bom-ref": "pkg:github/erktm/dendronotes@v0.1.0-13-gcaaf1d2-dirty",
       "name": "dendronotes",
-      "version": "0.1.0",
+      "version": "0.1.0-13-gcaaf1d2-dirty",
       "description": "Self-hosted Markdown notes",
       "licenses": [
         {
@@ -26,7 +26,7 @@
           }
         }
       ],
-      "purl": "pkg:github/erktm/dendronotes@v0.1.0",
+      "purl": "pkg:github/erktm/dendronotes@v0.1.0-13-gcaaf1d2-dirty",
       "externalReferences": [
         {
           "type": "vcs",
@@ -262,12 +262,12 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:golang/stdlib@v1.27.3",
+      "bom-ref": "pkg:golang/stdlib@v1.27.4",
       "name": "stdlib",
       "group": "go",
-      "version": "v1.27.3",
+      "version": "v1.27.4",
       "description": "The Go standard library and runtime compiled into the binary",
-      "purl": "pkg:golang/stdlib@v1.27.3",
+      "purl": "pkg:golang/stdlib@v1.27.4",
       "licenses": [
         {
           "license": {
@@ -1377,7 +1377,7 @@
   ],
   "dependencies": [
     {
-      "ref": "pkg:github/erktm/dendronotes@v0.1.0",
+      "ref": "pkg:github/erktm/dendronotes@v0.1.0-13-gcaaf1d2-dirty",
       "dependsOn": [
         "pkg:golang/github.com/Azure/go-ntlmssp@v0.1.1",
         "pkg:golang/github.com/coreos/go-oidc/v3@v3.21.0",
@@ -1395,7 +1395,7 @@
         "pkg:golang/golang.org/x/term@v0.47.0",
         "pkg:golang/golang.org/x/text@v0.43.0",
         "pkg:golang/golang.org/x/time@v0.16.0",
-        "pkg:golang/stdlib@v1.27.3",
+        "pkg:golang/stdlib@v1.27.4",
         "pkg:npm/%40codemirror/autocomplete@6.20.4",
         "pkg:npm/%40codemirror/collab@6.1.1",
         "pkg:npm/%40codemirror/commands@6.11.1",

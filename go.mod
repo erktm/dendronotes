@@ -5,7 +5,7 @@ module dendronotes
 go 1.26.0
 
 // The release the binaries and the image are built with (CI, SBOM).
-toolchain go1.27.3
+toolchain go1.27.4
 
 require (
 	github.com/coreos/go-oidc/v3 v3.21.0
