@@ -26,6 +26,10 @@ func tokenMay(rt route, method, scope string) bool {
 	if !read && scope != store.ScopeWrite {
 		return false
 	}
+	// Publishing to the internet is for people in the app, never for tokens.
+	if strings.HasPrefix(rt.pattern, "/api/somas/{soma}/shares") {
+		return false
+	}
 	switch rt.access {
 	case public:
 		return true

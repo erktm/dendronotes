@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"dendronotes/internal/httpx"
@@ -114,7 +115,7 @@ func (s *Server) accessLog(next http.Handler) http.Handler {
 		}
 		s.log.Log(r.Context(), lvl, "request",
 			"method", r.Method,
-			"path", r.URL.Path,
+			"path", logPath(r.URL.Path),
 			"status", rec.status,
 			"bytes", rec.bytes,
 			"dur_ms", float64(time.Since(start).Microseconds())/1000,
@@ -148,3 +149,18 @@ func (r *statusRecorder) Write(b []byte) (int, error) {
 }
 
 func (r *statusRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
+
+// logPath is a request path for the log, without the token of a public link
+// (/p/<token>, /api/public/<token>/…): whoever reads the log does not get to
+// open what was shared.
+func logPath(p string) string {
+	for _, prefix := range []string{"/p/", "/api/public/"} {
+		if rest, ok := strings.CutPrefix(p, prefix); ok {
+			if i := strings.IndexByte(rest, '/'); i >= 0 {
+				return prefix + "…" + rest[i:]
+			}
+			return prefix + "…"
+		}
+	}
+	return p
+}

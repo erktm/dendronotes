@@ -107,6 +107,7 @@ type Authenticator struct {
 	badTokens *rateLimiter
 	starts    *rateLimiter // SSO sign-in attempts per client IP
 	resets    *rateLimiter // password reset requests and attempts per client IP
+	shared    *rateLimiter // requests for public share links per client IP
 	allowed   map[string]bool
 	sem       chan struct{} // bounds concurrent argon2 computations (memory)
 	dummy     *Hash         // verified for unknown users, so timing reveals nothing
@@ -127,6 +128,7 @@ func New(cfg Config, st *store.Store, ips *clientip.Resolver, log *slog.Logger) 
 		badTokens: newRateLimiter(2*time.Second, 10, time.Millisecond, 1<<30),
 		starts:    newRateLimiter(3*time.Second, 20, 20*time.Millisecond, 500),
 		resets:    newRateLimiter(30*time.Second, 10, 200*time.Millisecond, 50),
+		shared:    newRateLimiter(250*time.Millisecond, 120, 2*time.Millisecond, 2000),
 		sem:       make(chan struct{}, 2),
 	}
 	enc, err := HashPassword("not a real password", cfg.HashParams)

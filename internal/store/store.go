@@ -308,13 +308,31 @@ var migrations = []string{
 		PRIMARY KEY (banner_id, user_id)
 	);`,
 	// 11: how the entries of a folder are sorted (folder '' is the top level).
+	// Like comments, the orders outlive their soma row (a deleted soma can be
+	// restored); a purge removes them.
 	`CREATE TABLE folder_order (
-		soma_id TEXT NOT NULL REFERENCES somas(id) ON DELETE CASCADE,
+		soma_id TEXT NOT NULL,
 		folder  TEXT NOT NULL,
 		mode    TEXT NOT NULL,
 		names   TEXT NOT NULL DEFAULT '[]',
 		PRIMARY KEY (soma_id, folder)
 	);`,
+	// 12: links to notes and drawings that follow them when they move: an
+	// internal one per entry (for everyone with access) and public read-only
+	// ones, of which only the SHA-256 of the token is kept. They outlive their
+	// soma row like comments.
+	`CREATE TABLE share_links (
+		id         TEXT PRIMARY KEY,
+		soma_id    TEXT NOT NULL,
+		path       TEXT NOT NULL,
+		kind       TEXT NOT NULL CHECK (kind IN ('internal', 'public')),
+		token_hash TEXT UNIQUE,
+		created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+		created_at INTEGER NOT NULL,
+		expires_at INTEGER NOT NULL DEFAULT 0
+	);
+	CREATE INDEX share_links_path ON share_links(soma_id, path);
+	CREATE UNIQUE INDEX share_links_internal ON share_links(soma_id, path) WHERE kind = 'internal';`,
 }
 
 // rebuilds are the migrations (by index) that recreate a table others refer

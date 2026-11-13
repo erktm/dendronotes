@@ -945,6 +945,10 @@
         <button type="button" class="button" onclick={() => void doc.takeTheirs()}>{s.takeTheirs}</button>
         <button type="button" class="button" onclick={() => void doc.keepMine()}>{s.keepMine}</button>
       {/if}
+      <button type="button" class="button" title={strings.links.open} aria-haspopup="dialog" onclick={() => (app.linkDialog = path)}>
+        <Icon name="link" size={16} />
+        <span class="label">{strings.links.open}</span>
+      </button>
       <button type="button" class="button" title={s.download} aria-haspopup="menu" aria-expanded={downloadMenu !== null} onclick={openDownload}>
         <Icon name="download" size={16} />
         <span class="label">{s.download}</span>

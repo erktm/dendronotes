@@ -1,5 +1,6 @@
 <script lang="ts">
   import { tick, untrack } from 'svelte'
+  import LinkDialog from './LinkDialog.svelte'
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
   import { saveFile } from '../lib/download'
   import { markdownWithTitle } from '../lib/noteExport'
@@ -81,6 +82,7 @@
     const soma = router.soma
     const path = router.notePath
     const view = router.view
+    const link = router.link
     const loaded = app.somasLoaded
     untrack(() => {
       if (!loaded) return
@@ -98,6 +100,11 @@
           router.goSoma(app.somas[0].id, true)
           return
         }
+      }
+      // An internal link: the server says where the entry is now.
+      if (link && app.somaId === soma) {
+        void app.followLink(link)
+        return
       }
       app.openPath(app.somaId && soma === app.somaId && view === 'soma' ? path : null)
     })
@@ -372,6 +379,16 @@
           <button
             type="button"
             class="icon-btn"
+            aria-label={strings.links.open}
+            title={strings.links.open}
+            aria-haspopup="dialog"
+            onclick={() => (app.linkDialog = app.note?.path ?? null)}
+          >
+            <Icon name="link" size={18} />
+          </button>
+          <button
+            type="button"
+            class="icon-btn"
             aria-label={strings.exportNote.open}
             title={strings.exportNote.open}
             aria-haspopup="menu"
@@ -432,6 +449,10 @@
     </div>
   </main>
 </div>
+
+{#if app.linkDialog}
+  <LinkDialog path={app.linkDialog} />
+{/if}
 
 {#if exportMenu}
   <ContextMenu x={exportMenu.x} y={exportMenu.y} items={exportMenu.items} onclose={() => (exportMenu = null)} />

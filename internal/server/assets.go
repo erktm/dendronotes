@@ -84,6 +84,10 @@ func (a *assets) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (a *assets) serveIndex(w http.ResponseWriter, r *http.Request) {
 	h := w.Header()
 	h.Set("Cache-Control", "no-store")
+	// Pages of public share links stay out of search engines.
+	if strings.HasPrefix(r.URL.Path, "/p/") {
+		h.Set("X-Robots-Tag", "noindex, nofollow")
+	}
 	if a.index == nil {
 		h.Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusServiceUnavailable)

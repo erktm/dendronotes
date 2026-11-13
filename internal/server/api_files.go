@@ -9,6 +9,7 @@ import (
 
 	"dendronotes/internal/attach"
 	"dendronotes/internal/httpx"
+	"dendronotes/internal/somas"
 )
 
 // fileCSP applies to files opened directly in the browser. They are
@@ -20,8 +21,13 @@ const fileCSP = "default-src 'none'; img-src 'self' data:; media-src 'self'; sty
 // The content type follows the extension, never the content; unknown types
 // are downloads.
 func (s *Server) handleReadFile(w http.ResponseWriter, r *http.Request) {
-	rt := runtimeOf(r)
-	f, e, err := rt.Soma.OpenFile(r.PathValue("path"))
+	s.serveFile(w, r, runtimeOf(r), r.PathValue("path"))
+}
+
+// serveFile delivers a file of a soma with its checked type, never sniffed,
+// under the sandboxing CSP.
+func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, rt *somas.Runtime, p string) {
+	f, e, err := rt.Soma.OpenFile(p)
 	if err != nil {
 		s.somaError(w, r, err)
 		return

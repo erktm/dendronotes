@@ -11,15 +11,21 @@
   import { strings } from './lib/strings'
 
   // The page of reset and welcome links works without (and apart from) a
-  // session.
+  // session, and so does the page of a public link (/p/<token>).
   const resetPage = location.pathname === RESET_PATH
+  const publicToken = /^\/p\/([A-Za-z0-9_-]{32,64})\/?$/.exec(location.pathname)?.[1] ?? ''
 
   onMount(() => {
-    if (!resetPage) void app.init()
+    if (!resetPage && !publicToken) void app.init()
   })
 </script>
 
-{#if resetPage}
+{#if publicToken}
+  <!-- Loaded on demand: most visits never need it. -->
+  {#await import('./components/PublicView.svelte') then m}
+    <m.default token={publicToken} />
+  {/await}
+{:else if resetPage}
   <ResetPassword />
 {:else if app.auth === 'checking'}
   <div class="splash" aria-label={strings.app.loading}><Logo size={40} /></div>

@@ -37,6 +37,41 @@ export const strings = {
     markdown: 'Download as Markdown',
     print: 'Print or save as PDF',
   },
+  links: {
+    open: 'Share',
+    title: (name: string) => `Share “${name}”`,
+    internal: 'Link for people in this soma',
+    internalHint: 'Opens this entry for everyone with access to the soma, also after it is renamed or moved.',
+    copy: 'Copy link',
+    copied: 'Link copied.',
+    copyFailed: 'Couldn’t copy the link.',
+    public: 'Public links',
+    publicHint:
+      'Anyone with a public link can read this note or drawing without signing in, also after it is moved. Pictures and drawings it shows go along; other notes stay hidden.',
+    create: 'Create public link',
+    expiry: 'Expires',
+    expiries: { 0: 'Never', 1: 'After 1 day', 7: 'After 7 days', 30: 'After 30 days', 90: 'After 90 days', 365: 'After a year' } as Record<number, string>,
+    newLink: 'Your new public link. Copy it now: it is shown only once.',
+    none: 'No public links to this entry.',
+    revoke: 'Revoke',
+    revokeLabel: (path: string) => `Revoke the public link to ${path}`,
+    revoked: 'Public link revoked.',
+    meta: (date: string, by: string | null) => (by ? `Created ${date} by ${by}` : `Created ${date}`),
+    expires: (date: string) => `expires ${date}`,
+    expired: 'expired',
+    others: (n: number) => `Public links to other entries in this soma (${n})`,
+    onlyEditors: 'Editors of the soma can create public links.',
+    linkGone: 'This link points to nothing anymore.',
+    close: 'Close',
+  },
+  publicPage: {
+    readOnly: 'Shared read-only',
+    loading: 'Loading …',
+    notFound: 'This link does not exist, or it was revoked.',
+    expired: 'This link has expired.',
+    sharedWith: 'Shared with',
+    drawingLabel: (name: string) => `Drawing ${name}`,
+  },
 
   editor: {
     toggleTask: 'Toggle task',
@@ -1103,6 +1138,11 @@ export const strings = {
   /** Messages for the API's error codes (see docs/openapi.yaml). */
   errors: {
     byCode: {
+      not_shareable: 'Only notes and drawings can get a public link.',
+      not_a_file: 'Only files can have a link.',
+      too_many_links: 'This soma has as many public links as it may have. Revoke some first.',
+      invalid_days: 'That expiry isn’t possible.',
+      link_expired: 'This link has expired.',
       network: 'Can’t reach the server. Check your connection.',
       invalid_name: 'That name isn’t allowed. Avoid \\ / : * ? " < > | and leading dots.',
       invalid_path: 'That path isn’t valid.',

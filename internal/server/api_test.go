@@ -128,7 +128,8 @@ func TestRouteAccess(t *testing.T) {
 		url := concrete.Replace(p)
 		switch rt.access {
 		case public:
-			if p != "/healthz" && p != "/readyz" && !strings.HasPrefix(p, "/api/auth/") {
+			// Signing in, and what public share links show.
+			if p != "/healthz" && p != "/readyz" && !strings.HasPrefix(p, "/api/auth/") && !strings.HasPrefix(p, "/api/public/") {
 				t.Errorf("public route %s %s", rt.method, p)
 			}
 		case somaViewer, somaWriter, somaContributor, somaEditor, somaOwner:

@@ -23,6 +23,7 @@ import { type FolderOrder, type Orders, type SortMode, type TreeNode, buildTree,
 import { readDropped } from '../dropped'
 import { isDrawingPath, withDrawingExtension } from '../drawing/paths'
 import * as drawingsApi from '../api/drawings'
+import * as linksApi from '../api/links'
 import { NoteSession } from './note.svelte'
 import { live, type CollabEventName } from './live.svelte'
 import type { CollabEvent, NoticeEvent, PresenceEvent, SavedEvent } from '../api/collab'
@@ -507,6 +508,23 @@ class App {
     }
     this.clearSelection()
     if (names.length) await this.placeInOrder(folder, names, before)
+  }
+
+  // --- Links ---------------------------------------------------------------
+
+  /** The file whose link dialog is open. */
+  linkDialog = $state<string | null>(null)
+
+  /** Opens the entry an internal link points to (it may have moved). */
+  async followLink(id: string): Promise<void> {
+    try {
+      const l = await linksApi.openLink(id)
+      for (const dir of ancestors(l.path)) this.expanded.add(dir)
+      router.go(l.path, true)
+    } catch (err) {
+      this.toast(err instanceof ApiError && err.code === 'not_found' ? strings.links.linkGone : errorMessage(err))
+      router.go(null, true)
+    }
   }
 
   // --- Sorting and selection ---------------------------------------------

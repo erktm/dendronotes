@@ -29,6 +29,8 @@ Kubernetes, also in an air gap.
   SVG or PNG.
 - **File tree** with several entries moved or deleted at once, folders sorted by name, date or
   by hand for everyone, and whole folders dropped in from the computer.
+- **Links** to notes and drawings that keep working when they move, for people in the soma or
+  public and read-only, with an optional expiry.
 - **Search** across all notes with phrases and `#tags`.
 - **Comments** with `@mentions`, a **history** of every note, a **trash** with restore.
 - **Email** through any SMTP relay: somas shared with you, mentions and replies you have not

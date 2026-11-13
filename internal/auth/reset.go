@@ -52,6 +52,19 @@ func (a *Authenticator) limitResets(w http.ResponseWriter, r *http.Request) bool
 	return true
 }
 
+// LimitShared applies the per-IP limit for public share links (pages and
+// the files on them); false means the answer was written.
+func (a *Authenticator) LimitShared(w http.ResponseWriter, r *http.Request) bool {
+	ip := a.ips.ClientIP(r).String()
+	if ok, wait := a.shared.allow(ip); !ok {
+		secs := int(math.Ceil(wait.Seconds()))
+		w.Header().Set("Retry-After", strconv.Itoa(secs))
+		httpx.WriteJSON(w, http.StatusTooManyRequests, map[string]any{"error": "rate_limited", "retryAfter": secs})
+		return false
+	}
+	return true
+}
+
 // HandleForgotPassword sends a reset link to the account with the given
 // user name or email address, if there is one that may have it.
 func (a *Authenticator) HandleForgotPassword(w http.ResponseWriter, r *http.Request) {

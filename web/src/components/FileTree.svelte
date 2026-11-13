@@ -46,6 +46,9 @@
         { label: strings.tree.newFolder, icon: 'folder-plus', action: () => startCreate('new-folder', folder) },
       )
     }
+    if (node && node.type === 'file') {
+      items.push({ label: strings.links.open, icon: 'link', action: () => (app.linkDialog = node.path) })
+    }
     if (node && app.can.organize) {
       items.push(
         { label: strings.tree.rename, icon: 'pencil', action: () => (app.edit = { kind: 'rename', path: node.path }) },

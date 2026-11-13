@@ -41,6 +41,13 @@ Files in a soma remain plain, Obsidian-compatible Markdown; the wiki link syntax
   folder's context menu (the tree's own for the top level) orders it by name, last change,
   creation or by hand; the order is the same for everyone in the soma, and in a folder sorted
   by hand you drag entries into place. Folders always come first.
+- **Links to notes and drawings.** "Share" (the link button in the top bar, in the drawing
+  editor or in the tree's context menu) copies a link for people in the soma; it opens the
+  note or drawing wherever it is by then, also after renaming or moving it, including moves
+  made in Obsidian. Editors can also create **public links**: anyone with such a link reads the
+  note or drawing without signing in, with the pictures and drawings it shows; synapses and
+  other notes stay hidden. A public link can expire, is shown only when it is created, and can
+  be revoked in the same dialog, which also lists all public links of the soma.
 - **Attachments.** Paste an image or drop files into the editor: they are uploaded next to the
   note and embedded as `![[photo.png]]`. Files dropped on a folder in the tree (or picked with
   the upload button) go into that folder; whole folders from the Finder or Explorer arrive

@@ -5,6 +5,7 @@ import { encodePath } from './paths'
 //   /s/<soma>              a soma without an open note
 //   /s/<soma>/n/<path>     a note
 //   /s/<soma>/graph        the graph
+//   /s/<soma>/l/<id>       an internal link: opens the entry wherever it is now
 //   /admin, /admin/<tab>   the admin area
 // The server answers every such URL with index.html, so links and reloads work.
 
@@ -15,9 +16,11 @@ export interface Route {
   notePath: string | null
   view: View
   adminTab: string
+  /** An internal link to follow (/s/<soma>/l/<id>). */
+  link?: string
 }
 
-const SOMA = /^\/s\/([a-z0-9]{1,40})(?:\/(n\/.+|graph))?\/?$/
+const SOMA = /^\/s\/([a-z0-9]{1,40})(?:\/(n\/.+|graph|l\/[a-z0-9]{1,40}))?\/?$/
 
 export function parse(pathname: string): Route {
   if (pathname === '/admin' || pathname.startsWith('/admin/')) {
@@ -28,6 +31,7 @@ export function parse(pathname: string): Route {
   const soma = m[1]!
   const rest = m[2]
   if (rest === 'graph') return { soma, notePath: null, view: 'graph', adminTab: '' }
+  if (rest?.startsWith('l/')) return { soma, notePath: null, view: 'soma', adminTab: '', link: rest.slice(2) }
   if (rest?.startsWith('n/')) {
     try {
       const p = rest.slice(2).split('/').map(decodeURIComponent).join('/')
@@ -48,6 +52,7 @@ function format(r: Route): string {
   if (r.view === 'admin') return r.adminTab && r.adminTab !== 'users' ? `/admin/${r.adminTab}` : '/admin'
   if (!r.soma) return '/'
   if (r.view === 'graph') return `/s/${r.soma}/graph`
+  if (r.link) return `/s/${r.soma}/l/${r.link}`
   return r.notePath ? noteURL(r.soma, r.notePath) : `/s/${r.soma}`
 }
 
@@ -56,6 +61,8 @@ class Router {
   notePath = $state<string | null>(null)
   view = $state<View>('soma')
   adminTab = $state('users')
+  /** An internal link the app follows, then replaces with the entry's URL. */
+  link = $state<string | null>(null)
 
   /** The graph view is open (instead of a note). */
   graph = $derived(this.view === 'graph')
@@ -70,6 +77,7 @@ class Router {
     this.notePath = r.notePath
     this.view = r.view
     this.adminTab = r.adminTab || 'users'
+    this.link = r.link ?? null
   }
 
   private push(r: Route, replace: boolean): void {

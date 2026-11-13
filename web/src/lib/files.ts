@@ -34,9 +34,9 @@ export function versionedFileURL(path: string, version: number | undefined): str
   return version ? `${fileURL(path)}?v=${version}` : fileURL(path)
 }
 
-const FILE_URL = /^\/api\/somas\/[a-z0-9]{1,40}\/files\/[^\\]*$/
+const FILE_URL = /^\/api\/(?:somas\/[a-z0-9]{1,40}|public\/[A-Za-z0-9_-]{32,64})\/files\/[^\\]*$/
 
-/** Whether a URL points to a file served from a soma (and nothing else). */
+/** Whether a URL points to a file served from a soma, or through a public link (and nothing else). */
 export function isFileURL(src: string): boolean {
   return FILE_URL.test(src)
 }

@@ -38,6 +38,7 @@ type Runtime struct {
 	MoveMu sync.Mutex
 
 	pruned atomic.Int64 // when the history was last pruned (unix nanoseconds)
+	moved  func(rt *Runtime, from, to string)
 
 	log      *slog.Logger
 	stop     context.CancelFunc
@@ -46,7 +47,7 @@ type Runtime struct {
 	lastUsed atomic.Int64 // unix nanoseconds
 }
 
-func newRuntime(id string, sm *soma.Soma, indexDir, historyFile string, rescan time.Duration, maxNote int64, log *slog.Logger) (*Runtime, error) {
+func newRuntime(id string, sm *soma.Soma, indexDir, historyFile string, rescan time.Duration, maxNote int64, moved func(*Runtime, string, string), log *slog.Logger) (*Runtime, error) {
 	hist, err := history.Open(historyFile)
 	if err != nil {
 		return nil, err
@@ -57,7 +58,7 @@ func newRuntime(id string, sm *soma.Soma, indexDir, historyFile string, rescan t
 		return nil, err
 	}
 	ctx, stop := context.WithCancel(context.Background())
-	rt := &Runtime{ID: id, Soma: sm, Index: ix, History: hist, Hub: events.NewHub(maxStreams), log: log, stop: stop, done: make(chan struct{})}
+	rt := &Runtime{ID: id, Soma: sm, Index: ix, History: hist, Hub: events.NewHub(maxStreams), moved: moved, log: log, stop: stop, done: make(chan struct{})}
 	rt.Collab = collab.New(collab.Options{
 		Soma:     sm,
 		MaxBytes: maxNote,
@@ -279,6 +280,11 @@ func (rt *Runtime) hidden(rel string) bool {
 func (rt *Runtime) Publish(ch index.Changes) {
 	if ch.Empty() {
 		return
+	}
+	if rt.moved != nil {
+		for _, m := range ch.Moved {
+			rt.moved(rt, m.From, m.To)
+		}
 	}
 	for _, n := range ch.Notes {
 		rt.Collab.FileChanged(n.Path)

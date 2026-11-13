@@ -35,6 +35,9 @@ type Options struct {
 	// IdleAfter closes a soma nobody used for this long (0: 30 minutes).
 	IdleAfter time.Duration
 	Log       *slog.Logger
+	// Moved is told about notes that moved outside dendronotes (found by
+	// content), so what is kept about them can follow.
+	Moved func(rt *Runtime, from, to string)
 }
 
 // Manager opens and closes somas on demand.
@@ -112,7 +115,7 @@ func (m *Manager) start(s store.Soma) (*Runtime, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open soma %s: %w", s.ID, err)
 	}
-	rt, err := newRuntime(s.ID, sm, dir, hist, m.opts.RescanInterval, m.opts.Soma.MaxNoteBytes, m.opts.Log.With("soma", s.ID))
+	rt, err := newRuntime(s.ID, sm, dir, hist, m.opts.RescanInterval, m.opts.Soma.MaxNoteBytes, m.opts.Moved, m.opts.Log.With("soma", s.ID))
 	if err != nil {
 		sm.Close()
 		return nil, err

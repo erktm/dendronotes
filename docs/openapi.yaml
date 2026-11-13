@@ -140,6 +140,43 @@ paths:
                 type: object
                 properties:
                   banners: { type: array, items: { $ref: "#/components/schemas/ShownBanner" } }
+  /api/public/{token}:
+    parameters:
+      - { name: token, in: path, required: true, schema: { type: string } }
+    get:
+      summary: What a public share link shows
+      description: >
+        No sign-in. A note comes with its text and the files it refers to (the
+        only files the link delivers); a drawing with its SVG file. Answers are
+        marked noindex and limited per client address.
+      security: []
+      responses:
+        "200":
+          description: The shared note or drawing.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [path, kind]
+                properties:
+                  path: { type: string }
+                  kind: { type: string, enum: [note, drawing] }
+                  content: { type: string, description: Notes only. }
+                  files: { type: array, items: { type: string }, description: Notes only. }
+                  svg: { type: string, description: Drawings only. }
+        "404": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+  /api/public/{token}/files/{path}:
+    parameters:
+      - { name: token, in: path, required: true, schema: { type: string } }
+      - $ref: "#/components/parameters/path"
+    get:
+      summary: A file a shared note refers to
+      security: []
+      responses:
+        "200": { description: The file, with the same type rules and sandbox as in a soma. }
+        "404": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
   /api/auth/password/forgot:
     post:
       summary: Ask for a link to reset the password by email
@@ -621,6 +658,83 @@ paths:
         "204": { description: Stored; open trees load again. }
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/links:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+    post:
+      summary: The internal link of a file
+      description: >
+        For everyone with access; made on first use, one per file. It opens at
+        /s/{soma}/l/{id} and follows the file when it is renamed or moved.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [path], properties: { path: { type: string } } }
+      responses:
+        "200": { description: The link., content: { application/json: { schema: { $ref: "#/components/schemas/ShareLink" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/links/{id}:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      summary: Where an internal link points now
+      responses:
+        "200": { description: The link with the file's current path., content: { application/json: { schema: { $ref: "#/components/schemas/ShareLink" } } } }
+        "404": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/shares:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+    get:
+      summary: The soma's public links (editor)
+      description: API tokens cannot manage public links.
+      responses:
+        "200":
+          description: Newest first; the tokens themselves are not kept.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  links: { type: array, items: { $ref: "#/components/schemas/ShareLink" } }
+        "403": { $ref: "#/components/responses/Error" }
+    post:
+      summary: Make a public read-only link to a note or drawing (editor)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path]
+              properties:
+                path: { type: string }
+                days: { type: integer, minimum: 0, maximum: 365, description: How long it lasts; 0 means it does not expire. }
+      responses:
+        "201":
+          description: The link and its token, shown only now (the page is /p/{token}).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  link: { $ref: "#/components/schemas/ShareLink" }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/shares/{id}:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+      - { name: id, in: path, required: true, schema: { type: string } }
+    delete:
+      summary: Revoke a public link (editor)
+      responses:
+        "204": { description: Revoked. }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
   /api/somas/{soma}/notes/{path}:
@@ -2038,6 +2152,16 @@ components:
         size: { type: integer }
         createdBy: { type: integer }
         createdAt: { type: string, format: date-time }
+    ShareLink:
+      type: object
+      required: [id, path, kind, createdAt]
+      properties:
+        id: { type: string }
+        path: { type: string, description: Where the file is now. }
+        kind: { type: string, enum: [internal, public] }
+        createdBy: { $ref: "#/components/schemas/Person" }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time, description: Public links that expire. }
     Person:
       type: object
       properties:

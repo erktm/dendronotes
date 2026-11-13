@@ -47,7 +47,8 @@ func (s *Server) recordTrash(r *http.Request, somaID, p, dst string, dir bool) {
 }
 
 // follow lets what dendronotes keeps about a note or folder – history,
-// comments and sort orders – go along when it moves (rename, trash, restore).
+// comments, sort orders and links – go along when it moves (rename, trash,
+// restore, or a move outside dendronotes the index recognized).
 func (s *Server) follow(rt *somas.Runtime, from, to string) {
 	rt.MoveHistory(from, to)
 	if err := s.store.MoveComments(context.Background(), rt.ID, from, to); err != nil {
@@ -55,6 +56,9 @@ func (s *Server) follow(rt *somas.Runtime, from, to string) {
 	}
 	if err := s.store.MoveFolderOrder(context.Background(), rt.ID, from, to); err != nil {
 		s.log.Error("moving sort orders failed", "from", from, "to", to, "err", err)
+	}
+	if err := s.store.MoveShareLinks(context.Background(), rt.ID, from, to); err != nil {
+		s.log.Error("moving share links failed", "from", from, "to", to, "err", err)
 	}
 }
 
@@ -66,6 +70,9 @@ func (s *Server) forget(rt *somas.Runtime, p string) {
 	}
 	if err := s.store.RemoveFolderOrder(context.Background(), rt.ID, p); err != nil {
 		s.log.Error("removing sort orders failed", "path", p, "err", err)
+	}
+	if err := s.store.RemoveShareLinks(context.Background(), rt.ID, p); err != nil {
+		s.log.Error("removing share links failed", "path", p, "err", err)
 	}
 }
 

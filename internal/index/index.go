@@ -15,6 +15,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -92,6 +93,14 @@ type Changes struct {
 	Tree    bool         `json:"tree"`    // files or folders appeared or disappeared
 	Notes   []NoteChange `json:"notes"`   // notes with new content (including new notes)
 	Removed []string     `json:"removed"` // notes that are gone
+	// Moved are notes that went away and came back elsewhere with the same
+	// content in one sync: moves made outside dendronotes (Obsidian, git).
+	Moved []Move `json:"-"`
+}
+
+// Move is a note that moved from one path to another.
+type Move struct {
+	From, To string
 }
 
 // NoteChange is a note with its new version.
@@ -248,6 +257,7 @@ func (ix *Index) syncLocked(ctx context.Context) (Changes, error) {
 	}
 	defer tx.Rollback()
 
+	added := map[string][]string{} // new notes by content
 	for _, e := range tree {
 		if e.Type != "file" || !soma.IsNote(e.Path) {
 			continue
@@ -271,13 +281,21 @@ func (ix *Index) syncLocked(ctx context.Context) (Changes, error) {
 			return Changes{}, err
 		}
 		ch.Notes = append(ch.Notes, NoteChange{Path: e.Path, ETag: etag})
+		if !exists && etag != "" && etag != emptyETag {
+			added[etag] = append(added[etag], e.Path)
+		}
 	}
+	gone := map[string][]string{} // by content
 	for p, old := range known {
 		if err := deleteNote(tx, old.id); err != nil {
 			return Changes{}, err
 		}
 		ch.Removed = append(ch.Removed, p)
+		if old.etag != "" && old.etag != emptyETag {
+			gone[old.etag] = append(gone[old.etag], p)
+		}
 	}
+	ch.Moved = pairMoves(gone, added)
 	if err := tx.Commit(); err != nil {
 		return Changes{}, err
 	}
@@ -289,6 +307,24 @@ func (ix *Index) syncLocked(ctx context.Context) (Changes, error) {
 		ix.log.Info("index ready", "notes", len(ix.Resolver().Notes()))
 	}
 	return ch, nil
+}
+
+// emptyETag is the version of an empty note: empty notes are not told apart.
+var emptyETag = soma.ETag(nil)
+
+// pairMoves matches vanished and new notes by content. Only a content that
+// vanished once and appeared once counts as a move; anything else stays a
+// removal and a new note.
+func pairMoves(gone, added map[string][]string) []Move {
+	var out []Move
+	for etag, from := range gone {
+		to := added[etag]
+		if len(from) == 1 && len(to) == 1 {
+			out = append(out, Move{From: from[0], To: to[0]})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].From < out[j].From })
+	return out
 }
 
 func (ix *Index) storeResolver(entries map[string]soma.Entry) {

@@ -150,6 +150,11 @@ func New(cfg config.Config, log *slog.Logger, webFS fs.FS, version string) (*Ser
 		RescanInterval: cfg.RescanInterval,
 		HistoryDays:    cfg.HistoryDays,
 		Log:            log,
+		// Moved outside dendronotes: history, comments, orders and links follow.
+		Moved: func(rt *somas.Runtime, from, to string) {
+			log.Info("note moved outside dendronotes", "soma", rt.ID, "from", from, "to", to)
+			s.follow(rt, from, to)
+		},
 	})
 	s.addCloser("somas", s.somas.Close)
 	if cfg.TrashDays > 0 {
