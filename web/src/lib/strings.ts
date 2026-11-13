@@ -1026,7 +1026,7 @@ export const strings = {
   tree: {
     newNote: 'New note',
     newDrawing: 'New drawing',
-    newMenu: 'New note or drawing',
+    newMenu: 'New note, drawing or folder',
     drawingName: 'Drawing name',
     newFolder: 'New folder',
     rename: 'Rename',

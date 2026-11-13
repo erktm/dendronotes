@@ -69,6 +69,7 @@
       items: [
         { label: strings.tree.newNote, icon: 'note', action: () => app.startCreate('new-note', targetFolder()) },
         { label: strings.tree.newDrawing, icon: 'drawing', action: () => app.startCreate('new-drawing', targetFolder()) },
+        { label: strings.tree.newFolder, icon: 'folder-plus', action: () => app.startCreate('new-folder', targetFolder()) },
       ],
     }
   }
@@ -98,14 +99,6 @@
           <Icon name="chevron-down" size={13} />
         </button>
       </div>
-      <button
-        type="button"
-        aria-label={strings.tree.newFolder}
-        title={strings.tree.newFolder}
-        onclick={() => app.startCreate('new-folder', targetFolder())}
-      >
-        <Icon name="folder-plus" size={18} />
-      </button>
       <button type="button" aria-label={strings.files.upload} title={strings.files.uploadHint} onclick={() => picker?.click()}>
         <Icon name="upload" size={18} />
       </button>

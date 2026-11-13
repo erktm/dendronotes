@@ -224,7 +224,7 @@ up to `DENDRONOTES_MAX_UPLOAD_MB`. The content must match the extension.
   a small square; the server stores it in `state.db`, encoded anew without metadata, and shows
   it only to people you share a soma with (and to admins). Pictures appear in the header (yours),
   at the bottom of a note (the others in it), in the sharing dialog and in the administration.
-- **Administration** (the gear in the left rail, admins only):
+- **Administration** (the person with a gear in the left rail, admins only):
   - *Users*: create accounts, change role, disable, set a new password, sign out everywhere,
     delete. A deleted account's somas go to an account you choose or to the trash. The last
     admin can be neither demoted, disabled nor deleted. With e-mail configured, *Send a welcome
