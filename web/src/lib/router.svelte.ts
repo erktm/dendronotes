@@ -7,9 +7,10 @@ import { encodePath } from './paths'
 //   /s/<soma>/graph        the graph
 //   /s/<soma>/l/<id>       an internal link: opens the entry wherever it is now
 //   /admin, /admin/<tab>   the admin area
+//   /tutorials, /tutorials/<topic>  the tutorials
 // The server answers every such URL with index.html, so links and reloads work.
 
-export type View = 'soma' | 'graph' | 'admin'
+export type View = 'soma' | 'graph' | 'admin' | 'tutorials'
 
 export interface Route {
   soma: string | null
@@ -18,11 +19,16 @@ export interface Route {
   adminTab: string
   /** An internal link to follow (/s/<soma>/l/<id>). */
   link?: string
+  /** The open tutorial (/tutorials/<topic>). */
+  topic?: string
 }
 
 const SOMA = /^\/s\/([a-z0-9]{1,40})(?:\/(n\/.+|graph|l\/[a-z0-9]{1,40}))?\/?$/
 
 export function parse(pathname: string): Route {
+  if (pathname === '/tutorials' || pathname.startsWith('/tutorials/')) {
+    return { soma: null, notePath: null, view: 'tutorials', adminTab: '', topic: pathname.slice('/tutorials/'.length) }
+  }
   if (pathname === '/admin' || pathname.startsWith('/admin/')) {
     return { soma: null, notePath: null, view: 'admin', adminTab: pathname.slice('/admin/'.length) || 'users' }
   }
@@ -50,6 +56,7 @@ export function noteURL(soma: string, path: string): string {
 
 function format(r: Route): string {
   if (r.view === 'admin') return r.adminTab && r.adminTab !== 'users' ? `/admin/${r.adminTab}` : '/admin'
+  if (r.view === 'tutorials') return r.topic ? `/tutorials/${r.topic}` : '/tutorials'
   if (!r.soma) return '/'
   if (r.view === 'graph') return `/s/${r.soma}/graph`
   if (r.link) return `/s/${r.soma}/l/${r.link}`
@@ -63,6 +70,8 @@ class Router {
   adminTab = $state('users')
   /** An internal link the app follows, then replaces with the entry's URL. */
   link = $state<string | null>(null)
+  /** The open tutorial. */
+  topic = $state('')
 
   /** The graph view is open (instead of a note). */
   graph = $derived(this.view === 'graph')
@@ -78,6 +87,7 @@ class Router {
     this.view = r.view
     this.adminTab = r.adminTab || 'users'
     this.link = r.link ?? null
+    this.topic = r.topic ?? ''
   }
 
   private push(r: Route, replace: boolean): void {
@@ -106,6 +116,11 @@ class Router {
 
   goGraph(): void {
     this.push({ soma: this.soma, notePath: null, view: 'graph', adminTab: '' }, false)
+  }
+
+  /** Opens the tutorials (a topic, or the first one). */
+  goTutorials(topic = ''): void {
+    this.push({ soma: this.soma, notePath: null, view: 'tutorials', adminTab: '', topic }, false)
   }
 
   goAdmin(tab = 'users'): void {

@@ -13,6 +13,8 @@
     ongraph,
     admin,
     onadmin,
+    tutorials,
+    ontutorials,
   }: {
     /** What the open sidebar shows; null when it is closed or the graph or admin area is open. */
     view: 'files' | 'search' | null
@@ -25,6 +27,9 @@
     /** The admin area is open. */
     admin: boolean
     onadmin: () => void
+    /** The tutorials are open. */
+    tutorials: boolean
+    ontutorials: () => void
   } = $props()
 </script>
 
@@ -86,6 +91,18 @@
       <Icon name="shield" size={20} />
     </button>
   {/if}
+
+  <button
+    class="item"
+    class:active={tutorials}
+    type="button"
+    aria-label={strings.tutorials.open}
+    aria-pressed={tutorials}
+    title={tutorials ? strings.tutorials.back : strings.tutorials.open}
+    onclick={ontutorials}
+  >
+    <Icon name="book" size={20} />
+  </button>
 
   <button class="item" type="button" aria-label={strings.nav.settings} title={strings.settings.open} onclick={onopensettings}>
     <svg viewBox="0 0 24 24" aria-hidden="true">

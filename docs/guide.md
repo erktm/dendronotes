@@ -161,6 +161,10 @@ duplicate, ⌘C / ⌘V copy and paste (also between drawings), ⌘] / ⌘[ forwa
 text, ⇧1 fits the drawing, ⌘ + scroll or pinch zooms. Shift keeps proportions and 15° steps;
 Alt-drag moves a copy.
 
+**Tutorials** (the book above the settings in the left rail): short step-by-step guides to
+the essentials: the first note, synapses, the file tree, drawings, working together, links,
+search and export.
+
 **Settings** (stored in the browser, never in the soma): live preview, Vim key bindings,
 readable line length, note font (sans or serif), theme (system, light, dark), color palette,
 the details panel, and whether renaming updates synapses.

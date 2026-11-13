@@ -86,7 +86,7 @@
     const loaded = app.somasLoaded
     untrack(() => {
       if (!loaded) return
-      if (view === 'admin') {
+      if (view === 'admin' || view === 'tutorials') {
         // Keep the sidebar useful in the admin area: open the last soma behind it.
         if (!app.somaId && app.preferredSoma()) app.useSoma(app.preferredSoma())
       } else {
@@ -120,7 +120,7 @@
 
   $effect(() => {
     document.title = strings.app.title(
-      router.view === 'admin' ? strings.admin.title : router.graph ? strings.graph.title : app.note ? displayName(app.note.path) : app.soma?.name,
+      router.view === 'admin' ? strings.admin.title : router.view === 'tutorials' ? strings.tutorials.title : router.graph ? strings.graph.title : app.note ? displayName(app.note.path) : app.soma?.name,
     )
   })
 
@@ -129,6 +129,12 @@
     if (router.view === 'admin') {
       router.goSoma(app.somaId || app.preferredSoma())
     } else router.goAdmin()
+  }
+
+  /** Opens the tutorials, or returns to the notes from them. */
+  function toggleTutorials() {
+    if (router.view === 'tutorials') router.goSoma(app.somaId || app.preferredSoma())
+    else router.goTutorials()
   }
 
   async function createSoma() {
@@ -149,8 +155,8 @@
     else router.goGraph()
   }
 
-  /** The graph or the admin area fills the main area instead of a note. */
-  const mainView = $derived(router.view === 'admin' || router.graph)
+  /** The graph, the admin area or the tutorials fill the main area instead of a note. */
+  const mainView = $derived(router.view === 'admin' || router.view === 'tutorials' || router.graph)
 
   /**
    * The rail works like tabs: only one entry is marked. From the graph or the
@@ -161,6 +167,7 @@
     if (mainView) {
       keepSidebar = true // on phones the route change would close it again
       if (router.view === 'admin') toggleAdmin()
+      else if (router.view === 'tutorials') toggleTutorials()
       else toggleGraph()
     } else if (sidebarOpen && app.sidebarView === panel) {
       sidebarOpen = false
@@ -306,6 +313,8 @@
     ongraph={toggleGraph}
     admin={router.view === 'admin'}
     onadmin={toggleAdmin}
+    tutorials={router.view === 'tutorials'}
+    ontutorials={toggleTutorials}
   />
   {#if sidebarOpen}
     {#if phone}
@@ -320,6 +329,8 @@
       <nav class="crumbs" aria-label={strings.soma.location}>
         {#if router.view === 'admin'}
           <span class="current" aria-current="page">{strings.admin.title}</span>
+        {:else if router.view === 'tutorials'}
+          <span class="current" aria-current="page">{strings.tutorials.title}</span>
         {:else if router.graph}
           {#if app.soma}<span>{app.soma.name}</span><span class="sep" aria-hidden="true">/</span>{/if}
           <span class="current" aria-current="page">{strings.graph.title}</span>
@@ -425,6 +436,11 @@
       <div class="content">
         {#if router.view === 'admin'}
           <AdminView />
+        {:else if router.view === 'tutorials'}
+          <!-- Loaded on demand: the main bundle is close to its limit. -->
+          {#await import('./TutorialsView.svelte') then m}
+            <m.default />
+          {/await}
         {:else if router.graph}
           {#key app.somaId}
             <GraphView center={app.lastNotePath} />

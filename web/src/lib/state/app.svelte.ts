@@ -236,7 +236,7 @@ class App {
     }
     const wanted = router.soma
     if (wanted && this.somas.some((s) => s.id === wanted)) return // the shell opens it
-    if (router.view === 'admin') return
+    if (router.view === 'admin' || router.view === 'tutorials') return
     if (wanted) this.toast(strings.somas.notFound)
     router.goSoma(this.preferredSoma(), true)
   }
@@ -316,7 +316,7 @@ class App {
     }
     if (!this.somaId || this.somas.some((s) => s.id === this.somaId)) return
     if (before) this.toast(strings.somas.accessEnded(before.name), 'info')
-    if (router.view === 'admin') this.useSoma(this.preferredSoma())
+    if (router.view === 'admin' || router.view === 'tutorials') this.useSoma(this.preferredSoma())
     else router.goSoma(this.preferredSoma(), true)
   }
 

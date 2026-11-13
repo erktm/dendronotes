@@ -845,6 +845,110 @@ export const strings = {
     noEntries: 'No entries yet.',
   },
 
+  tutorials: {
+    title: 'Tutorials',
+    open: 'Tutorials',
+    back: 'Back to the notes',
+    intro: 'Short guides to what matters most. Each takes a minute.',
+    topicsLabel: 'Tutorials',
+    stepOf: (i: number, n: number) => `Step ${i} of ${n}`,
+    tip: 'Tip',
+    // Text between backticks shows as a key or a piece of Markdown.
+    topics: [
+      {
+        id: 'first-note',
+        title: 'Your first note',
+        summary: 'Write, rename and switch between editing and reading.',
+        steps: [
+          'Click `+` at the top of the file tree, or press `⌘O` and type a name, then `Shift+Enter`.',
+          'The big title above the text is the note’s file name. Change it there to rename the note.',
+          'Write in Markdown: `# Heading`, `**bold**`, `- [ ] task`. The editor shows the result while you type.',
+          'Press `⌘E` or use Edit and Read at the top to switch to the finished view.',
+        ],
+        tip: 'Everything saves on its own; there is no save button to forget.',
+      },
+      {
+        id: 'synapses',
+        title: 'Connect notes with synapses',
+        summary: 'Link notes, follow links back and see the whole picture.',
+        steps: [
+          'Type `[[` and pick a note from the list. `[[Note#Heading]]` points to a heading.',
+          'Click a synapse to open the note. A dashed one leads to a note that does not exist yet: clicking it creates the note.',
+          'The details panel on the right lists the incoming synapses: every note that points here.',
+          'Renaming or moving a note keeps all synapses to it working.',
+          'Press `⌘⇧G` for the graph of all notes and how they connect.',
+        ],
+      },
+      {
+        id: 'organize',
+        title: 'Keep the file tree tidy',
+        summary: 'Folders, moving, sorting and dropping files in.',
+        steps: [
+          'Drag notes and folders onto a folder to move them there.',
+          '`⌘`-click (`Ctrl`-click) several entries, or `Shift`-click a range; the bar above the tree moves or deletes them together.',
+          'Right-click a folder and choose how to sort it: by name, last change, creation or by hand. Sorted by hand, drag entries into place.',
+          'Drop files or whole folders from the Finder or Explorer onto a folder to upload them.',
+        ],
+        tip: 'Deleted entries go to the trash at the bottom of the file tree and can be restored from there.',
+      },
+      {
+        id: 'drawings',
+        title: 'Draw a diagram',
+        summary: 'Shapes, arrows that stick, icons and drawings in notes.',
+        steps: [
+          'Choose “New drawing” from the arrow next to `+` at the top of the file tree.',
+          'Pick a shape on the left (`R`, `O`, `D`, or more shapes below the diamond) and drag on the canvas.',
+          'Draw an arrow (`A`) from one shape to another: it sticks to both and follows them when they move.',
+          'Double-click a shape to write in it. Press `I` for icons, including the packs of your soma.',
+          'Use “Embed in a note” to show the drawing inside a note.',
+        ],
+      },
+      {
+        id: 'together',
+        title: 'Work together',
+        summary: 'Share a soma, edit at the same time, comment and go back in time.',
+        steps: [
+          'Open the soma menu at the top of the sidebar and choose “Share soma …”. Add people or groups and pick what they may do.',
+          'Everyone in a note sees the others’ changes and cursors at once.',
+          'Select text and click Comment to start a thread. `@name` notifies someone.',
+          'The clock at the top shows the note’s history. Restore any earlier version with one click.',
+        ],
+      },
+      {
+        id: 'links',
+        title: 'Send a link to a note',
+        summary: 'Links for your team and public read-only links.',
+        steps: [
+          'Click the link button at the top of a note or drawing (or right-click it in the file tree).',
+          '“Copy link” gives a link for people in the soma. It keeps working when the note is renamed or moved.',
+          'Editors can create a public link: anyone with it reads the note without signing in. Choose when it expires.',
+          'Revoke a public link in the same dialog at any time.',
+        ],
+        tip: 'A public link is shown only once, right after you create it. Copy it then.',
+      },
+      {
+        id: 'find',
+        title: 'Find things fast',
+        summary: 'Quick switcher, search and tags.',
+        steps: [
+          'Press `⌘O` and type a few letters of a note’s name to open it.',
+          'Press `⌘⇧F` to search all notes. `"exact phrase"` finds the phrase, `#tag` a tag.',
+          'Click a result to open the note at that line.',
+        ],
+      },
+      {
+        id: 'export',
+        title: 'Export and print',
+        summary: 'Markdown, PDF, pictures and the whole soma.',
+        steps: [
+          'The download button at the top of a note saves it as Markdown with its title, or prints it. In the print dialog choose “Save as PDF” for a PDF.',
+          'Drawings download as SVG or PNG from “Download” in the drawing editor.',
+          'The soma menu offers the whole soma as a ZIP.',
+        ],
+      },
+    ],
+  },
+
   nav: {
     main: 'Main navigation',
     files: 'Files',
