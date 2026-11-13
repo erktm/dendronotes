@@ -4,6 +4,7 @@
   import * as admin from '../lib/api/admin'
   import type { ServerInfo } from '../lib/api/admin'
   import { formatSize } from '../lib/files'
+  import { ApiError } from '../lib/api/client'
   import { errorMessage } from '../lib/errors'
   import { strings } from '../lib/strings'
 
@@ -45,6 +46,29 @@
       app.toast(errorMessage(err))
     } finally {
       syncing = false
+    }
+  }
+
+  let testing = $state(false)
+  async function testMail() {
+    const to = app.user?.email
+    if (!to) {
+      app.toast(t.mailTestNoAddress)
+      return
+    }
+    testing = true
+    try {
+      await admin.testMail()
+      app.toast(t.mailTestSent(to), 'info')
+    } catch (err) {
+      const detail = err instanceof ApiError && typeof err.body.detail === 'string' ? err.body.detail : ''
+      app.toast(detail ? t.mailTestFailed(detail) : errorMessage(err))
+    } finally {
+      testing = false
+      admin.server().then(
+        (i) => (info = i),
+        () => {},
+      )
     }
   }
 
@@ -190,6 +214,34 @@
           </div>
         {:else}
           <p class="admin-faint">{t.ldapOff}</p>
+        {/if}
+      </div>
+      <div class="admin-card wide">
+        <h3>{t.mail}</h3>
+        {#if info.mail.enabled}
+          {@const m = info.mail}
+          <dl>
+            <dt>{t.mailRelay}</dt>
+            <dd class="admin-mono">{m.host}:{m.port} · {m.tls}</dd>
+            <dt>{t.mailFrom}</dt>
+            <dd class="admin-mono">{m.from}</dd>
+            <dt>{t.mailWaiting}</dt>
+            <dd>{m.waiting}</dd>
+            <dt>{t.mailLastSent}</dt>
+            <dd>{admin.formatDate(m.lastSentAt ?? '') || t.never}</dd>
+            {#if m.lastError}
+              <dt>{t.mailLastError}</dt>
+              <dd>
+                <span class="warn-text">{m.lastError}</span>
+                {#if m.lastErrorAt}<div class="admin-faint">{admin.formatDate(m.lastErrorAt)}</div>{/if}
+              </dd>
+            {/if}
+          </dl>
+          <div class="admin-actions">
+            <button type="button" class="admin-btn" disabled={testing} onclick={() => void testMail()}>{t.mailTest}</button>
+          </div>
+        {:else}
+          <p class="admin-faint">{t.mailOff}</p>
         {/if}
       </div>
     </div>

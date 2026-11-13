@@ -44,6 +44,18 @@
     }
   }
 
+  async function setMail(key: 'mailComments' | 'mailShares', on: boolean) {
+    busy = true
+    try {
+      app.setUser(await api.updateProfile({ [key]: on }))
+      app.toast(strings.profile.mailSaved, 'info')
+    } catch (err) {
+      app.toast(errorMessage(err))
+    } finally {
+      busy = false
+    }
+  }
+
   async function changePassword(e: SubmitEvent) {
     e.preventDefault()
     pwError = ''
@@ -91,6 +103,32 @@
         </div>
       {/if}
     </form>
+
+    {#if app.mailEnabled}
+      <div class="section" role="group" aria-labelledby="mail-title">
+        <h3 id="mail-title">{strings.profile.mailTitle}</h3>
+        {#if !app.user.email}<p class="hint">{strings.profile.mailNoAddress}</p>{/if}
+        <label class="check">
+          <input
+            type="checkbox"
+            checked={app.user.mailComments}
+            disabled={busy || !app.user.email}
+            onchange={(e) => void setMail('mailComments', e.currentTarget.checked)}
+          />
+          {strings.profile.mailComments}
+        </label>
+        <label class="check">
+          <input
+            type="checkbox"
+            checked={app.user.mailShares}
+            disabled={busy || !app.user.email}
+            onchange={(e) => void setMail('mailShares', e.currentTarget.checked)}
+          />
+          {strings.profile.mailShares}
+        </label>
+        <p class="hint">{strings.profile.mailSecurity}</p>
+      </div>
+    {/if}
 
     {#if local}
       <form class="section" onsubmit={changePassword}>
@@ -183,7 +221,7 @@
     font-size: var(--text-sm);
     font-weight: 550;
   }
-  input {
+  input:not([type='checkbox']) {
     height: 38px;
     padding: 0 var(--space-3);
     border: 1px solid var(--line-strong);
@@ -192,10 +230,22 @@
     color: var(--text);
     font: inherit;
   }
-  input:focus-visible {
+  input:not([type='checkbox']):focus-visible {
     outline: 2px solid var(--focus);
     outline-offset: 1px;
     border-color: transparent;
+  }
+  label.check {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    margin: 8px 0 0;
+    font-weight: 400;
+    cursor: pointer;
+  }
+  label.check input {
+    margin: 3px 0 0;
+    accent-color: var(--accent);
   }
   .error {
     margin: 8px 0 0;

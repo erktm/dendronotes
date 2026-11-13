@@ -38,6 +38,10 @@ export interface User {
   createdAt: string
   lastLoginAt: string
   avatar: Avatar
+  /** Unread mentions and replies also by e-mail. */
+  mailComments: boolean
+  /** An e-mail when a soma is shared with the account. */
+  mailShares: boolean
 }
 
 export type AvatarPattern = 'plain' | 'dendrite' | 'rings' | 'vesicles'
@@ -61,6 +65,8 @@ export interface Me {
   user: User
   mode: 'local' | 'proxy'
   logoutUrl?: string
+  /** E-mail is configured on the server. */
+  mail?: boolean
 }
 
 export type { ShareRole, SomaRole } from '../roles'
@@ -181,9 +187,18 @@ export interface AuthMethods {
   /** The password form is offered to everyone (else only via ?local=1, for the admin). */
   local: boolean
   sso: { label: string } | null
+  /** "Forgot password" is offered (e-mail is configured). */
+  passwordReset?: boolean
 }
 
 export const authMethods = () => request<AuthMethods>('GET', '/api/auth/methods')
+
+/** Asks for a reset link; the answer is the same whether the account exists or not. */
+export const forgotPassword = (login: string) => request<{ ok: boolean }>('POST', '/api/auth/password/forgot', { body: { login } })
+
+/** Sets a password with the token from a reset or welcome e-mail. */
+export const resetPassword = (token: string, password: string) =>
+  request<{ username: string }>('POST', '/api/auth/password/reset', { body: { token, password } })
 
 export const login = (username: string, password: string) =>
   request<Me>('POST', '/api/auth/login', { body: { username, password }, expect401: true })
@@ -230,7 +245,8 @@ export const searchPeople = (q: string, signal?: AbortSignal) =>
   request<{ users: Person[]; groups: Group[] }>('GET', `/api/users/search?q=${encodeURIComponent(q)}`, { signal })
 export const deleteSoma = (id: string) => request<{ id: string }>('DELETE', `/api/somas/${encodeURIComponent(id)}`)
 
-export const updateProfile = (body: { displayName?: string; email?: string }) => request<User>('PATCH', '/api/me', { body })
+export const updateProfile = (body: { displayName?: string; email?: string; mailComments?: boolean; mailShares?: boolean }) =>
+  request<User>('PATCH', '/api/me', { body })
 export const setAvatar = (style: AvatarStyle) => request<User>('PUT', '/api/me/avatar', { body: style })
 /** A square PNG (64 … 512 pixels) the browser has cropped. */
 export const uploadAvatarPhoto = (png: Blob) => request<User>('PUT', '/api/me/avatar/photo', { raw: png })

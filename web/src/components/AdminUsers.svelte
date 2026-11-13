@@ -40,7 +40,17 @@
   let dialog: HTMLDialogElement | undefined = $state()
   let mode = $state<Mode>('create')
   let target = $state.raw<User | null>(null)
-  let form = $state({ username: '', displayName: '', email: '', password: '', role: 'user' as 'admin' | 'user', transferTo: 0 })
+  let form = $state({
+    username: '',
+    displayName: '',
+    email: '',
+    password: '',
+    role: 'user' as 'admin' | 'user',
+    transferTo: 0,
+    sendWelcome: false,
+  })
+  // A welcome e-mail needs an address; with it, the password may stay empty.
+  const welcome = $derived(app.mailEnabled && form.sendWelcome && form.email.trim() !== '')
   let busy = $state(false)
   let formError = $state('')
 
@@ -55,6 +65,7 @@
       password: '',
       role: u?.role ?? 'user',
       transferTo: app.user?.id ?? 0,
+      sendWelcome: app.mailEnabled,
     }
     dialog?.showModal()
   }
@@ -66,7 +77,7 @@
     try {
       if (mode === 'create') {
         const { username, displayName, email, password, role } = form
-        const u = await admin.createUser({ username, displayName, email, password, role })
+        const u = await admin.createUser({ username, displayName, email, password, role, sendWelcome: welcome })
         app.toast(t.userCreated(u.username), 'info')
       } else if (mode === 'edit' && target) {
         await admin.updateUser(target.id, { displayName: form.displayName, email: form.email, role: form.role })
@@ -216,9 +227,23 @@
         <option value="admin">{t.roleAdmin}</option>
       </select>
       {#if mode === 'create'}
-        <label for="u-pw">{t.initialPassword}</label>
-        <input id="u-pw" class="admin-field" type="password" bind:value={form.password} required minlength="10" autocomplete="new-password" />
-        <p>{strings.profile.minLength}</p>
+        {#if app.mailEnabled}
+          <label class="check">
+            <input type="checkbox" bind:checked={form.sendWelcome} disabled={!form.email.trim()} />
+            {t.sendWelcome}
+          </label>
+        {/if}
+        <label for="u-pw">{welcome ? t.passwordOptional : t.initialPassword}</label>
+        <input
+          id="u-pw"
+          class="admin-field"
+          type="password"
+          bind:value={form.password}
+          required={!welcome}
+          minlength="10"
+          autocomplete="new-password"
+        />
+        <p>{welcome ? t.sendWelcomeHint : strings.profile.minLength}</p>
       {/if}
     {:else if mode === 'password'}
       <p>{t.resetText}</p>
@@ -246,6 +271,16 @@
 </dialog>
 
 <style>
+  .check {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-weight: 400;
+    cursor: pointer;
+  }
+  .check input {
+    accent-color: var(--accent);
+  }
   .person {
     display: flex;
     align-items: center;

@@ -53,6 +53,20 @@ export interface ServerInfo {
   localLogin: boolean
   sso: SSOStatus | null
   ldap: LDAPStatus | null
+  mail: MailStatus
+}
+
+export interface MailStatus {
+  enabled: boolean
+  host?: string
+  port?: number
+  tls?: string
+  from?: string
+  /** Messages in the outbox. */
+  waiting: number
+  lastError?: string
+  lastErrorAt?: string
+  lastSentAt?: string
 }
 
 export interface SSOStatus {
@@ -93,8 +107,10 @@ export interface NewUser {
   username: string
   displayName: string
   email: string
+  /** May stay empty with a welcome e-mail: the person chooses it. */
   password: string
   role: 'admin' | 'user'
+  sendWelcome?: boolean
 }
 
 export const users = () => request<{ users: User[] }>('GET', '/api/admin/users').then((r) => r.users)
@@ -166,6 +182,8 @@ export const server = () => request<ServerInfo>('GET', '/api/admin/server')
 export const checkSSO = () => request<SSOStatus>('POST', '/api/admin/sso/check')
 export const checkLDAP = () => request<LDAPStatus>('POST', '/api/admin/ldap/check')
 export const syncLDAP = () => request<LDAPSyncStatus>('POST', '/api/admin/ldap/sync')
+/** Sends a test e-mail to the admin's own address at once. */
+export const testMail = () => request<{ ok: boolean }>('POST', '/api/admin/mail/test')
 
 export const audit = (before = 0, limit = 100) =>
   request<{ entries: AuditEntry[] }>('GET', `/api/admin/audit?limit=${limit}${before ? `&before=${before}` : ''}`).then((r) => r.entries)

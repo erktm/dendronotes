@@ -1,18 +1,21 @@
 <script lang="ts">
-  import Logo from './Logo.svelte'
+  import AuthCard from './AuthCard.svelte'
   import { app } from '../lib/state/app.svelte'
   import { ApiError } from '../lib/api/client'
-  import { authMethods, type AuthMethods } from '../lib/api/soma'
+  import { authMethods, forgotPassword, type AuthMethods } from '../lib/api/soma'
   import { errorMessage } from '../lib/errors'
   import { focusOnMount } from '../lib/actions'
   import { strings } from '../lib/strings'
-  import Wordmark from './Wordmark.svelte'
 
   let username = $state('')
   let password = $state('')
   let busy = $state(false)
   let error = $state('')
   let methods = $state.raw<AuthMethods | null>(null)
+  // "Forgot password": the form, then the confirmation for this login.
+  let forgot = $state(false)
+  let forgotLogin = $state('')
+  let sentFor = $state('')
 
   // ?local=1 shows the password form even when single sign-on replaces it
   // (emergency access for the admin account).
@@ -43,6 +46,14 @@
     )
   })
 
+  function rateLimited(err: unknown): string {
+    if (err instanceof ApiError && err.status === 429) {
+      const secs = typeof err.body.retryAfter === 'number' ? err.body.retryAfter : 0
+      return secs ? strings.auth.tooManyAttempts(secs) : errorMessage(err)
+    }
+    return ''
+  }
+
   async function submit(e: SubmitEvent) {
     e.preventDefault()
     if (!username || !password || busy) return
@@ -55,41 +66,85 @@
         error = strings.auth.wrongPassword
       } else if (err instanceof ApiError && err.code === 'account_disabled') {
         error = strings.auth.accountDisabled
-      } else if (err instanceof ApiError && err.status === 429) {
-        const secs = typeof err.body.retryAfter === 'number' ? err.body.retryAfter : 0
-        error = secs ? strings.auth.tooManyAttempts(secs) : errorMessage(err)
       } else {
-        error = errorMessage(err)
+        error = rateLimited(err) || errorMessage(err)
       }
       password = ''
     } finally {
       busy = false
     }
   }
+
+  function openForgot() {
+    forgot = true
+    forgotLogin = username.trim()
+    sentFor = error = ''
+  }
+
+  function closeForgot() {
+    forgot = false
+    sentFor = error = ''
+  }
+
+  async function sendLink(e: SubmitEvent) {
+    e.preventDefault()
+    const login = forgotLogin.trim()
+    if (!login || busy) return
+    busy = true
+    error = ''
+    try {
+      await forgotPassword(login)
+      sentFor = login
+    } catch (err) {
+      error = rateLimited(err) || errorMessage(err)
+    } finally {
+      busy = false
+    }
+  }
 </script>
 
-<main class="screen">
-  <div class="card">
-    <div class="brand">
-      <Logo size={44} />
-      <Wordmark size="lg" />
-    </div>
-
-    {#if app.mode === 'proxy'}
-      <h1>{strings.auth.proxyTitle}</h1>
-      <p class="lead">{strings.auth.proxyText}</p>
-      <button class="primary" type="button" onclick={() => location.reload()}>{strings.auth.reload}</button>
+<AuthCard>
+  {#if app.mode === 'proxy'}
+    <h1>{strings.auth.proxyTitle}</h1>
+    <p class="lead">{strings.auth.proxyText}</p>
+    <button class="primary" type="button" onclick={() => location.reload()}>{strings.auth.reload}</button>
+  {:else if forgot}
+    <h1>{strings.auth.forgotTitle}</h1>
+    {#if sentFor}
+      <p class="lead" role="status">{strings.auth.forgotSent(sentFor)}</p>
+      <button class="primary" type="button" onclick={closeForgot}>{strings.auth.backToSignIn}</button>
     {:else}
-      <h1>{strings.auth.welcome}</h1>
-      <p class="lead">{strings.auth.lead}</p>
-      {#if methods?.sso}
-        <a class="primary sso" href={ssoHref}>{strings.auth.ssoContinue(methods.sso.label)}</a>
-        {#if showForm}<p class="or"><span>{strings.auth.or}</span></p>{/if}
-      {/if}
-      {#if error && !showForm}
-        <p class="error" role="alert">{error}</p>
-      {/if}
-      {#if showForm}
+      <p class="lead">{strings.auth.forgotLead}</p>
+      <form onsubmit={sendLink}>
+        <label for="forgot-login">{strings.auth.forgotLogin}</label>
+        <input
+          id="forgot-login"
+          type="text"
+          autocomplete="username"
+          autocapitalize="none"
+          spellcheck="false"
+          bind:value={forgotLogin}
+          use:focusOnMount
+          required
+        />
+        {#if error}<p class="error" role="alert">{error}</p>{/if}
+        <button class="primary" type="submit" disabled={busy || !forgotLogin.trim()}>
+          {busy ? strings.auth.forgotSending : strings.auth.forgotSend}
+        </button>
+        <button class="link" type="button" onclick={closeForgot}>{strings.auth.backToSignIn}</button>
+      </form>
+    {/if}
+  {:else}
+    <h1>{strings.auth.welcome}</h1>
+    <p class="lead">{strings.auth.lead}</p>
+    {#if methods?.sso}
+      <a class="primary sso" href={ssoHref}>{strings.auth.ssoContinue(methods.sso.label)}</a>
+      {#if showForm}<p class="or"><span>{strings.auth.or}</span></p>{/if}
+    {/if}
+    {#if error && !showForm}
+      <p class="error" role="alert">{error}</p>
+    {/if}
+    {#if showForm}
       <form onsubmit={submit}>
         <label for="username">{strings.auth.username}</label>
         <input
@@ -121,115 +176,10 @@
         <button class="primary" type="submit" disabled={busy || !username || !password}>
           {busy ? strings.auth.signingIn : strings.auth.signIn}
         </button>
+        {#if methods?.passwordReset}
+          <button class="link" type="button" onclick={openForgot}>{strings.auth.forgot}</button>
+        {/if}
       </form>
-      {/if}
     {/if}
-  </div>
-</main>
-
-<style>
-  .screen {
-    display: grid;
-    place-items: center;
-    min-height: 100%;
-    padding: var(--space-6) var(--space-4);
-    background:
-      radial-gradient(60rem 30rem at 15% -10%, var(--accent-soft), transparent 60%),
-      var(--bg);
-  }
-  .card {
-    width: min(100%, 380px);
-    padding: var(--space-8);
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    background: var(--bg-raised);
-    box-shadow: var(--shadow);
-  }
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    margin-bottom: var(--space-6);
-  }
-  h1 {
-    font-size: var(--text-xl);
-    font-weight: 600;
-    letter-spacing: -0.015em;
-  }
-  .lead {
-    margin: var(--space-2) 0 var(--space-6);
-    color: var(--text-muted);
-  }
-  form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-  label {
-    font-size: var(--text-sm);
-    font-weight: 550;
-  }
-  input[type='password'],
-  input[type='text'] {
-    height: 42px;
-    padding: 0 var(--space-3);
-    border: 1px solid var(--line-strong);
-    border-radius: var(--radius-sm);
-    background: var(--bg);
-    color: var(--text);
-    font: inherit;
-  }
-  label[for='password'] {
-    margin-top: var(--space-2);
-  }
-  input[type='password']:focus-visible,
-  input[type='text']:focus-visible {
-    outline: 2px solid var(--focus);
-    outline-offset: 1px;
-    border-color: transparent;
-  }
-  .error {
-    color: var(--err);
-    font-size: var(--text-sm);
-  }
-  .primary {
-    margin-top: var(--space-3);
-    height: 42px;
-    border: 0;
-    border-radius: var(--radius-sm);
-    background: var(--accent);
-    color: var(--on-accent);
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .primary:hover:not(:disabled) {
-    background: var(--accent-strong);
-  }
-  a.primary {
-    display: grid;
-    place-items: center;
-    margin-top: 0;
-    text-decoration: none;
-  }
-  .sso + .error {
-    margin-top: var(--space-3);
-  }
-  .or {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    margin: var(--space-4) 0;
-    color: var(--text-faint);
-    font-size: var(--text-xs);
-  }
-  .or::before,
-  .or::after {
-    content: '';
-    flex: 1;
-    border-top: 1px solid var(--line);
-  }
-  .primary:disabled {
-    opacity: 0.55;
-    cursor: default;
-  }
-</style>
+  {/if}
+</AuthCard>

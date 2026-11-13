@@ -90,6 +90,8 @@ class App {
   mode = $state<'local' | 'proxy'>('local')
   user = $state.raw<User | null>(null)
   logoutUrl = $state('')
+  /** E-mail is configured on the server (the profile offers its settings). */
+  mailEnabled = $state(false)
   isAdmin = $derived(this.user?.role === 'admin')
 
   /** The somas the account can open, and the one that is open. */
@@ -196,6 +198,7 @@ class App {
     this.user = me.user
     this.mode = me.mode
     this.logoutUrl = me.logoutUrl ?? ''
+    this.mailEnabled = me.mail ?? false
     this.auth = 'authenticated'
     void this.loadSomas()
   }
