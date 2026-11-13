@@ -72,38 +72,6 @@
     }
   }
 
-  // Sign-up: whether people may create accounts, and from which domains.
-  let signup = $state.raw<admin.SignupSettings | null>(null)
-  let signupOpen = $state(false)
-  let signupDomains = $state('')
-  let savingSignup = $state(false)
-
-  $effect(() => {
-    admin.signupSettings().then(
-      (v) => {
-        signup = v
-        signupOpen = v.open
-        signupDomains = v.domains.join('\n')
-      },
-      () => {},
-    )
-  })
-
-  async function saveSignup(e: SubmitEvent) {
-    e.preventDefault()
-    savingSignup = true
-    try {
-      const domains = signupDomains.split(/[\s,;]+/).filter(Boolean)
-      signup = await admin.setSignupSettings(signupOpen, domains)
-      signupDomains = signup.domains.join('\n')
-      app.toast(t.signupSaved, 'info')
-    } catch (err) {
-      app.toast(errorMessage(err))
-    } finally {
-      savingSignup = false
-    }
-  }
-
   let checkingLDAP = $state(false)
   async function checkLDAP() {
     if (!info) return
@@ -174,34 +142,6 @@
           <a class="admin-btn" href={admin.backupURL} download><Icon name="download" size={15} /> {t.downloadBackup}</a>
         </div>
       </div>
-      {#if signup}
-        <div class="admin-card wide">
-          <h3>{t.signup}</h3>
-          <p class="admin-faint">{t.signupText}</p>
-          {#if !signup.possible}
-            <p class="admin-faint">{t.signupImpossible}</p>
-          {:else}
-            <form class="signup" onsubmit={saveSignup}>
-              <label class="check"><input type="checkbox" bind:checked={signupOpen} /> {t.signupAllow}</label>
-              <label for="signup-domains">{t.signupDomains}</label>
-              <textarea
-                id="signup-domains"
-                class="admin-field area"
-                rows="3"
-                spellcheck="false"
-                placeholder="example.org"
-                aria-describedby="signup-domains-hint"
-                bind:value={signupDomains}
-                disabled={!signupOpen}
-              ></textarea>
-              <span class="admin-faint" id="signup-domains-hint">{t.signupDomainsHint}</span>
-              <div class="admin-actions">
-                <button type="submit" class="admin-btn" disabled={savingSignup}>{t.signupSave}</button>
-              </div>
-            </form>
-          {/if}
-        </div>
-      {/if}
       <div class="admin-card wide">
         <h3>{t.sso}</h3>
         {#if info.sso}
@@ -346,26 +286,6 @@
 </div>
 
 <style>
-  .signup {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-top: var(--space-3);
-  }
-  .signup label:not(.check) {
-    font-size: var(--text-sm);
-    font-weight: 550;
-  }
-  .signup .check {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: var(--text-sm);
-  }
-  .signup textarea {
-    min-height: 72px;
-    font-family: var(--font-mono);
-  }
   .warn-text {
     color: var(--warn-text);
   }

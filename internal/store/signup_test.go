@@ -7,24 +7,9 @@ import (
 	"time"
 )
 
-func TestSignupSettingsAndPending(t *testing.T) {
+func TestPendingSignups(t *testing.T) {
 	ctx := context.Background()
 	s := open(t, t.TempDir())
-
-	v, err := s.Signup(ctx)
-	if err != nil || v.Open || len(v.Domains) != 0 {
-		t.Fatalf("default sign-up settings: %+v %v", v, err)
-	}
-	if err := s.SetSignup(ctx, SignupSettings{Open: true, Domains: []string{"example.org"}}); err != nil {
-		t.Fatal(err)
-	}
-	v, _ = s.Signup(ctx)
-	if !v.Open || !v.Allows("anna@Example.ORG") || v.Allows("anna@example.com") || v.Allows("no address") {
-		t.Errorf("domains: %+v", v)
-	}
-	if !(SignupSettings{Open: true}).Allows("anyone@anywhere.example") {
-		t.Error("without domains every address may sign up")
-	}
 
 	p := PendingSignup{Username: "anna", DisplayName: "Anna", Email: "anna@example.org", PasswordHash: "hash"}
 	first, err := s.AddPendingSignup(ctx, p, time.Hour)

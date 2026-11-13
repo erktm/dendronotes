@@ -7,36 +7,27 @@ import (
 	"testing"
 
 	"dendronotes/internal/auth"
+	"dendronotes/internal/config"
 )
 
 var confirmToken = regexp.MustCompile(`/confirm-account#([A-Za-z0-9_-]+)`)
 
 func TestSignup(t *testing.T) {
 	s, relay := newMailServer(t)
-	admin := newClient(t, s)
-	admin.login()
 	anon := newClient(t, s)
 	signup := func(c *client, user, email string) int {
 		t.Helper()
 		return c.do("POST", "/api/auth/signup", `{"username":"`+user+`","displayName":"New Person","email":"`+email+`","password":"a long enough password"}`).Code
 	}
 
-	// Closed until an admin opens it.
+	// Off unless DENDRONOTES_SIGNUP is on.
 	if got := decode[auth.MethodsResponse](t, anon.do("GET", "/api/auth/methods", "")); got.Signup {
-		t.Fatal("sign-up offered while closed")
+		t.Fatal("sign-up offered while off")
 	}
 	expect(t, anon.do("POST", "/api/auth/signup", `{}`), 404, "not_available")
-	expect(t, admin.do("PUT", "/api/admin/signup", `{"open":true,"domains":["Example.org","@team.example","example.org"]}`), 200, "")
-	settings := decode[struct {
-		Open    bool     `json:"open"`
-		Domains []string `json:"domains"`
-	}](t, admin.do("GET", "/api/admin/signup", ""))
-	if !settings.Open || strings.Join(settings.Domains, ",") != "example.org,team.example" {
-		t.Fatalf("settings: %+v", settings)
-	}
-	expect(t, admin.do("PUT", "/api/admin/signup", `{"open":true,"domains":["no domain"]}`), 400, "invalid_domain")
+	s.cfg.Signup = config.Signup{Enabled: true, Domains: []string{"example.org", "team.example"}}
 	if got := decode[auth.MethodsResponse](t, anon.do("GET", "/api/auth/methods", "")); !got.Signup {
-		t.Fatal("sign-up not offered while open")
+		t.Fatal("sign-up not offered while on")
 	}
 
 	// Checks before anything is sent.
@@ -84,11 +75,11 @@ func TestSignup(t *testing.T) {
 		t.Fatalf("mails for a used address: %v", subjects(mails))
 	}
 
-	// Closing sign-ups makes waiting links useless.
+	// Switching sign-up off makes waiting links useless.
 	if code := signup(newClient(t, s), "later", "later@team.example"); code != 202 {
 		t.Fatalf("sign-up: %d", code)
 	}
 	later := confirmToken.FindStringSubmatch(delivered(s, relay)[0].text)[1]
-	expect(t, admin.do("PUT", "/api/admin/signup", `{"open":false}`), 200, "")
+	s.cfg.Signup.Enabled = false
 	expect(t, newClient(t, s).do("POST", "/api/auth/signup/confirm", `{"token":"`+later+`"}`), 404, "not_available")
 }

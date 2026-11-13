@@ -14,9 +14,10 @@ docker run --rm -it dendronotes:<version> hash-password
 ```
 
 Further accounts are created by an admin in the administration area, or by the people
-themselves when an admin allows it (*Administration → Server → Sign-up*, optionally limited to
-some e-mail domains). Sign-up needs e-mail (`DENDRONOTES_SMTP_HOST`) and password sign-in for
-everyone (`DENDRONOTES_LOCAL_LOGIN`, the default). The account exists only after its owner
+themselves with `DENDRONOTES_SIGNUP=true`, optionally only for the e-mail domains in
+`DENDRONOTES_SIGNUP_DOMAINS` (e.g. `example.org,team.example`). Sign-up needs e-mail
+(`DENDRONOTES_SMTP_HOST`) and password sign-in for everyone (`DENDRONOTES_LOCAL_LOGIN`, the
+default); otherwise the server does not start. The account exists only after its owner
 opened the link sent to the address (valid 24 hours, once); until then nothing is reserved.
 The answer to a sign-up is the same whether the address already has an account or not; that
 address gets an e-mail naming the existing account instead. A user name that is taken is

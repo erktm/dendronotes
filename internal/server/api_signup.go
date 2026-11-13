@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -13,7 +12,7 @@ import (
 	"dendronotes/internal/store"
 )
 
-// People can create their own accounts when an admin allows it: the account
+// People can create their own accounts when DENDRONOTES_SIGNUP is on: the account
 // exists only after the e-mail address was confirmed with the link sent to
 // it. Until then nothing is reserved; the answer to a sign-up never tells
 // whether the address already has an account (that address gets an e-mail
@@ -22,29 +21,16 @@ import (
 // signupTTL is how long a confirmation link works.
 const signupTTL = 24 * time.Hour
 
-// signupPossible reports whether this server can offer sign-ups at all:
-// e-mail is configured and everyone signs in with local passwords.
-func (s *Server) signupPossible() bool {
-	return s.mailEnabled() && s.cfg.Auth.Mode == string(auth.ModeLocal) && s.cfg.Auth.LocalLogin
-}
-
-// signupOpen reports whether sign-ups are open now.
-func (s *Server) signupOpen(ctx context.Context) (store.SignupSettings, bool) {
-	if !s.signupPossible() {
-		return store.SignupSettings{}, false
-	}
-	v, err := s.store.Signup(ctx)
-	if err != nil {
-		s.log.Error("reading sign-up settings", "err", err)
-		return v, false
-	}
-	return v, v.Open
+// signupOpen reports whether people may create accounts now: switched on
+// with DENDRONOTES_SIGNUP (the configuration makes sure e-mail and local
+// passwords are there).
+func (s *Server) signupOpen() bool {
+	return s.cfg.Signup.Enabled && s.mailEnabled() && s.cfg.Auth.Mode == string(auth.ModeLocal) && s.cfg.Auth.LocalLogin
 }
 
 // handleSignup takes a sign-up and sends the link that confirms it.
 func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
-	settings, open := s.signupOpen(r.Context())
-	if !open {
+	if !s.signupOpen() {
 		httpx.Error(w, http.StatusNotFound, "not_available")
 		return
 	}
@@ -76,7 +62,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "weak_password")
 		return
 	}
-	if !settings.Allows(email) {
+	if !s.cfg.Signup.Allows(email) {
 		httpx.Error(w, http.StatusBadRequest, "domain_not_allowed")
 		return
 	}
@@ -134,7 +120,7 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 // handleConfirmSignup creates the account of a confirmed sign-up with its
 // first soma and signs it in.
 func (s *Server) handleConfirmSignup(w http.ResponseWriter, r *http.Request) {
-	if _, open := s.signupOpen(r.Context()); !open {
+	if !s.signupOpen() {
 		httpx.Error(w, http.StatusNotFound, "not_available")
 		return
 	}
@@ -181,61 +167,4 @@ func (s *Server) handleConfirmSignup(w http.ResponseWriter, r *http.Request) {
 		IP: s.ips.ClientIP(r).String()})
 	_ = s.welcome(r.Context(), u)
 	s.auth.StartSession(w, r, u)
-}
-
-// handleAdminSignup shows the sign-up settings and whether they can apply.
-func (s *Server) handleAdminSignup(w http.ResponseWriter, r *http.Request) {
-	v, err := s.store.Signup(r.Context())
-	if err != nil {
-		s.internalError(w, r, "reading sign-up settings", err)
-		return
-	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"open": v.Open, "domains": v.Domains, "possible": s.signupPossible(),
-		"mail": s.mailEnabled(), "localLogin": s.cfg.Auth.Mode == string(auth.ModeLocal) && s.cfg.Auth.LocalLogin,
-	})
-}
-
-// handleAdminSetSignup opens or closes sign-ups and sets the allowed domains.
-func (s *Server) handleAdminSetSignup(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Open    bool     `json:"open"`
-		Domains []string `json:"domains"`
-	}
-	if err := httpx.DecodeJSON(w, r, &body, 16<<10); err != nil {
-		httpx.WriteDecodeError(w, err)
-		return
-	}
-	if body.Open && !s.signupPossible() {
-		httpx.Error(w, http.StatusBadRequest, "signup_not_possible")
-		return
-	}
-	if len(body.Domains) > store.MaxSignupDomains {
-		httpx.Error(w, http.StatusBadRequest, "invalid_domain")
-		return
-	}
-	domains := []string{}
-	seen := map[string]bool{}
-	for _, d := range body.Domains {
-		d = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(d), "@"))
-		if d == "" || seen[d] {
-			continue
-		}
-		if len(d) > 253 || !strings.Contains(d, ".") || strings.ContainsAny(d, " @/\\\t\r\n<>") {
-			httpx.Error(w, http.StatusBadRequest, "invalid_domain")
-			return
-		}
-		seen[d] = true
-		domains = append(domains, d)
-	}
-	if err := s.store.SetSignup(r.Context(), store.SignupSettings{Open: body.Open, Domains: domains}); err != nil {
-		s.internalError(w, r, "storing sign-up settings", err)
-		return
-	}
-	detail := "closed"
-	if body.Open {
-		detail = "open " + strings.Join(domains, ", ")
-	}
-	s.audit(r, "settings.signup", "", strings.TrimSpace(detail))
-	s.handleAdminSignup(w, r)
 }

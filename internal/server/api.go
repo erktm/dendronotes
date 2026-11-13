@@ -132,8 +132,6 @@ func (s *Server) routes() []route {
 		{"PUT", "/api/admin/icon-sections/order", s.handleAdminOrderIconSections, adminOnly},
 		{"PATCH", "/api/admin/icon-sections/{id}", s.handleAdminRenameIconSection, adminOnly},
 		{"DELETE", "/api/admin/icon-sections/{id}", s.handleAdminDeleteIconSection, adminOnly},
-		{"GET", "/api/admin/signup", s.handleAdminSignup, adminOnly},
-		{"PUT", "/api/admin/signup", s.handleAdminSetSignup, adminOnly},
 		{"GET", "/api/admin/users", s.handleAdminUsers, adminOnly},
 		{"POST", "/api/admin/users", s.handleAdminCreateUser, adminOnly},
 		{"PATCH", "/api/admin/users/{id}", s.handleAdminUpdateUser, adminOnly},

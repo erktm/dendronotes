@@ -5,86 +5,10 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"strings"
 	"time"
 )
-
-// Setting reads a server-wide setting into v; ErrNotFound if it was never set.
-func (s *Store) Setting(ctx context.Context, key string, v any) error {
-	var raw string
-	err := s.db.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = ?`, key).Scan(&raw)
-	if errors.Is(err, sql.ErrNoRows) {
-		return ErrNotFound
-	}
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal([]byte(raw), v)
-}
-
-// SetSetting stores a server-wide setting as JSON.
-func (s *Store) SetSetting(ctx context.Context, key string, v any) error {
-	data, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	_, err = s.db.ExecContext(ctx, `INSERT INTO settings (key, value) VALUES (?, ?)
-		ON CONFLICT (key) DO UPDATE SET value = excluded.value`, key, string(data))
-	return err
-}
-
-// SignupSettings say whether people may create accounts themselves.
-type SignupSettings struct {
-	Open bool `json:"open"`
-	// Domains are the e-mail domains allowed to sign up; empty means any.
-	Domains []string `json:"domains"`
-}
-
-const signupKey = "signup"
-
-// MaxSignupDomains bounds the list of allowed domains.
-const MaxSignupDomains = 100
-
-// Signup returns the sign-up settings (closed until an admin opens it).
-func (s *Store) Signup(ctx context.Context) (SignupSettings, error) {
-	var v SignupSettings
-	err := s.Setting(ctx, signupKey, &v)
-	if errors.Is(err, ErrNotFound) {
-		return SignupSettings{Domains: []string{}}, nil
-	}
-	if v.Domains == nil {
-		v.Domains = []string{}
-	}
-	return v, err
-}
-
-// SetSignup stores the sign-up settings.
-func (s *Store) SetSignup(ctx context.Context, v SignupSettings) error {
-	if v.Domains == nil {
-		v.Domains = []string{}
-	}
-	return s.SetSetting(ctx, signupKey, v)
-}
-
-// Allows reports whether an e-mail address may sign up under these settings.
-func (v SignupSettings) Allows(email string) bool {
-	if len(v.Domains) == 0 {
-		return true
-	}
-	at := strings.LastIndexByte(email, '@')
-	if at < 0 {
-		return false
-	}
-	domain := strings.ToLower(email[at+1:])
-	for _, d := range v.Domains {
-		if strings.EqualFold(d, domain) {
-			return true
-		}
-	}
-	return false
-}
 
 // PendingSignup is a sign-up waiting for the confirmation of its address.
 type PendingSignup struct {

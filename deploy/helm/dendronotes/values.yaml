@@ -21,6 +21,9 @@ fullnameOverride: ""
 #   DENDRONOTES_OIDC_CLIENT_ID: dendronotes
 config:
   DENDRONOTES_LOG_FORMAT: json
+  # People create their own accounts, confirmed by e-mail (needs mail below):
+  # DENDRONOTES_SIGNUP: "true"
+  # DENDRONOTES_SIGNUP_DOMAINS: "example.org,team.example"
 
 # Further environment entries (valueFrom works here).
 extraEnv: []

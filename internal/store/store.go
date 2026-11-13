@@ -334,14 +334,9 @@ var migrations = []string{
 	);
 	CREATE INDEX share_links_path ON share_links(soma_id, path);
 	CREATE UNIQUE INDEX share_links_internal ON share_links(soma_id, path) WHERE kind = 'internal';`,
-	// 13: server-wide settings the admins change in the app (JSON values),
-	// and sign-ups waiting for their e-mail confirmation: nothing is reserved
+	// 13: sign-ups waiting for their e-mail confirmation: nothing is reserved
 	// until the link is used; only the SHA-256 of the token is kept.
-	`CREATE TABLE settings (
-		key   TEXT PRIMARY KEY,
-		value TEXT NOT NULL
-	);
-	CREATE TABLE pending_signups (
+	`CREATE TABLE pending_signups (
 		token_hash    TEXT PRIMARY KEY,
 		username      TEXT NOT NULL,
 		display_name  TEXT NOT NULL DEFAULT '',

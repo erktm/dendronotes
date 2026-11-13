@@ -134,15 +134,12 @@ func New(cfg config.Config, log *slog.Logger, webFS fs.FS, version string) (*Ser
 		ProxyLogoutURL:         cfg.Auth.ProxyLogoutURL,
 		OnProvision:            s.welcome,
 		Version:                version,
-		SignupOpen: func(ctx context.Context) bool {
-			_, open := s.signupOpen(ctx)
-			return open
-		},
-		OnLogin:       s.metrics.login,
-		OnSignedOut:   s.dropUserStreams,
-		MailEnabled:   cfg.Mail.Enabled(),
-		SendResetLink: sendResetLink,
-		OnPasswordSet: s.onPasswordSet,
+		SignupOpen:             func(context.Context) bool { return s.signupOpen() },
+		OnLogin:                s.metrics.login,
+		OnSignedOut:            s.dropUserStreams,
+		MailEnabled:            cfg.Mail.Enabled(),
+		SendResetLink:          sendResetLink,
+		OnPasswordSet:          s.onPasswordSet,
 	}, st, s.ips, log)
 	if err != nil {
 		return fail(fmt.Errorf("auth: %w", err))

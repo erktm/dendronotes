@@ -37,8 +37,8 @@ Kubernetes, also in an air gap.
   read yet, security notices, welcome emails and "forgot password".
 - **Banners** for announcements such as updates or maintenance, on the sign-in page and in the
   app, for everyone, the admins or a group, with an optional time window; closable or not.
-- **Sign-up** when the admins allow it, confirmed by e-mail and optionally limited to some
-  e-mail domains.
+- **Sign-up** when switched on, confirmed by email and optionally limited to some email
+  domains.
 - **Accounts and sharing**: every account has its own somas, shared with people and groups in
   five roles; sign-in with passwords, Keycloak or another OpenID Connect provider, Active
   Directory / LDAP, or an authenticating proxy; personal API tokens.
@@ -180,6 +180,8 @@ All variables carry the `DENDRONOTES_` prefix. Variables without it are ignored.
 | `DENDRONOTES_SMTP_PASSWORD_FILE`       |                    | File containing the relay password (Mailjet: the secret key) |
 | `DENDRONOTES_MAIL_FROM`                |                    | Sender, e.g. `dendronotes <no-reply@example.org>`; required with `DENDRONOTES_SMTP_HOST` |
 | `DENDRONOTES_MAIL_DIGEST_DELAY`        | `10m`              | How long a mention or reply may stay unread before it is sent by email |
+| `DENDRONOTES_SIGNUP`                   | `false`            | `true`: people create their own accounts from the sign-in page, confirmed by email (needs email and password sign-in for everyone) |
+| `DENDRONOTES_SIGNUP_DOMAINS`           |                    | Only these email domains may sign up, comma-separated (e.g. `example.org`); empty: every address |
 
 In local mode, one of the three admin password variables is required while no enabled admin
 account exists; without it, the server does not start. Once an admin exists, they are ignored

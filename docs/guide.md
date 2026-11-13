@@ -251,9 +251,10 @@ up to `DENDRONOTES_MAX_UPLOAD_MB`. The content must match the extension.
     Connect provider and the directory are reachable, the e-mail relay with waiting messages,
     the last error and a test e-mail, and the effective configuration (secrets show only
     whether they are set).
-  - *Server → Sign-up* lets people create accounts themselves from the sign-in page, for every
-    address or only some e-mail domains. Each account exists once its owner confirmed the
-    address with the link from the e-mail, and it gets a first soma like any new account.
+  - With `DENDRONOTES_SIGNUP=true` people create accounts themselves from the sign-in page,
+    for every address or only the e-mail domains in `DENDRONOTES_SIGNUP_DOMAINS`. Each account
+    exists once its owner confirmed the address with the link from the e-mail, and it gets a
+    first soma like any new account. *Server* shows both settings.
   - *Audit log*: sign-ins (failed ones too), account and soma changes.
 
 Disabling an account, setting its password or ending its sessions takes effect at once; open
