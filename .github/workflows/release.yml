@@ -1,10 +1,20 @@
 name: Release
 
-# A tag v<major>.<minor>.<patch> publishes binaries, the container image and
-# the Helm chart.
+# Every push to main runs the tests; semantic-release then reads the
+# Conventional Commits since the last tag (feat: minor, fix: patch, BREAKING
+# CHANGE: major), tags the new version and writes its GitHub release with the
+# notes. Only then are binaries, the container image and the Helm chart built
+# and published for that tag. Commits that need no release (docs:, ci:, chore:
+# and the like) stop after the tests. The tag is pushed with GITHUB_TOKEN, so it
+# starts no other workflow.
 on:
   push:
-    tags: ["v*.*.*"]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 permissions:
   contents: write # the GitHub release
@@ -27,21 +37,39 @@ jobs:
         with:
           node-version: 26
           cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - name: Version and names
-        run: |
-          echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
-          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
-          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
-          echo "CHARTS=oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts" >> "$GITHUB_ENV"
+          cache-dependency-path: |
+            web/package-lock.json
+            .github/semantic-release/package-lock.json
 
       - name: Tests
         run: |
           (cd web && npm ci)
           make test
 
+      - name: Semantic release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          (cd .github/semantic-release && npm ci --ignore-scripts --no-audit --no-fund)
+          .github/semantic-release/node_modules/.bin/semantic-release
+
+      - name: Version and names
+        id: version
+        run: |
+          tag=$(git tag --points-at HEAD --list 'v*.*.*' | sort -V | tail -1)
+          if [ -z "$tag" ]; then
+            echo "No new version for this commit; nothing to publish."
+            exit 0
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          echo "VERSION=${tag#v}" >> "$GITHUB_ENV"
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+          echo "CHARTS=oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts" >> "$GITHUB_ENV"
+
       - name: Binaries
+        if: steps.version.outputs.tag != ''
         run: |
           (cd web && npm run build)
           mkdir -p dist
@@ -58,6 +86,7 @@ jobs:
           cp security/vex.openvex.json dist/
 
       - name: Container image (linux/amd64, linux/arm64)
+        if: steps.version.outputs.tag != ''
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           docker buildx create --use
@@ -68,21 +97,24 @@ jobs:
             --push .
 
       - name: Helm chart
+        if: steps.version.outputs.tag != ''
         run: |
           helm package deploy/helm/dendronotes --version "$VERSION" --app-version "$VERSION" --destination dist
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
           helm push "dist/dendronotes-$VERSION.tgz" "$CHARTS"
 
       - name: GitHub release
+        if: steps.version.outputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           (cd dist && sha256sum *.tar.gz *.tgz sbom.cdx.json vex.openvex.json > checksums.txt)
           assets="dist/*.tar.gz dist/*.tgz dist/sbom.cdx.json dist/vex.openvex.json dist/checksums.txt"
-          # A tag pushed again (a rebuilt release) replaces the files of its release.
-          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" --clobber $assets
+          # semantic-release created the release with its notes; a rerun replaces
+          # the files.
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" --clobber $assets
           else
-            gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes \
+            gh release create "$TAG" --verify-tag --generate-notes \
               --title "dendronotes $VERSION" $assets
           fi

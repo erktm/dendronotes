@@ -1,6 +1,7 @@
 /bin/
 /dev/
 /web/node_modules/
+/.github/semantic-release/node_modules/
 /web/dist/*
 !/web/dist/.keep
 /.offline/*
