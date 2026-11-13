@@ -88,7 +88,7 @@
       title={admin ? strings.admin.back : strings.admin.open}
       onclick={onadmin}
     >
-      <Icon name="shield" size={20} />
+      <Icon name="admin" size={20} />
     </button>
   {/if}
 
