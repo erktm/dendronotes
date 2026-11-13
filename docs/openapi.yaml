@@ -127,6 +127,19 @@ paths:
                     properties:
                       label: { type: string }
                   passwordReset: { type: boolean }
+  /api/auth/banners:
+    get:
+      summary: The banners of the sign-in page (active, for everyone)
+      security: []
+      responses:
+        "200":
+          description: Banners, most important first.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  banners: { type: array, items: { $ref: "#/components/schemas/ShownBanner" } }
   /api/auth/password/forgot:
     post:
       summary: Ask for a link to reset the password by email
@@ -229,6 +242,28 @@ paths:
         "200": { description: The updated account., content: { application/json: { schema: { $ref: "#/components/schemas/User" } } } }
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/me/banners:
+    get:
+      summary: The banners you see in the app now (your audience, not closed)
+      responses:
+        "200":
+          description: Banners, most important first.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  banners: { type: array, items: { $ref: "#/components/schemas/ShownBanner" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/me/banners/{id}/dismiss:
+    post:
+      summary: Close a banner for your account (until its text changes); not with API tokens
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200": { description: Closed. }
+        "400": { description: "The banner cannot be closed (`not_dismissible`)." }
+        "404": { description: No such banner. }
   /api/me/password:
     post:
       summary: Change your password (local accounts); your other sessions end
@@ -1607,6 +1642,49 @@ paths:
       summary: Server state, storage, open somas and effective configuration (admin; secrets only as "(set)")
       responses:
         "200": { description: Server state. }
+  /api/admin/banners:
+    get:
+      summary: All banners, newest first (admin)
+      responses:
+        "200":
+          description: Banners.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  banners: { type: array, items: { $ref: "#/components/schemas/Banner" } }
+    post:
+      summary: Publish a banner (admin); open tabs load their banners again
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BannerInput" }
+      responses:
+        "201": { description: Created., content: { application/json: { schema: { $ref: "#/components/schemas/Banner" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+  /api/admin/banners/{id}:
+    patch:
+      summary: Change a banner (admin; all fields); a changed text shows again to those who closed it
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BannerInput" }
+      responses:
+        "200": { description: Changed., content: { application/json: { schema: { $ref: "#/components/schemas/Banner" } } } }
+        "400": { $ref: "#/components/responses/Error" }
+        "404": { description: No such banner. }
+    delete:
+      summary: Delete a banner (admin)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        "200": { description: Deleted. }
+        "404": { description: No such banner. }
   /api/admin/mail/test:
     post:
       summary: Send a test email to your own address at once (admin)
@@ -1793,6 +1871,38 @@ components:
         avatar: { $ref: "#/components/schemas/Avatar" }
         mailComments: { type: boolean }
         mailShares: { type: boolean }
+    ShownBanner:
+      type: object
+      properties:
+        id: { type: integer }
+        message: { type: string, description: Short Markdown (bold, italic, code, links). }
+        kind: { type: string, enum: [info, warning, critical] }
+        dismissible: { type: boolean }
+        revision: { type: integer, description: Grows when the text changes. }
+    BannerInput:
+      type: object
+      required: [message, kind, audience]
+      properties:
+        message: { type: string, maxLength: 1000 }
+        kind: { type: string, enum: [info, warning, critical] }
+        onLogin: { type: boolean, description: On the sign-in page (only with audience everyone). }
+        inApp: { type: boolean }
+        audience: { type: string, enum: [everyone, admins, group] }
+        groupId: { type: integer, description: With audience group; the group Everyone means everyone. }
+        dismissible: { type: boolean }
+        startsAt: { type: [string, "null"], format: date-time }
+        endsAt: { type: [string, "null"], format: date-time }
+    Banner:
+      allOf:
+        - $ref: "#/components/schemas/BannerInput"
+        - type: object
+          properties:
+            id: { type: integer }
+            groupName: { type: string }
+            revision: { type: integer }
+            createdBy: { $ref: "#/components/schemas/Person" }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
     AvatarStyle:
       type: object
       required: [color, pattern, initials]

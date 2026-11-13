@@ -281,6 +281,32 @@ var migrations = []string{
 	ALTER TABLE users ADD COLUMN mail_comments INTEGER NOT NULL DEFAULT 1;
 	ALTER TABLE users ADD COLUMN mail_shares INTEGER NOT NULL DEFAULT 1;
 	ALTER TABLE notifications ADD COLUMN mailed_at INTEGER NOT NULL DEFAULT 0;`,
+	// 10: banners the admins publish (sign-in page and app) and who closed
+	// which one; a closing counts for the revision of the text it was made
+	// on, so a changed text shows again.
+	`CREATE TABLE banners (
+		id          INTEGER PRIMARY KEY,
+		message     TEXT NOT NULL,
+		kind        TEXT NOT NULL CHECK (kind IN ('info', 'warning', 'critical')),
+		on_login    INTEGER NOT NULL DEFAULT 0,
+		in_app      INTEGER NOT NULL DEFAULT 1,
+		audience    TEXT NOT NULL CHECK (audience IN ('everyone', 'admins', 'group')),
+		group_id    INTEGER REFERENCES groups(id) ON DELETE CASCADE,
+		dismissible INTEGER NOT NULL DEFAULT 1,
+		starts_at   INTEGER NOT NULL DEFAULT 0,
+		ends_at     INTEGER NOT NULL DEFAULT 0,
+		revision    INTEGER NOT NULL DEFAULT 1,
+		created_by  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+		created_at  INTEGER NOT NULL,
+		updated_at  INTEGER NOT NULL
+	);
+	CREATE TABLE banner_dismissals (
+		banner_id    INTEGER NOT NULL REFERENCES banners(id) ON DELETE CASCADE,
+		user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		revision     INTEGER NOT NULL,
+		dismissed_at INTEGER NOT NULL,
+		PRIMARY KEY (banner_id, user_id)
+	);`,
 }
 
 // rebuilds are the migrations (by index) that recreate a table others refer
