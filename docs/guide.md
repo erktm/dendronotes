@@ -157,8 +157,8 @@ duplicate, ⌘C / ⌘V copy and paste (also between drawings), ⌘] / ⌘[ forwa
 text, ⇧1 fits the drawing, ⌘ + scroll or pinch zooms. Shift keeps proportions and 15° steps;
 Alt-drag moves a copy.
 
-**About** (at the bottom of the sidebar) shows the version and links to the source code on
-GitHub; the sign-in page links there too.
+The line at the very bottom of the app shows the version and the license and links to the
+source code on GitHub; the sign-in page shows the same without the version.
 
 **Tutorials** (the book above the settings in the left rail): short step-by-step guides to
 the essentials (the first note, synapses, the file tree, drawings, working together, links,

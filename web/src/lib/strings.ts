@@ -871,14 +871,10 @@ export const strings = {
   },
 
   about: {
-    open: 'About',
-    title: `About ${brand.name}`,
+    label: `About ${brand.name}`,
     version: (v: string) => `Version ${v}`,
-    text: `${brand.name} keeps your notes as plain Markdown files in folders you own, connects them with synapses, draws diagrams and lets people write together, all on your own server.`,
-    license: 'Free and open source software under the Apache License 2.0.',
+    license: 'Apache License 2.0',
     source: 'Source code on GitHub',
-    footer: `${brand.name} is open source.`,
-    close: 'Close',
   },
   tutorials: {
     title: 'Tutorials',
@@ -921,7 +917,7 @@ export const strings = {
           ['```go', 'A code block in a language, closed by ``` on its own line'],
           ['| a | b |', 'A table: a row of cells, then | --- | --- | below the first'],
           ['---', 'A horizontal line'],
-          ['[text](https://…)', 'A link to a web page'],
+          ['[text](address)', 'A link to a web page (its address) or a file'],
           ['[[Note]]', 'A synapse to a note; [[Note#Heading]] to a heading, [[Note|text]] with other text'],
           ['![[photo.png]]', 'Shows a picture, a drawing or another note; ![[photo.png|300]] sets the width'],
           ['#tag', 'A tag, found by the search'],

@@ -3,7 +3,7 @@
   import LoginBanners from './LoginBanners.svelte'
   import Logo from './Logo.svelte'
   import Wordmark from './Wordmark.svelte'
-  import { brand, strings } from '../lib/strings'
+  import AboutLine from './AboutLine.svelte'
 
   // The card of the pages before signing in (sign-in, choosing a password).
   let { children }: { children: Snippet } = $props()
@@ -18,10 +18,7 @@
     </div>
     {@render children()}
   </div>
-  <footer class="about">
-    {strings.about.footer}
-    <a href={brand.repository} target="_blank" rel="noopener noreferrer">{strings.about.source}</a>
-  </footer>
+  <AboutLine />
 </main>
 
 <style>
@@ -36,16 +33,6 @@
     background:
       radial-gradient(60rem 30rem at 15% -10%, var(--accent-soft), transparent 60%),
       var(--bg);
-  }
-  .about {
-    color: var(--text-muted);
-    font-size: var(--text-sm);
-    text-align: center;
-  }
-  .about a {
-    color: var(--text);
-    text-decoration: underline;
-    text-underline-offset: 2px;
   }
   .card {
     width: min(100%, 380px);

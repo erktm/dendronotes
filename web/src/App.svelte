@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import AppBanners from './components/AppBanners.svelte'
+  import AboutLine from './components/AboutLine.svelte'
   import Login from './components/Login.svelte'
   import Logo from './components/Logo.svelte'
   import ResetPassword from './components/ResetPassword.svelte'
@@ -39,6 +40,7 @@
   <div class="frame">
     <AppBanners />
     <div class="frame-main"><Shell /></div>
+    <div class="frame-foot"><AboutLine version={app.version} /></div>
   </div>
 {/if}
 
@@ -53,6 +55,11 @@
   .frame-main {
     flex: 1;
     min-height: 0;
+  }
+  .frame-foot {
+    flex: none;
+    border-top: 1px solid var(--line);
+    background: var(--bg-sunken);
   }
   .splash {
     display: grid;

@@ -99,9 +99,8 @@ class App {
   /** E-mail is configured on the server (the profile offers its settings). */
   mailEnabled = $state(false)
   isAdmin = $derived(this.user?.role === 'admin')
-  /** The version of dendronotes (the about dialog). */
+  /** The version of dendronotes (the about line at the bottom). */
   version = $state('')
-  aboutOpen = $state(false)
 
   /** The somas the account can open, and the one that is open. */
   somas = $state.raw<Membership[]>([])
