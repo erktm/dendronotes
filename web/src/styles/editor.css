@@ -268,6 +268,43 @@
   background: color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
+/* --- Note title (the file name above the text, as in Obsidian) ---------- */
+
+.note-title {
+  margin: 0 0 0.55em;
+}
+.note-title.in-reading {
+  box-sizing: border-box;
+  max-width: calc(var(--note-measure) + 96px);
+  margin: 0 auto;
+  padding: 40px 48px 0;
+  font-family: var(--note-font);
+  font-size: var(--note-size);
+}
+.note-title.in-reading + .reading {
+  padding-top: 0.55em;
+}
+.note-title-text {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 2em;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+input.note-title-text:focus {
+  outline: none;
+  box-shadow: inset 0 -2px 0 var(--accent-soft);
+}
 /* --- Reading view -------------------------------------------------------- */
 
 .reading {

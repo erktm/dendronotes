@@ -14,6 +14,7 @@ import { drawingTitle, isDrawingPath } from '../drawing/paths'
 import { strings } from '../strings'
 import { livePreview, refreshDecorations, synapseHost, type SynapseHost } from './livePreview'
 import { presence, setPeers, type PeerCursor } from './presence'
+import { inlineTitle, setTitle as setTitleEffect, type TitleSpec } from './inlineTitle'
 import { commentExtension, commentPositions, setCommentRanges, type CommentHost, type CommentRange } from './comments'
 import { SynapseSyntax } from './synapseSyntax'
 
@@ -68,6 +69,8 @@ export interface EditorHandle {
   restore(sel: { anchor: number; head: number } | null, scrollTop: number): void
   /** Measures again (after being hidden). */
   remeasure(): void
+  /** The note's title above the text (see inlineTitle.ts). */
+  setTitle(spec: TitleSpec): void
   destroy(): void
 }
 
@@ -196,6 +199,7 @@ export function createEditor(parent: HTMLElement, o: EditorOptions): EditorHandl
     readOnlyC.of(EditorState.readOnly.of(o.readOnly)),
     EditorView.contentAttributes.of({ 'aria-label': o.label, spellcheck: 'true' }),
     placeholder(o.placeholder),
+    inlineTitle(),
     // Pasted or dropped files are uploaded and embedded where they land.
     EditorView.domEventHandlers({
       paste(event, view) {
@@ -235,6 +239,9 @@ export function createEditor(parent: HTMLElement, o: EditorOptions): EditorHandl
     },
     setReadOnly(on) {
       view.dispatch({ effects: readOnlyC.reconfigure(EditorState.readOnly.of(on)) })
+    },
+    setTitle(spec) {
+      view.dispatch({ effects: setTitleEffect.of(spec) })
     },
     async setVim(on) {
       if (on === vimOn) return

@@ -133,6 +133,17 @@
     handle?.setReadOnly(session.readOnly)
   })
 
+  // The title above the text; editing it renames the note (editors only).
+  $effect(() => {
+    const path = session.path
+    handle?.setTitle({
+      title: displayName(path),
+      editable: !session.readOnly && app.can.organize,
+      label: strings.note.titleLabel,
+      rename: (title) => app.rename(path, title),
+    })
+  })
+
   // Files added, renamed or removed: re-resolve synapses and attachments;
   // a drawing saved anew is drawn again.
   const drawingStamp = $derived(

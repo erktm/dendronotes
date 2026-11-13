@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { displayName } from '../lib/paths'
   import { untrack } from 'svelte'
   import type { NoteSession } from '../lib/state/note.svelte'
   import { app } from '../lib/state/app.svelte'
@@ -348,6 +349,8 @@
 </script>
 
 <div class="note-surface" class:serif={settings.noteFont === 'serif'} class:readable={settings.readableWidth} bind:this={surface}>
+  <!-- The title, as in the editor: the file name, not part of the text. -->
+  <div class="note-title in-reading"><h1 class="note-title-text">{displayName(session.path)}</h1></div>
   <!-- Sanitized by DOMPurify in renderMarkdown. -->
   <article class="reading" bind:this={article} use:interactions>{@html html}</article>
   {#if viewing}

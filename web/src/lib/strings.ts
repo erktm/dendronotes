@@ -846,6 +846,7 @@ export const strings = {
     loading: 'Loading …',
     placeholder: 'Start writing …',
     contentLabel: (name: string) => `Content of ${name}`,
+    titleLabel: 'Title (changing it renames the note)',
     notFoundTitle: 'Note not found',
     notFoundText: (name: string) => `“${name}” may have been moved or deleted.`,
     unsupportedTitle: 'Can’t open this file yet',
