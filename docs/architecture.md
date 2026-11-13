@@ -76,7 +76,7 @@ flowchart TB
 | `internal/config` | Reads and checks every `DENDRONOTES_*` variable |
 | `internal/server` | The route table with an access level per route, middleware, all API handlers, the embedded web interface |
 | `internal/auth`, `internal/sso`, `internal/ldap` | Passwords (argon2id), sessions, API tokens, rate limits; OpenID Connect; Active Directory / LDAP |
-| `internal/store` | `state.db`: accounts, sessions, somas, members and groups, comments, trash records, icons, audit log, with versioned migrations |
+| `internal/store` | `state.db`: accounts, sessions, somas, members and groups, comments, trash records, icon libraries, sort orders, links, sign-ups and settings, audit log, with versioned migrations |
 | `internal/somas` | Opens a soma on first use (files, index, watcher, live updates, live documents) and closes it after 30 idle minutes |
 | `internal/soma` | Every file operation, through Go's `os.Root`: paths cannot leave the soma, hidden entries are unreachable, writes are atomic |
 | `internal/index` | Per soma: synapses, file references, tags and full-text search in SQLite FTS5; a cache, rebuilt when missing |
@@ -95,7 +95,7 @@ flowchart TB
 |-------|------|------|
 | `SOMAS_DIR/<soma>/…` | The notes, attachments and drawings (`*.drawing.svg`) | Source of truth: plain files |
 | `SOMAS_DIR/<soma>/.trash/` | Deleted files and folders (the place Obsidian uses too) | Files, records in `state.db` |
-| `DATA_DIR/state.db` | Accounts, sessions (hashed), API tokens and password links (hashed), somas, members, groups, comments, notifications, trash records, icon library, profile photos, e-mails waiting to be sent, banners and who closed them, audit log | Not a cache: back it up |
+| `DATA_DIR/state.db` | Accounts, sessions (hashed), API tokens and password links (hashed), somas, members, groups, comments, notifications, trash records, icon libraries with their sections (per soma and for the server), sort orders of folders, links to notes and drawings (public tokens hashed), sign-ups waiting for confirmation (tokens hashed), server settings, profile photos, e-mails waiting to be sent, banners and who closed them, audit log | Not a cache: back it up |
 | `DATA_DIR/history/<soma id>.db` | Earlier versions of notes | Not a cache: back it up |
 | `DATA_DIR/index/<soma id>/index.db` | Synapses, file references, tags, full-text index | Cache: deleted, it is rebuilt |
 
@@ -103,6 +103,11 @@ flowchart TB
 migrating, the store copies the file. The index carries a schema version and is rebuilt when it
 differs. dendronotes never creates folders in a soma on its own; the only folder it manages
 there is `.trash`.
+
+What dendronotes keeps about notes (history, comments, sort orders, links) follows them when
+they are renamed, moved, trashed or restored. Moves made outside dendronotes, for example in
+Obsidian, are recognized by the index when a note vanishes and one with the same content
+appears in the same sync, and are followed the same way.
 
 E-mails never hold up a request: handlers render a message and put it into the outbox table
 of `state.db`; one worker hands the messages to the relay, retries with growing pauses and
