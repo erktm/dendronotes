@@ -172,7 +172,9 @@ details panel, and whether renaming updates synapses.
 graphite with a touch of rose), Sage (leaf green) and six taken from the ways nerve tissue is
 made visible: the stains Golgi (ink on aged paper, silver turned gold), Nissl (cresyl violet),
 Eosin (H&E: pink and blue-violet) and Myelin (Luxol fast blue with a rose counterstain), and the
-fluorescence of Confocal (cyan and magenta) and Brainbow (coral and turquoise).
+fluorescence of Confocal (cyan and magenta) and Brainbow (coral and turquoise). Threshold is all or
+none, as a neuron fires: true black in the dark, so OLED screens leave the pixels off, and pure
+white by day, with azure and amber.
 
 The settings list three **drawn designs** under their own heading. They look like a
 neurobiologist's notes and drawings rather than an app: Lab notebook (sepia ink and red pencil

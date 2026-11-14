@@ -1,7 +1,7 @@
 /*
  * dendronotes design tokens.
  *
- * Eleven palettes, each with a light and a dark variant, chosen per browser
+ * Twelve palettes, each with a light and a dark variant, chosen per browser
  * in the settings (<html data-palette="…">; Cortex when none is set). Light or
  * dark follows the system unless <html data-theme="light|dark"> says otherwise.
  * Any element with data-palette shows that palette inside it (the previews in
@@ -807,6 +807,89 @@
   --warn-soft: #2a2414;
   --warn-text: #e3b65c;
   --scrim: rgb(0 0 0 / 0.5);
+}
+
+/* Threshold – all or none, as a neuron fires: true black, the unlit pixels of OLED screens; pure white by day; azure and amber */
+[data-palette='threshold'] {
+  --bg: #ffffff;
+  --bg-raised: #ffffff;
+  --bg-sunken: #f4f4f4;
+  --bg-hover: #ededed;
+  --line: #dedede;
+  --line-strong: #b0b0b0;
+  --text: #000000;
+  --text-muted: #3a3a3a;
+  --text-faint: #555555;
+  --accent: #0052cc;
+  --accent-strong: #003a94;
+  --accent-soft: #e6efff;
+  --on-accent: #ffffff;
+  --accent-2: #a14400;
+  --ok: #16703a;
+  --warn: #7a5200;
+  --err: #c0182f;
+  --focus: #0052cc;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.12), 0 6px 20px rgb(0 0 0 / 0.08);
+  --code-bg: #f4f4f4;
+  --warn-soft: #fff3d1;
+  --warn-text: #7a5200;
+  --scrim: rgb(0 0 0 / 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-palette='threshold']:not([data-theme='light']),
+  :root:not([data-theme='light']) [data-palette='threshold'] {
+    --bg: #000000;
+    --bg-raised: #000000;
+    --bg-sunken: #0a0a0a;
+    --bg-hover: #161616;
+    --line: #262626;
+    --line-strong: #474747;
+    --text: #f5f5f5;
+    --text-muted: #b3b3b3;
+    --text-faint: #8f8f8f;
+    --accent: #4d9fff;
+    --accent-strong: #a6cdff;
+    --accent-soft: #0b1d36;
+    --on-accent: #000000;
+    --accent-2: #ffb340;
+    --ok: #4ade80;
+    --warn: #facc15;
+    --err: #ff6b6b;
+    --focus: #4d9fff;
+    --shadow: 0 0 0 1px rgb(255 255 255 / 0.08);
+    --code-bg: #0d0d0d;
+    --warn-soft: #241c05;
+    --warn-text: #facc15;
+    --scrim: rgb(0 0 0 / 0.75);
+  }
+}
+
+:root[data-theme='dark'][data-palette='threshold'],
+:root[data-theme='dark'] [data-palette='threshold'] {
+  --bg: #000000;
+  --bg-raised: #000000;
+  --bg-sunken: #0a0a0a;
+  --bg-hover: #161616;
+  --line: #262626;
+  --line-strong: #474747;
+  --text: #f5f5f5;
+  --text-muted: #b3b3b3;
+  --text-faint: #8f8f8f;
+  --accent: #4d9fff;
+  --accent-strong: #a6cdff;
+  --accent-soft: #0b1d36;
+  --on-accent: #000000;
+  --accent-2: #ffb340;
+  --ok: #4ade80;
+  --warn: #facc15;
+  --err: #ff6b6b;
+  --focus: #4d9fff;
+  --shadow: 0 0 0 1px rgb(255 255 255 / 0.08);
+  --code-bg: #0d0d0d;
+  --warn-soft: #241c05;
+  --warn-text: #facc15;
+  --scrim: rgb(0 0 0 / 0.75);
 }
 
 /* Lab notebook – a neurobiologist's notes and drawings: sepia ink and red pencil on cream paper (styles/sketch.css draws the lines) */

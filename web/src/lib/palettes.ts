@@ -1,7 +1,7 @@
 // The color palettes defined in styles/tokens.css, in the order the settings
 // show them. Names and descriptions live in strings.ts.
 
-export const PALETTES = ['cortex', 'sage', 'golgi', 'nissl', 'eosin', 'myelin', 'confocal', 'brainbow', 'notebook', 'epaper', 'cyanotype'] as const
+export const PALETTES = ['cortex', 'sage', 'golgi', 'nissl', 'eosin', 'myelin', 'confocal', 'brainbow', 'threshold', 'notebook', 'epaper', 'cyanotype'] as const
 export type Palette = (typeof PALETTES)[number]
 
 /** The palette when none is chosen; tokens.css also puts it on :root. */
@@ -17,6 +17,7 @@ export const THEME_COLORS: Record<Palette, { light: string; dark: string }> = {
   myelin: { light: '#2f4fa2', dark: '#0d1020' },
   confocal: { light: '#0b7282', dark: '#0a0d13' },
   brainbow: { light: '#b23f1a', dark: '#121213' },
+  threshold: { light: '#0052cc', dark: '#000000' },
   notebook: { light: '#26211a', dark: '#18150f' },
   epaper: { light: '#151515', dark: '#101010' },
   cyanotype: { light: '#17406f', dark: '#0f2546' },
