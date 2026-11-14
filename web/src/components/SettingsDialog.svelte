@@ -4,7 +4,7 @@
   import { app } from '../lib/state/app.svelte'
   import { settings, type NoteFont, type ThemeChoice } from '../lib/state/settings.svelte'
   import { strings } from '../lib/strings'
-  import { PALETTES } from '../lib/palettes'
+  import { DRAWN, PALETTES, type Palette } from '../lib/palettes'
 
   let dialog: HTMLDialogElement | undefined = $state()
 
@@ -22,6 +22,11 @@
     { value: 'system', label: strings.settings.system },
     { value: 'light', label: strings.settings.light },
     { value: 'dark', label: strings.settings.dark },
+  ]
+  // The color designs first, then the drawn ones under their own heading.
+  const groups: { id: string; name: string; desc: string; palettes: Palette[] }[] = [
+    { id: 'set-palette', name: strings.settings.palette, desc: strings.settings.paletteDesc, palettes: PALETTES.filter((p) => !DRAWN.has(p)) },
+    { id: 'set-drawn', name: strings.settings.drawn, desc: strings.settings.drawnDesc, palettes: PALETTES.filter((p) => DRAWN.has(p)) },
   ]
 </script>
 
@@ -67,31 +72,33 @@
         {/each}
       </div>
     </div>
-    <div class="setting">
-      <span class="name" id="set-palette">{strings.settings.palette}<span class="desc">{strings.settings.paletteDesc}</span></span>
-    </div>
-    <div class="palettes" role="group" aria-labelledby="set-palette">
-      {#each PALETTES as p (p)}
-        <button
-          type="button"
-          class="palette"
-          aria-pressed={settings.palette === p}
-          title={strings.settings.palettes[p].desc}
-          onclick={() => (settings.palette = p)}
-        >
-          <!-- Drawn in the palette itself: data-palette scopes its tokens. -->
-          <span class="preview" data-palette={p} aria-hidden="true">
-            <span class="side"><span class="bar"></span><span class="bar short"></span></span>
-            <span class="body">
-              <span class="bar text"></span>
-              <span class="bar"></span>
-              <span class="dots"><span class="dot"></span><span class="dot"></span><span class="dot second"></span></span>
+    {#each groups as g (g.id)}
+      <div class="setting">
+        <span class="name" id={g.id}>{g.name}<span class="desc">{g.desc}</span></span>
+      </div>
+      <div class="palettes" role="group" aria-labelledby={g.id}>
+        {#each g.palettes as p (p)}
+          <button
+            type="button"
+            class="palette"
+            aria-pressed={settings.palette === p}
+            title={strings.settings.palettes[p].desc}
+            onclick={() => (settings.palette = p)}
+          >
+            <!-- Drawn in the palette itself: data-palette scopes its tokens. -->
+            <span class="preview" data-palette={p} data-drawn={DRAWN.has(p) || undefined} aria-hidden="true">
+              <span class="side"><span class="bar"></span><span class="bar short"></span></span>
+              <span class="body">
+                <span class="bar text"></span>
+                <span class="bar"></span>
+                <span class="dots"><span class="dot"></span><span class="dot"></span><span class="dot second"></span></span>
+              </span>
             </span>
-          </span>
-          <span class="pname">{strings.settings.palettes[p].name}</span>
-        </button>
-      {/each}
-    </div>
+            <span class="pname">{strings.settings.palettes[p].name}</span>
+          </button>
+        {/each}
+      </div>
+    {/each}
     <p class="note palette-desc">{strings.settings.palettes[settings.palette].desc}</p>
     <div class="setting">
       <label for="set-details">{strings.settings.details}<span class="desc">{strings.settings.detailsDesc}</span></label>

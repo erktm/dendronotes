@@ -8,7 +8,8 @@ import math, os, random
 ART = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'src', 'styles', 'art')
 
 def f(v):
-    return ('%.1f' % v).rstrip('0').rstrip('.')
+    s = ('%.1f' % v).rstrip('0').rstrip('.')
+    return '0' if s == '-0' else s
 
 def curve(pts, start=True):
     """Catmull-Rom through points as cubic Béziers (M at the start if asked)."""
@@ -19,6 +20,30 @@ def curve(pts, start=True):
         c2 = (p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6)
         d += f'C{f(c1[0])} {f(c1[1])} {f(c2[0])} {f(c2[1])} {f(p2[0])} {f(p2[1])}'
     return d
+
+def closed(loop):
+    """A smooth closed outline through points."""
+    ring = loop[-1:] + loop + loop[:2]
+    return curve(ring[1:-1]) + 'Z'
+
+def capsule(pts, w, wobble=None):
+    """The outline of a tube of width w along pts, with round ends."""
+    left, right = [], []
+    for i, (x, y) in enumerate(pts):
+        a = pts[max(0, i - 1)]; b = pts[min(len(pts) - 1, i + 1)]
+        n = math.hypot(b[0] - a[0], b[1] - a[1]) or 1
+        nx, ny = -(b[1] - a[1]) / n, (b[0] - a[0]) / n
+        k = w / 2 * (1 + (wobble.uniform(-0.03, 0.03) if wobble else 0))
+        left.append((x + nx * k, y + ny * k))
+        right.append((x - nx * k, y - ny * k))
+    def cap(c, frm, to):
+        a0 = math.atan2(frm[1] - c[1], frm[0] - c[0])
+        a1 = math.atan2(to[1] - c[1], to[0] - c[0])
+        if a1 > a0:
+            a1 -= 2 * math.pi
+        return [(c[0] + math.cos(a0 + (a1 - a0) * t / 4) * w / 2, c[1] + math.sin(a0 + (a1 - a0) * t / 4) * w / 2) for t in range(1, 4)]
+    loop = left + cap(pts[-1], left[-1], right[-1]) + list(reversed(right)) + cap(pts[0], right[0], left[0])
+    return closed(loop), left, right
 
 def ribbon(pts, widths):
     """A tapered stroke: the outline of a line whose width changes along it."""
@@ -46,7 +71,11 @@ class Drawing:
         self.dots = []     # spine heads, nucleoli
         self.somata = []   # cell bodies, with the nucleus left light
         self.labels = []   # (letter, x, y, leader from, leader to)
+        self.lines = {}    # stroke width: outlines and hatching drawn as lines
         self.pts = []
+
+    def line(self, d, width):
+        self.lines.setdefault(width, []).append(d)
 
     def branch(self, x, y, angle, length, w0, w1, depth, maxdepth, spread=(16, 34), spines=0.5, bend=0.14, kids=(2, 2, 3), shrink=(0.6, 0.8), wshrink=0.72, up=None):
         r = self.r
@@ -138,6 +167,8 @@ class Drawing:
                f'<path fill="#000" d="{"".join(self.ink)}"/>']
         for soma in self.somata:
             out.append(f'<path fill="#000" fill-rule="evenodd" d="{soma}"/>')
+        for width, ds in sorted(self.lines.items()):
+            out.append(f'<path fill="none" stroke="#000" stroke-width="{f(width)}" stroke-linecap="round" stroke-linejoin="round" d="{"".join(ds)}"/>')
         if self.fine:
             out.append(f'<path fill="none" stroke="#000" stroke-width="0.45" stroke-linecap="round" d="{"".join(self.fine)}"/>')
         if self.dots:
@@ -185,5 +216,73 @@ for i in range(3, len(line) - 4, 5):
     a = (-math.pi / 2 if d.r.random() < 0.5 else math.pi / 2) + d.r.uniform(-0.8, 0.8)
     d.branch(x, y, a, d.r.uniform(4, 7), 1.0, 0.35, 3, 3, (30, 50), 0.6, 0.2)
 open(os.path.join(ART, 'dendrite.svg'), 'w').write(d.svg(margin=2))
-for n in ('neuron.svg', 'purkinje.svg', 'dendrite.svg'):
+# A motor neuron of the spinal cord, after the classic plates: a large
+# angular soma with thick dendrites all around, an axon that leaves from a
+# hillock, is wrapped in myelin between the nodes of Ranvier, sends a
+# recurrent collateral back and ends on a striated muscle fibre.
+m = Drawing(11)
+cx, cy = 122, 104
+m.soma(cx, cy, 18, 15, points=9, nucleus=0.36)
+for ang, ln, w in ((-100, 44, 5.4), (-52, 46, 5.0), (-148, 44, 5.2), (-8, 42, 4.6), (192, 40, 4.8), (36, 32, 3.8), (146, 34, 3.8), (-76, 30, 3.6)):
+    t = math.radians(ang)
+    m.branch(cx + math.cos(t) * 14, cy + math.sin(t) * 11, t, ln, w, 2.6, 0, 3, (16, 36), 0.14, 0.13, (2, 2, 3), (0.6, 0.8), 0.68)
+# The hillock: a cone that narrows into the axon.
+hill = [(cx + 1, cy + 12), (cx + 1.5, cy + 19), (cx + 2, cy + 26)]
+m.ink.append(ribbon(hill, [7.5, 3.2, 1.4]))
+m.pts += hill
+ax = [(cx + 2 + 2.2 * math.sin(i / 9) + m.r.uniform(-0.15, 0.15), cy + 26 + i * 2.5) for i in range(78)]
+m.ink.append(ribbon(ax, [1.4 - 0.4 * i / len(ax) for i in range(len(ax))]))
+m.pts += ax
+# Myelin: internodes as tubes around the axon, the shadow side hatched.
+nodes = []
+i = 8
+while i < len(ax) - 10:
+    j = min(i + 12, len(ax) - 8)
+    seg = ax[i:j + 1]
+    d, left, right = capsule(seg, 6.6, m.r)
+    m.line(d, 0.7)
+    for a, b in zip(left[1:-1:2], right[1:-1:2]):
+        # short strokes from the right edge in, as a pen shades a cylinder
+        m.line(f'M{f(b[0])} {f(b[1])}L{f(b[0] + (a[0] - b[0]) * 0.34)} {f(b[1] + (a[1] - b[1]) * 0.34 - 0.8)}', 0.35)
+    nodes.append(ax[j + 2])
+    i = j + 4
+# A recurrent collateral from the first node, curving back up.
+nx, ny = nodes[0]
+m.branch(nx - 1, ny, -2.5, 40, 0.9, 0.3, 2, 4, (25, 40), 0, 0.16, (1, 2), (0.55, 0.7), 0.8, up=-math.pi / 2)
+# The muscle fibre: a long tube with cross striations and a few nuclei.
+ex, ey = ax[-1]
+wave = lambda x: ey + 14 + 0.8 * math.sin((x - ex) / 30)
+fibre = [(x, wave(x)) for x in range(int(ex) - 64, int(ex) + 66, 6)]
+d, left, right = capsule(fibre, 16, m.r)
+m.line(d, 0.8)
+m.pts += left + right
+x = fibre[0][0] + 3
+k = 0
+while x < fibre[-1][0] - 3:
+    m.line(f'M{f(x)} {f(wave(x) - 5.6)}L{f(x + 0.4)} {f(wave(x) + 5.6)}', 0.5 if k % 2 else 0.22)
+    x += 1.6 if k % 2 else 2.4
+    k += 1
+for x, side in ((fibre[3][0], 1), (fibre[-5][0], -1)):
+    yc = wave(x) + side * 5.6
+    m.line(closed([(x + math.cos(t * math.pi / 4) * 3.4, yc + math.sin(t * math.pi / 4) * 1.3) for t in range(8)]), 0.5)
+    m.dots.append((x + 0.4, yc, 0.55))
+# The end plate: a low mound on the fibre; the terminal branches lie on it,
+# swell along the way and end in boutons.
+plate = lambda x: wave(x) - 8 - 4.5 * max(0, math.cos((x - ex) / 24 * math.pi / 2)) ** 1.5
+m.line(curve([(x, plate(x)) for x in range(int(ex) - 24, int(ex) + 25, 2)]), 0.6)
+for side, reach, lift in ((-1, 19, 1.4), (-1, 10, 2.6), (1, 9, 2.4), (1, 18, 1.3), (-1, 4, 3.6), (1, 4.5, 3.4)):
+    pts = [(ex, ey)]
+    for t in (0.2, 0.4, 0.6, 0.8, 1.0):
+        x = ex + side * reach * t
+        pts.append((x, plate(x) - lift * (1 - 0.5 * t) + 0.5 * math.sin(t * 7 + reach)))
+    m.ink.append(ribbon(pts, [1.2 - 0.45 * i / len(pts) for i in range(len(pts))]))
+    m.dots.append((pts[-1][0], pts[-1][1], m.r.uniform(1.4, 1.8)))
+    if reach > 15:
+        m.dots.append((pts[3][0], pts[3][1], 0.95))
+    m.pts += pts
+m.labels += [('a', cx + 30, cy + 34, (cx + 28, cy + 30), (cx + 14, cy + 10)),
+             ('b', nodes[1][0] + 16, nodes[1][1] + 3, (nodes[1][0] + 13, nodes[1][1]), (nodes[1][0] + 2.5, nodes[1][1])),
+             ('c', ex + 32, ey - 10, (ex + 29, ey - 8), (ex + 12, ey + 4))]
+open(os.path.join(ART, 'motor.svg'), 'w').write(m.svg())
+for n in ('neuron.svg', 'purkinje.svg', 'motor.svg', 'dendrite.svg'):
     print(n, len(open(os.path.join(ART, n)).read()))

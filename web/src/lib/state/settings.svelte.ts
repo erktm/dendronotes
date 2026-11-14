@@ -1,7 +1,7 @@
 // Per-browser settings, stored in localStorage. Nothing is written into the
 // soma, so the notes stay plain Markdown.
 
-import { DEFAULT_PALETTE, PALETTES, THEME_COLORS, type Palette } from '../palettes'
+import { DEFAULT_PALETTE, DRAWN, PALETTES, THEME_COLORS, type Palette } from '../palettes'
 
 export type ThemeChoice = 'system' | 'light' | 'dark'
 export type ViewMode = 'edit' | 'read'
@@ -136,7 +136,9 @@ class Settings {
         else root.dataset.theme = this.theme
       })
       $effect(() => {
-        document.documentElement.dataset.palette = this.palette
+        const root = document.documentElement
+        root.dataset.palette = this.palette
+        root.toggleAttribute('data-drawn', DRAWN.has(this.palette))
         const colors = THEME_COLORS[this.palette]
         for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
           meta.content = meta.media.includes('dark') ? colors.dark : colors.light

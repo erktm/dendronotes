@@ -235,7 +235,9 @@ export const strings = {
     light: 'Light',
     dark: 'Dark',
     palette: 'Design',
-    paletteDesc: 'Each has a light and a dark variant. Lab notebook and E-paper also draw by hand.',
+    paletteDesc: 'Each has a light and a dark variant.',
+    drawn: 'Drawn designs',
+    drawnDesc: 'Lines drawn by hand, shading and neuron drawings, as in a neurobiologist’s notes.',
     palettes: {
       cortex: { name: 'Cortex', desc: 'Gray matter: quiet graphite with a touch of rose' },
       sage: { name: 'Sage', desc: 'Leaf green on sage paper' },
@@ -247,6 +249,7 @@ export const strings = {
       brainbow: { name: 'Brainbow', desc: 'Neurons in many colors: coral and turquoise' },
       notebook: { name: 'Lab notebook', desc: 'A neurobiologist’s notes and drawings: sepia ink and red pencil on squared paper' },
       epaper: { name: 'E-paper', desc: 'The lab notebook on an e-paper screen: black ink on gray, dithered shading' },
+      cyanotype: { name: 'Cyanotype', desc: 'Neuron plates as a sun print: Prussian blue and paper white, hatched shading' },
     },
     details: 'Show details panel',
     detailsDesc: 'Outline and synapses next to the note.',

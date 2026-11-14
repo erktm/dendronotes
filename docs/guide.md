@@ -174,12 +174,15 @@ made visible: the stains Golgi (ink on aged paper, silver turned gold), Nissl (c
 Eosin (H&E: pink and blue-violet) and Myelin (Luxol fast blue with a rose counterstain), and the
 fluorescence of Confocal (cyan and magenta) and Brainbow (coral and turquoise).
 
-Two **drawn designs** look like a neurobiologist's notes and drawings rather than an app: Lab
-notebook (sepia ink and red pencil on squared paper) and E-paper (the same notebook on a gray
-e-paper screen, with dithered shading). Lines and boxes look drawn by hand, chosen entries are
-stippled or dithered, headings and the wordmark take a book face, and pen drawings of a
-pyramidal and a Purkinje cell, labeled like an anatomical plate, fill the empty page and the
-sign-in page. Both have a light and a dark variant.
+The settings list three **drawn designs** under their own heading. They look like a
+neurobiologist's notes and drawings rather than an app: Lab notebook (sepia ink and red pencil
+on squared paper), E-paper (the same notebook on a gray e-paper screen, with dithered shading)
+and Cyanotype (neuron plates as a sun print, Prussian blue and paper white, with hatched
+shading). Lines and boxes look drawn by hand, chosen entries are stippled, dithered or hatched,
+headings and the wordmark take a book face, and pen drawings labeled like an anatomical plate
+fill the empty page and the sign-in page: a pyramidal and a Purkinje cell, and on the Cyanotype
+a motor neuron whose myelinated axon ends on a muscle fibre. Each has a light and a dark
+variant.
 
 Uploads are limited to images (PNG, JPEG, GIF, WebP, AVIF, BMP, ICO, SVG), PDF, audio (MP3,
 WAV, Ogg, FLAC, M4A), video (MP4, WebM, MOV), text (Markdown, TXT, CSV, JSON) and zip files,

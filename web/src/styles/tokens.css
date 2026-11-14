@@ -1,7 +1,7 @@
 /*
  * dendronotes design tokens.
  *
- * Ten palettes, each with a light and a dark variant, chosen per browser
+ * Eleven palettes, each with a light and a dark variant, chosen per browser
  * in the settings (<html data-palette="…">; Cortex when none is set). Light or
  * dark follows the system unless <html data-theme="light|dark"> says otherwise.
  * Any element with data-palette shows that palette inside it (the previews in
@@ -973,4 +973,87 @@
   --warn-soft: #29230f;
   --warn-text: #e3c06c;
   --scrim: rgb(0 0 0 / 0.6);
+}
+
+/* Cyanotype – neuron plates as a sun print: Prussian blue and paper white, hatched shading (styles/sketch.css) */
+[data-palette='cyanotype'] {
+  --bg: #edf1f2;
+  --bg-raised: #f5f7f8;
+  --bg-sunken: #e1e7ea;
+  --bg-hover: #d8e0e5;
+  --line: #b5c3cd;
+  --line-strong: #6e8597;
+  --text: #102a4c;
+  --text-muted: #34506f;
+  --text-faint: #48627f;
+  --accent: #17406f;
+  --accent-strong: #0b2648;
+  --accent-soft: #d3dfea;
+  --on-accent: #f5f7f8;
+  --accent-2: #0b6580;
+  --ok: #2b6440;
+  --warn: #7a5210;
+  --err: #a3283a;
+  --focus: #17406f;
+  --shadow: 2px 2px 0 rgb(16 42 76 / 0.5);
+  --code-bg: #e4eaee;
+  --warn-soft: #efe3c5;
+  --warn-text: #7a5210;
+  --scrim: rgb(16 42 76 / 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-palette='cyanotype']:not([data-theme='light']),
+  :root:not([data-theme='light']) [data-palette='cyanotype'] {
+    --bg: #0f2546;
+    --bg-raised: #142c52;
+    --bg-sunken: #0a1b36;
+    --bg-hover: #1b3864;
+    --line: #2c4c7b;
+    --line-strong: #5878a6;
+    --text: #eef3f9;
+    --text-muted: #bccbe0;
+    --text-faint: #a3b6d0;
+    --accent: #e6eef8;
+    --accent-strong: #ffffff;
+    --accent-soft: #213f6e;
+    --on-accent: #0f2546;
+    --accent-2: #93d5ee;
+    --ok: #9adcaa;
+    --warn: #f0cf7a;
+    --err: #ffa59b;
+    --focus: #e6eef8;
+    --shadow: 2px 2px 0 rgb(2 10 24 / 0.6);
+    --code-bg: #0a1b36;
+    --warn-soft: #2e2a1a;
+    --warn-text: #f0cf7a;
+    --scrim: rgb(2 8 20 / 0.6);
+  }
+}
+
+:root[data-theme='dark'][data-palette='cyanotype'],
+:root[data-theme='dark'] [data-palette='cyanotype'] {
+  --bg: #0f2546;
+  --bg-raised: #142c52;
+  --bg-sunken: #0a1b36;
+  --bg-hover: #1b3864;
+  --line: #2c4c7b;
+  --line-strong: #5878a6;
+  --text: #eef3f9;
+  --text-muted: #bccbe0;
+  --text-faint: #a3b6d0;
+  --accent: #e6eef8;
+  --accent-strong: #ffffff;
+  --accent-soft: #213f6e;
+  --on-accent: #0f2546;
+  --accent-2: #93d5ee;
+  --ok: #9adcaa;
+  --warn: #f0cf7a;
+  --err: #ffa59b;
+  --focus: #e6eef8;
+  --shadow: 2px 2px 0 rgb(2 10 24 / 0.6);
+  --code-bg: #0a1b36;
+  --warn-soft: #2e2a1a;
+  --warn-text: #f0cf7a;
+  --scrim: rgb(2 8 20 / 0.6);
 }
