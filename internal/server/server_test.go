@@ -100,6 +100,17 @@ func newTestServerWith(t *testing.T, fsys fstest.MapFS, cfg config.Config) *Serv
 func somaDir(s *Server) string { return filepath.Join(s.cfg.SomasDir, "test") }
 
 // rtOf opens the test soma for the rest of the test.
+// waitWatching waits until the soma's changes on disk are followed, so that
+// a file written by the test is not missed.
+func waitWatching(t *testing.T, rt *somas.Runtime) {
+	t.Helper()
+	select {
+	case <-rt.Watching():
+	case <-time.After(10 * time.Second):
+		t.Fatal("the soma is not watched")
+	}
+}
+
 func rtOf(t *testing.T, s *Server) *somas.Runtime {
 	t.Helper()
 	sm, err := s.store.SomaByID(context.Background(), testSoma)

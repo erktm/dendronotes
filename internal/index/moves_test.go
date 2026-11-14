@@ -30,7 +30,7 @@ func TestSyncFindsMovesByContent(t *testing.T) {
 	mv("Notes", "Folder")
 	mv("Twin A.md", "Twin C.md") // the same content moving twice: not told apart
 	mv("Twin B.md", "Twin D.md")
-	mv("Empty.md", "Blank.md")   // empty notes are never paired
+	mv("Empty.md", "Blank.md") // empty notes are never paired
 	ch := f.sync(t)
 	want := []Move{{From: "Notes/X.md", To: "Folder/X.md"}, {From: "Plan.md", To: "Archive/Plan 2026.md"}}
 	if !reflect.DeepEqual(ch.Moved, want) {

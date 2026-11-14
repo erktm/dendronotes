@@ -285,6 +285,7 @@ func TestExternalChangesAreFollowed(t *testing.T) {
 		t.Fatalf("readyz: %v %v", resp, err)
 	}
 	resp.Body.Close()
+	waitWatching(t, rtOf(t, s))
 
 	next := subscribe(t, s)
 	full := filepath.Join(somaDir(s), "Outside edit.md")

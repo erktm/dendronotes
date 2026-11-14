@@ -43,8 +43,9 @@ type Runtime struct {
 	log      *slog.Logger
 	stop     context.CancelFunc
 	done     chan struct{}
-	users    atomic.Int64 // requests and streams currently using the soma
-	lastUsed atomic.Int64 // unix nanoseconds
+	watching chan struct{} // closed once changes on disk are followed
+	users    atomic.Int64  // requests and streams currently using the soma
+	lastUsed atomic.Int64  // unix nanoseconds
 }
 
 func newRuntime(id string, sm *soma.Soma, indexDir, historyFile string, rescan time.Duration, maxNote int64, moved func(*Runtime, string, string), log *slog.Logger) (*Runtime, error) {
@@ -58,7 +59,7 @@ func newRuntime(id string, sm *soma.Soma, indexDir, historyFile string, rescan t
 		return nil, err
 	}
 	ctx, stop := context.WithCancel(context.Background())
-	rt := &Runtime{ID: id, Soma: sm, Index: ix, History: hist, Hub: events.NewHub(maxStreams), moved: moved, log: log, stop: stop, done: make(chan struct{})}
+	rt := &Runtime{ID: id, Soma: sm, Index: ix, History: hist, Hub: events.NewHub(maxStreams), moved: moved, log: log, stop: stop, done: make(chan struct{}), watching: make(chan struct{})}
 	rt.Collab = collab.New(collab.Options{
 		Soma:     sm,
 		MaxBytes: maxNote,
@@ -150,9 +151,31 @@ func (rt *Runtime) pruneHistory(days int) {
 	}
 }
 
+// Watching is closed once changes on disk are followed: the file system
+// watcher is in place (its events wait until the first sync is done), or it
+// could not start and periodic rescans take over.
+func (rt *Runtime) Watching() <-chan struct{} { return rt.watching }
+
 // follow brings the index up to date with the soma, then follows changes via
 // the file system watcher and periodic rescans until ctx is done.
 func (rt *Runtime) follow(ctx context.Context, rescan time.Duration) {
+	// The watcher starts before the first sync, so that nothing changed while
+	// the sync runs is missed.
+	w, err := watch.New(watch.Options{
+		Dir:      rt.Soma.Dir(),
+		Dirs:     rt.dirs,
+		Skip:     rt.hidden,
+		Debounce: watchDebounce,
+		Log:      rt.log,
+	})
+	if err != nil {
+		rt.log.Warn("file system watcher unavailable, relying on periodic rescans", "err", err)
+		w = nil
+	} else {
+		defer w.Close()
+	}
+	close(rt.watching)
+
 	for attempt := 0; ; attempt++ {
 		start := time.Now()
 		_, err := rt.Index.Sync(ctx)
@@ -172,18 +195,8 @@ func (rt *Runtime) follow(ctx context.Context, rescan time.Duration) {
 		}
 	}
 
-	w, err := watch.New(watch.Options{
-		Dir:      rt.Soma.Dir(),
-		Dirs:     rt.dirs,
-		Skip:     rt.hidden,
-		Debounce: watchDebounce,
-		Log:      rt.log,
-	})
-	if err != nil {
-		rt.log.Warn("file system watcher unavailable, relying on periodic rescans", "err", err)
-	} else {
+	if w != nil {
 		runDone := make(chan struct{})
-		defer w.Close()
 		defer func() { <-runDone }() // no batch may touch the index after we return
 		go func() {
 			defer close(runDone)

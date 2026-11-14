@@ -110,6 +110,7 @@ func TestHistoryOutside(t *testing.T) {
 	base := "/api/somas/" + testSoma
 	expect(t, admin.do("POST", base+"/notes/Log.md", `{"content":"one"}`), 201, "")
 	rt := rtOf(t, s)
+	waitWatching(t, rt)
 	if err := os.WriteFile(filepath.Join(somaDir(s), "Log.md"), []byte("one\ntwo"), 0o644); err != nil {
 		t.Fatal(err)
 	}
