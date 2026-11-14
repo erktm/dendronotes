@@ -1,7 +1,7 @@
 /*
  * dendronotes design tokens.
  *
- * Eight color palettes, each with a light and a dark variant, chosen per browser
+ * Ten palettes, each with a light and a dark variant, chosen per browser
  * in the settings (<html data-palette="…">; Cortex when none is set). Light or
  * dark follows the system unless <html data-theme="light|dark"> says otherwise.
  * Any element with data-palette shows that palette inside it (the previews in
@@ -807,4 +807,170 @@
   --warn-soft: #2a2414;
   --warn-text: #e3b65c;
   --scrim: rgb(0 0 0 / 0.5);
+}
+
+/* Lab notebook – a neurobiologist's notes and drawings: sepia ink and red pencil on cream paper (styles/sketch.css draws the lines) */
+[data-palette='notebook'] {
+  --bg: #f2ece0;
+  --bg-raised: #f8f4eb;
+  --bg-sunken: #e8e0d0;
+  --bg-hover: #e4dbc8;
+  --line: #c7b9a0;
+  --line-strong: #8c7f6a;
+  --text: #1f1b15;
+  --text-muted: #4d4639;
+  --text-faint: #5d5545;
+  --accent: #26211a;
+  --accent-strong: #0f0c08;
+  --accent-soft: #e2d8c4;
+  --on-accent: #f8f4eb;
+  --accent-2: #8f2f1c;
+  --ok: #2c6638;
+  --warn: #7a5210;
+  --err: #a12a1f;
+  --focus: #26211a;
+  --shadow: 2px 2px 0 rgb(38 33 26 / 0.55);
+  --code-bg: #ebe4d6;
+  --warn-soft: #efdfbf;
+  --warn-text: #7a5210;
+  --scrim: rgb(31 27 21 / 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-palette='notebook']:not([data-theme='light']),
+  :root:not([data-theme='light']) [data-palette='notebook'] {
+    --bg: #18150f;
+    --bg-raised: #1e1a13;
+    --bg-sunken: #110f0a;
+    --bg-hover: #2a251b;
+    --line: #3e372a;
+    --line-strong: #6b5f4b;
+    --text: #eee6d5;
+    --text-muted: #bcb19c;
+    --text-faint: #a39882;
+    --accent: #e9dfcb;
+    --accent-strong: #fffbf2;
+    --accent-soft: #352e22;
+    --on-accent: #18150f;
+    --accent-2: #e3937a;
+    --ok: #90cf9c;
+    --warn: #e2b862;
+    --err: #f09080;
+    --focus: #e9dfcb;
+    --shadow: 2px 2px 0 rgb(0 0 0 / 0.65);
+    --code-bg: #110f0a;
+    --warn-soft: #2d2615;
+    --warn-text: #e2b862;
+    --scrim: rgb(0 0 0 / 0.55);
+  }
+}
+
+:root[data-theme='dark'][data-palette='notebook'],
+:root[data-theme='dark'] [data-palette='notebook'] {
+  --bg: #18150f;
+  --bg-raised: #1e1a13;
+  --bg-sunken: #110f0a;
+  --bg-hover: #2a251b;
+  --line: #3e372a;
+  --line-strong: #6b5f4b;
+  --text: #eee6d5;
+  --text-muted: #bcb19c;
+  --text-faint: #a39882;
+  --accent: #e9dfcb;
+  --accent-strong: #fffbf2;
+  --accent-soft: #352e22;
+  --on-accent: #18150f;
+  --accent-2: #e3937a;
+  --ok: #90cf9c;
+  --warn: #e2b862;
+  --err: #f09080;
+  --focus: #e9dfcb;
+  --shadow: 2px 2px 0 rgb(0 0 0 / 0.65);
+  --code-bg: #110f0a;
+  --warn-soft: #2d2615;
+  --warn-text: #e2b862;
+  --scrim: rgb(0 0 0 / 0.55);
+}
+
+/* E-paper – the same notebook on a gray e-paper screen: black ink, dithered shading (styles/sketch.css) */
+[data-palette='epaper'] {
+  --bg: #e5e5e0;
+  --bg-raised: #eeeeea;
+  --bg-sunken: #dadad4;
+  --bg-hover: #d2d2cb;
+  --line: #b4b4ad;
+  --line-strong: #7c7c76;
+  --text: #121212;
+  --text-muted: #3b3b39;
+  --text-faint: #4a4a47;
+  --accent: #151515;
+  --accent-strong: #000000;
+  --accent-soft: #cdcdc6;
+  --on-accent: #f2f2ee;
+  --accent-2: #5b466f;
+  --ok: #2d5a36;
+  --warn: #6a4c10;
+  --err: #8c2a22;
+  --focus: #151515;
+  --shadow: 2px 2px 0 #151515;
+  --code-bg: #dcdcd6;
+  --warn-soft: #e4d9bd;
+  --warn-text: #6a4c10;
+  --scrim: rgb(18 18 18 / 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-palette='epaper']:not([data-theme='light']),
+  :root:not([data-theme='light']) [data-palette='epaper'] {
+    --bg: #101010;
+    --bg-raised: #171717;
+    --bg-sunken: #0a0a0a;
+    --bg-hover: #242424;
+    --line: #393939;
+    --line-strong: #6a6a6a;
+    --text: #ededed;
+    --text-muted: #b3b3b3;
+    --text-faint: #999999;
+    --accent: #f1f1f1;
+    --accent-strong: #ffffff;
+    --accent-soft: #2b2b2b;
+    --on-accent: #101010;
+    --accent-2: #bfaee0;
+    --ok: #8fcf9b;
+    --warn: #e3c06c;
+    --err: #f39189;
+    --focus: #f1f1f1;
+    --shadow: 2px 2px 0 #4a4a4a;
+    --code-bg: #0a0a0a;
+    --warn-soft: #29230f;
+    --warn-text: #e3c06c;
+    --scrim: rgb(0 0 0 / 0.6);
+  }
+}
+
+:root[data-theme='dark'][data-palette='epaper'],
+:root[data-theme='dark'] [data-palette='epaper'] {
+  --bg: #101010;
+  --bg-raised: #171717;
+  --bg-sunken: #0a0a0a;
+  --bg-hover: #242424;
+  --line: #393939;
+  --line-strong: #6a6a6a;
+  --text: #ededed;
+  --text-muted: #b3b3b3;
+  --text-faint: #999999;
+  --accent: #f1f1f1;
+  --accent-strong: #ffffff;
+  --accent-soft: #2b2b2b;
+  --on-accent: #101010;
+  --accent-2: #bfaee0;
+  --ok: #8fcf9b;
+  --warn: #e3c06c;
+  --err: #f39189;
+  --focus: #f1f1f1;
+  --shadow: 2px 2px 0 #4a4a4a;
+  --code-bg: #0a0a0a;
+  --warn-soft: #29230f;
+  --warn-text: #e3c06c;
+  --scrim: rgb(0 0 0 / 0.6);
 }

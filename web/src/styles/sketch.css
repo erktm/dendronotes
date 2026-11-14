@@ -1,0 +1,218 @@
+/*
+ * The drawn designs: Lab notebook and E-paper (palettes.ts SKETCHED).
+ *
+ * Beyond their colors (tokens.css) they look like a neurobiologist's notes:
+ * squared paper with a faint grain, boxes drawn by hand with a second pen
+ * stroke, shading stippled with ink dots (Lab notebook) or dithered like an
+ * e-paper screen, an italic book face for headings, and neuron drawings in
+ * the margins. The drawings (styles/art/, made by scripts/neurons.py) are
+ * masks, so they take the ink color of the design, light and dark.
+ *
+ * Only this file knows these designs; components keep their own styles and
+ * are reached through their stable class names.
+ */
+
+:root:is([data-palette='notebook'], [data-palette='epaper']) {
+  --radius-sm: 8px 3px 7px 4px / 4px 7px 3px 8px;
+  --radius: 16px 5px 14px 6px / 6px 14px 5px 16px;
+  --sketch-stroke: 1.5px;
+  /* Shading: ink dots, as a pen drawing stipples a shadow. */
+  --shade: radial-gradient(circle, color-mix(in srgb, var(--line-strong) 70%, transparent) 0.7px, transparent 1px) 0 0 / 4px 4px;
+  /* The paper: squares of a lab notebook. */
+  --paper: linear-gradient(color-mix(in srgb, var(--line) 30%, transparent) 1px, transparent 1px) 0 0 / 22px 22px,
+    linear-gradient(90deg, color-mix(in srgb, var(--line) 30%, transparent) 1px, transparent 1px) 0 0 / 22px 22px;
+  --grain-filter: none;
+  --grain-opacity: 0.22;
+  --heading-font: var(--font-serif);
+  --heading-style: italic;
+}
+
+:root[data-palette='epaper'] {
+  /* Dithering: every other pixel inked, as e-paper shows gray. */
+  --shade: conic-gradient(var(--line) 25%, transparent 0 50%, var(--line) 0 75%, transparent 0) 0 0 / 2px 2px;
+  /* The paper: a fine dot grid. */
+  --paper: radial-gradient(circle, color-mix(in srgb, var(--line-strong) 55%, transparent) 0.8px, transparent 1.2px) 0 0 / 22px 22px;
+  --grain-opacity: 0.16;
+  --heading-style: normal;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:is([data-palette='notebook'], [data-palette='epaper']):not([data-theme='light']) {
+    --grain-filter: invert(1);
+    --grain-opacity: 0.1;
+  }
+}
+:root[data-theme='dark']:is([data-palette='notebook'], [data-palette='epaper']) {
+  --grain-filter: invert(1);
+  --grain-opacity: 0.1;
+}
+
+/* --- Paper ------------------------------------------------------------ */
+
+:root:is([data-palette='notebook'], [data-palette='epaper']) body {
+  background: var(--paper), var(--bg);
+}
+
+/* A faint grain over everything, as paper has; it never takes a click. */
+:root:is([data-palette='notebook'], [data-palette='epaper']) body::after {
+  position: fixed;
+  z-index: 2147483000;
+  inset: 0;
+  background: url('./art/grain.svg');
+  content: '';
+  filter: var(--grain-filter);
+  opacity: var(--grain-opacity);
+  pointer-events: none;
+}
+
+/* The lab notebook's margin: a red double line beside the notes. */
+:root[data-palette='notebook'] .sidebar {
+  border-right: 3px double color-mix(in srgb, var(--accent-2) 55%, transparent);
+}
+
+/* --- Lines drawn by hand ---------------------------------------------- */
+
+/* Boxes: a wobbly outline, drawn twice a hair apart, and a hard print shadow. */
+:root:is([data-palette='notebook'], [data-palette='epaper']) :is(dialog, .menu, .auth-card, .admin-card, .toast, .tip, .fresh) {
+  border: var(--sketch-stroke) solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow:
+    0.6px 1px 0 -0.2px var(--line-strong),
+    var(--shadow);
+}
+
+:root:is([data-palette='notebook'], [data-palette='epaper']) :is(input:not([type='checkbox'], [type='radio']), select, textarea) {
+  border-width: var(--sketch-stroke);
+  border-radius: var(--radius-sm);
+}
+
+:root:is([data-palette='notebook'], [data-palette='epaper']) :focus-visible {
+  outline-style: dashed !important;
+}
+
+/* Where something is chosen, it is shaded: stippled or dithered. */
+:root:is([data-palette='notebook'], [data-palette='epaper'])
+  :is(.tree .row.active, .tree .row.selected, .rail .item.active, nav button[aria-current='page']) {
+  background: var(--shade), var(--accent-soft);
+}
+
+/* --- Type --------------------------------------------------------------- */
+
+:root:is([data-palette='notebook'], [data-palette='epaper'])
+  :is(.admin h1, .tutorials h1, .tutorials h2, .empty > h1, .auth-card h1, dialog h2, .note-title-text) {
+  font-family: var(--heading-font);
+  font-style: var(--heading-style);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+/* The wordmark: an italic book face with "dendro" in red pencil, a dendrite
+   drawn underneath (Lab notebook); typewriter letters on e-paper. */
+:root:is([data-palette='notebook'], [data-palette='epaper']) .wordmark {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 0.36em;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+:root[data-palette='notebook'] .wordmark .accent {
+  color: var(--accent-2);
+}
+:root[data-palette='epaper'] .wordmark {
+  font-family: var(--font-mono);
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+:root:is([data-palette='notebook'], [data-palette='epaper']) .wordmark::after {
+  position: absolute;
+  right: -6%;
+  bottom: 0;
+  left: 0;
+  height: 0.46em;
+  background: var(--text);
+  content: '';
+  mask: url('./art/dendrite.svg') no-repeat left center / 100% 100%;
+}
+
+/* --- Drawings in the margins ------------------------------------------ */
+
+/* The empty page: a pyramidal cell instead of the logo. */
+:root:is([data-palette='notebook'], [data-palette='epaper']) .empty > .mark {
+  width: 240px;
+  height: 330px;
+  margin-bottom: 0;
+  border-radius: 0;
+  background: var(--text);
+  mask: url('./art/neuron.svg') no-repeat center / contain;
+}
+:root:is([data-palette='notebook'], [data-palette='epaper']) .empty > .mark > svg {
+  visibility: hidden;
+}
+
+/* The sign-in page: a Purkinje cell on one side, a pyramidal cell on the other. */
+:root:is([data-palette='notebook'], [data-palette='epaper']) .screen {
+  position: relative;
+  overflow: hidden;
+  background: var(--paper), var(--bg);
+}
+:root:is([data-palette='notebook'], [data-palette='epaper']) .screen::before,
+:root:is([data-palette='notebook'], [data-palette='epaper']) .screen::after {
+  position: absolute;
+  background: var(--text);
+  content: '';
+  opacity: 0.16;
+  pointer-events: none;
+}
+:root:is([data-palette='notebook'], [data-palette='epaper']) .screen::before {
+  bottom: -40px;
+  left: max(-60px, calc(50% - 640px));
+  width: min(46vw, 460px);
+  height: min(62vh, 560px);
+  mask: url('./art/purkinje.svg') no-repeat left bottom / contain;
+}
+:root:is([data-palette='notebook'], [data-palette='epaper']) .screen::after {
+  top: 24px;
+  right: max(-40px, calc(50% - 620px));
+  width: min(30vw, 300px);
+  height: min(56vh, 460px);
+  mask: url('./art/neuron.svg') no-repeat right top / contain;
+}
+:root:is([data-palette='notebook'], [data-palette='epaper']) .screen > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* The tutorials: a Purkinje cell in the corner of the header. */
+:root:is([data-palette='notebook'], [data-palette='epaper']) .tutorials > header {
+  position: relative;
+  overflow: hidden;
+}
+:root:is([data-palette='notebook'], [data-palette='epaper']) .tutorials > header::after {
+  position: absolute;
+  top: 8px;
+  right: 24px;
+  width: 150px;
+  height: 140px;
+  background: var(--text);
+  content: '';
+  mask: url('./art/purkinje.svg') no-repeat right top / contain;
+  opacity: 0.22;
+  pointer-events: none;
+}
+
+/* --- E-paper: no animations, as the screen redraws at once ------------ */
+
+:root[data-palette='epaper'] *,
+:root[data-palette='epaper'] *::before,
+:root[data-palette='epaper'] *::after {
+  transition: none !important;
+}
+
+@media print {
+  :root:is([data-palette='notebook'], [data-palette='epaper']) body::after {
+    display: none;
+  }
+}

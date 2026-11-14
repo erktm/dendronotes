@@ -165,14 +165,21 @@ the essentials (the first note, synapses, the file tree, drawings, working toget
 search and export) and a Markdown cheat sheet.
 
 **Settings** (stored in the browser, never in the soma): live preview, Vim key bindings,
-readable line length, note font (sans or serif), theme (system, light, dark), color palette,
-the details panel, and whether renaming updates synapses.
+readable line length, note font (sans or serif), theme (system, light, dark), design, the
+details panel, and whether renaming updates synapses.
 
-**Color palettes**, each with a light and a dark variant: Cortex (the default; gray matter,
+**Designs**, each with a light and a dark variant: Cortex (the default; gray matter,
 graphite with a touch of rose), Sage (leaf green) and six taken from the ways nerve tissue is
 made visible: the stains Golgi (ink on aged paper, silver turned gold), Nissl (cresyl violet),
 Eosin (H&E: pink and blue-violet) and Myelin (Luxol fast blue with a rose counterstain), and the
 fluorescence of Confocal (cyan and magenta) and Brainbow (coral and turquoise).
+
+Two **drawn designs** look like a neurobiologist's notes and drawings rather than an app: Lab
+notebook (sepia ink and red pencil on squared paper) and E-paper (the same notebook on a gray
+e-paper screen, with dithered shading). Lines and boxes look drawn by hand, chosen entries are
+stippled or dithered, headings and the wordmark take a book face, and pen drawings of a
+pyramidal and a Purkinje cell, labeled like an anatomical plate, fill the empty page and the
+sign-in page. Both have a light and a dark variant.
 
 Uploads are limited to images (PNG, JPEG, GIF, WebP, AVIF, BMP, ICO, SVG), PDF, audio (MP3,
 WAV, Ogg, FLAC, M4A), video (MP4, WebM, MOV), text (Markdown, TXT, CSV, JSON) and zip files,
