@@ -170,7 +170,10 @@ sequenceDiagram
   (`@codemirror/collab`). Positions are UTF-16 code units on both sides; a shared catalog of
   change sets keeps the Go and the CodeMirror rules equal.
 - Saving goes through `soma.WriteNote` with the ETag; a file changed meanwhile is merged
-  (three-way), never overwritten. Every save is recorded in the history with its authors.
+  (three-way), never overwritten. That includes a change arriving while the save is being
+  written: the file is checked again after the slow flush, the new content takes its place by
+  exchanging the two names in one step where the system can, and a file that changed in that
+  moment is put back and merged. Every save is recorded in the history with its authors.
 - Cursors, selections and changes go only to the tabs that joined that note.
 
 Drawings are not live documents: the editor saves the whole file about a second after the last

@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
-	"io/fs"
 	"os"
 	"path"
 	"strings"
@@ -148,24 +147,7 @@ func (s *Soma) WriteFile(p string, content []byte, ifMatch string) (Entry, strin
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	lst, err := s.root.Lstat(p)
-	if err != nil {
-		return Entry{}, "", mapErr(err)
-	}
-	switch {
-	case lst.Mode()&fs.ModeSymlink != 0:
-		return Entry{}, "", ErrReadOnly
-	case lst.IsDir():
-		return Entry{}, "", ErrIsDir
-	}
-	current, err := s.root.ReadFile(p)
-	if err != nil {
-		return Entry{}, "", mapErr(err)
-	}
-	if cur := ETag(current); ifMatch != cur {
-		return Entry{}, "", &ConflictError{ETag: cur}
-	}
-	if err := s.atomicWrite(p, content, lst.Mode().Perm()); err != nil {
+	if err := s.replaceChecked(p, content, ifMatch); err != nil {
 		return Entry{}, "", err
 	}
 	e, err := s.Stat(p) // Stat takes no lock

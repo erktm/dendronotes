@@ -8,10 +8,8 @@
 package soma
 
 import (
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -45,6 +43,11 @@ type Soma struct {
 	// mu serializes mutations so that the ETag check and the write of a
 	// note cannot interleave with another request.
 	mu sync.Mutex
+	// writeHook runs at the stages of conditional writes (tests).
+	writeHook func(p string, stage WriteStage)
+	// noExchange makes writes rename as on systems without an exchange of
+	// two names (tests).
+	noExchange bool
 }
 
 // Entry is a file or folder in the tree.
@@ -262,7 +265,8 @@ func (s *Soma) readNote(p string) (Note, error) {
 
 // WriteNote replaces the content of an existing note. ifMatch must be the
 // ETag the client based its changes on; otherwise a *ConflictError with the
-// current ETag is returned.
+// current ETag is returned. That holds for changes made elsewhere while the
+// note is being written as well (see replaceChecked).
 func (s *Soma) WriteNote(p string, content []byte, ifMatch string) (Note, error) {
 	p, err := CleanPath(p)
 	if err != nil {
@@ -278,24 +282,7 @@ func (s *Soma) WriteNote(p string, content []byte, ifMatch string) (Note, error)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	lst, err := s.root.Lstat(p)
-	if err != nil {
-		return Note{}, mapErr(err)
-	}
-	switch {
-	case lst.Mode()&fs.ModeSymlink != 0:
-		return Note{}, ErrReadOnly
-	case lst.IsDir():
-		return Note{}, ErrIsDir
-	}
-	current, err := s.root.ReadFile(p)
-	if err != nil {
-		return Note{}, mapErr(err)
-	}
-	if cur := ETag(current); ifMatch != cur {
-		return Note{}, &ConflictError{ETag: cur}
-	}
-	if err := s.atomicWrite(p, content, lst.Mode().Perm()); err != nil {
+	if err := s.replaceChecked(p, content, ifMatch); err != nil {
 		return Note{}, err
 	}
 	return s.noteMeta(p, content)
@@ -491,34 +478,6 @@ func (s *Soma) freeName(p string) (string, error) {
 		candidate = fmt.Sprintf("%s (%d)%s", stem, i, ext)
 	}
 	return "", ErrExists
-}
-
-// atomicWrite writes data to a temporary file next to p and renames it over
-// p, so readers (and sync tools) never see a half-written note.
-func (s *Soma) atomicWrite(p string, data []byte, perm fs.FileMode) error {
-	dir := path.Dir(p)
-	var rnd [8]byte
-	_, _ = rand.Read(rnd[:])
-	tmp := path.Join(dir, tmpPrefix+hex.EncodeToString(rnd[:]))
-
-	f, err := s.root.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, perm)
-	if err != nil {
-		return mapErr(err)
-	}
-	_, werr := f.Write(data)
-	serr := f.Sync()
-	cerr := f.Close()
-	if err := errors.Join(werr, serr, cerr); err != nil {
-		_ = s.root.Remove(tmp)
-		return err
-	}
-	_ = s.root.Chmod(tmp, perm) // OpenFile is subject to the umask
-	if err := s.root.Rename(tmp, p); err != nil {
-		_ = s.root.Remove(tmp)
-		return mapErr(err)
-	}
-	s.syncDir(dir)
-	return nil
 }
 
 // syncDir flushes a directory entry change to disk (best effort; not every

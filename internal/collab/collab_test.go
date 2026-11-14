@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -282,6 +283,46 @@ func TestChangesOnDiskAreMerged(t *testing.T) {
 	}
 	if n := f.sink.take("s1", "notice"); len(n) == 0 || n[len(n)-1]["kind"] != "conflict" {
 		t.Errorf("conflict notice: %v", n)
+	}
+}
+
+// A change made elsewhere while a save is being written is merged like any
+// other change on disk, never overwritten.
+func TestChangeDuringSaveIsMerged(t *testing.T) {
+	for _, c := range []struct {
+		name  string
+		stage soma.WriteStage
+	}{{"flushed", soma.WriteFlushed}, {"replacing", soma.WriteReplacing}} {
+		t.Run(c.name, func(t *testing.T) {
+			f := newFixture(t, map[string]string{"Plan.md": "one\ntwo\nthree\n"})
+			var changed atomic.Bool
+			f.soma.SetWriteHook(func(p string, stage soma.WriteStage) {
+				if p == "Plan.md" && stage == c.stage && changed.CompareAndSwap(false, true) {
+					// Another program writes the note in place.
+					if err := os.WriteFile(filepath.Join(f.dir, "Plan.md"), []byte("one\ntwo\nTHREE\n"), 0o644); err != nil {
+						t.Error(err)
+					}
+				}
+			})
+			f.m.AddStream("s1", User{ID: 1, Name: "Erik"})
+			j, _ := f.m.Join("s1", 1, "Plan.md", nil)
+			if _, err := f.m.Push("s1", 1, "Plan.md", j.Doc, 0, []Update{edit(14, 0, 3, "ONE")}, false); err != nil {
+				t.Fatal(err)
+			}
+			f.waitSaved("Plan.md")
+			if !changed.Load() {
+				t.Fatal("the note was not changed during the save")
+			}
+			if got := f.file("Plan.md"); got != "ONE\ntwo\nTHREE\n" {
+				t.Errorf("merged file: %q", got)
+			}
+			if n := f.sink.take("s1", "notice"); len(n) != 1 || n[0]["kind"] != "merged" {
+				t.Errorf("notice: %v", n)
+			}
+			if j2, _ := f.m.Join("s1", 1, "Plan.md", nil); j2.Text != "ONE\ntwo\nTHREE\n" {
+				t.Errorf("document: %q", j2.Text)
+			}
+		})
 	}
 }
 
