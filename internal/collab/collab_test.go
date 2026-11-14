@@ -230,11 +230,13 @@ func TestChangesOnDiskAreMerged(t *testing.T) {
 	f := newFixture(t, map[string]string{"Plan.md": "one\ntwo\nthree\n"})
 	f.m.AddStream("s1", User{ID: 1, Name: "Erik"})
 	j, _ := f.m.Join("s1", 1, "Plan.md", nil)
-	if _, err := f.m.Push("s1", 1, "Plan.md", j.Doc, 0, []Update{edit(14, 0, 3, "ONE")}, false); err != nil {
+	// Someone edits the file elsewhere while the note is edited here, before
+	// the save. (The file is written first: a save that started already could
+	// otherwise overwrite it, as on slow test machines.)
+	if err := os.WriteFile(filepath.Join(f.dir, "Plan.md"), []byte("one\ntwo\nTHREE\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// Someone edits the file elsewhere before the save.
-	if err := os.WriteFile(filepath.Join(f.dir, "Plan.md"), []byte("one\ntwo\nTHREE\n"), 0o644); err != nil {
+	if _, err := f.m.Push("s1", 1, "Plan.md", j.Doc, 0, []Update{edit(14, 0, 3, "ONE")}, false); err != nil {
 		t.Fatal(err)
 	}
 	f.m.FileChanged("Plan.md")
@@ -267,10 +269,10 @@ func TestChangesOnDiskAreMerged(t *testing.T) {
 	}
 
 	// Conflicting edits keep both versions.
-	if _, err := f.m.Push("s1", 1, "Plan.md", j.Doc, j2.Version, []Update{edit(19, 4, 7, "mine")}, false); err != nil {
+	if err := os.WriteFile(filepath.Join(f.dir, "Plan.md"), []byte("ONE\ntheirs\nTHREE\nfour\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(f.dir, "Plan.md"), []byte("ONE\ntheirs\nTHREE\nfour\n"), 0o644); err != nil {
+	if _, err := f.m.Push("s1", 1, "Plan.md", j.Doc, j2.Version, []Update{edit(19, 4, 7, "mine")}, false); err != nil {
 		t.Fatal(err)
 	}
 	f.m.FileChanged("Plan.md")
