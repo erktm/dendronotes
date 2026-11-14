@@ -912,7 +912,7 @@
   --warn: #7a5210;
   --err: #a12a1f;
   --focus: #26211a;
-  --shadow: 2px 2px 0 rgb(38 33 26 / 0.55);
+  --shadow: 0 1px 2px rgb(38 33 26 / 0.06), 0 4px 16px rgb(38 33 26 / 0.06);
   --code-bg: #ebe4d6;
   --warn-soft: #efdfbf;
   --warn-text: #7a5210;
@@ -940,7 +940,7 @@
     --warn: #e2b862;
     --err: #f09080;
     --focus: #e9dfcb;
-    --shadow: 2px 2px 0 rgb(0 0 0 / 0.65);
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px rgb(0 0 0 / 0.25);
     --code-bg: #110f0a;
     --warn-soft: #2d2615;
     --warn-text: #e2b862;
@@ -968,7 +968,7 @@
   --warn: #e2b862;
   --err: #f09080;
   --focus: #e9dfcb;
-  --shadow: 2px 2px 0 rgb(0 0 0 / 0.65);
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px rgb(0 0 0 / 0.25);
   --code-bg: #110f0a;
   --warn-soft: #2d2615;
   --warn-text: #e2b862;
@@ -995,7 +995,7 @@
   --warn: #6a4c10;
   --err: #8c2a22;
   --focus: #151515;
-  --shadow: 2px 2px 0 #151515;
+  --shadow: 0 1px 2px rgb(21 21 21 / 0.06), 0 4px 16px rgb(21 21 21 / 0.06);
   --code-bg: #dcdcd6;
   --warn-soft: #e4d9bd;
   --warn-text: #6a4c10;
@@ -1023,7 +1023,7 @@
     --warn: #e3c06c;
     --err: #f39189;
     --focus: #f1f1f1;
-    --shadow: 2px 2px 0 #4a4a4a;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px rgb(0 0 0 / 0.25);
     --code-bg: #0a0a0a;
     --warn-soft: #29230f;
     --warn-text: #e3c06c;
@@ -1051,7 +1051,7 @@
   --warn: #e3c06c;
   --err: #f39189;
   --focus: #f1f1f1;
-  --shadow: 2px 2px 0 #4a4a4a;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px rgb(0 0 0 / 0.25);
   --code-bg: #0a0a0a;
   --warn-soft: #29230f;
   --warn-text: #e3c06c;
@@ -1078,7 +1078,7 @@
   --warn: #7a5210;
   --err: #a3283a;
   --focus: #17406f;
-  --shadow: 2px 2px 0 rgb(16 42 76 / 0.5);
+  --shadow: 0 1px 2px rgb(16 42 76 / 0.06), 0 4px 16px rgb(16 42 76 / 0.06);
   --code-bg: #e4eaee;
   --warn-soft: #efe3c5;
   --warn-text: #7a5210;
@@ -1106,7 +1106,7 @@
     --warn: #f0cf7a;
     --err: #ffa59b;
     --focus: #e6eef8;
-    --shadow: 2px 2px 0 rgb(2 10 24 / 0.6);
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px rgb(0 0 0 / 0.25);
     --code-bg: #0a1b36;
     --warn-soft: #2e2a1a;
     --warn-text: #f0cf7a;
@@ -1134,7 +1134,7 @@
   --warn: #f0cf7a;
   --err: #ffa59b;
   --focus: #e6eef8;
-  --shadow: 2px 2px 0 rgb(2 10 24 / 0.6);
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px rgb(0 0 0 / 0.25);
   --code-bg: #0a1b36;
   --warn-soft: #2e2a1a;
   --warn-text: #f0cf7a;

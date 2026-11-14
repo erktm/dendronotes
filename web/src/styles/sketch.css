@@ -30,6 +30,8 @@
   --heading-style: italic;
   --heading-caps: normal;
   --heading-spacing: -0.01em;
+  /* The hard shadow of a printed box (dialogs, menus, cards; not the controls). */
+  --print-shadow: 2px 2px 0 color-mix(in srgb, var(--text) 55%, transparent);
 }
 
 [data-drawn][data-palette='epaper'] {
@@ -39,6 +41,7 @@
   --paper: radial-gradient(circle, color-mix(in srgb, var(--line-strong) 55%, transparent) 0.8px, transparent 1.2px) 0 0 / 22px 22px;
   --grain-opacity: 0.16;
   --heading-style: normal;
+  --print-shadow: 2px 2px 0 var(--text);
 }
 
 [data-drawn][data-palette='cyanotype'] {
@@ -59,11 +62,13 @@
   :root[data-drawn]:not([data-theme='light']) {
     --grain-filter: invert(1);
     --grain-opacity: 0.1;
+    --print-shadow: 2px 2px 0 color-mix(in srgb, var(--line-strong) 60%, black);
   }
 }
 :root[data-theme='dark'][data-drawn] {
   --grain-filter: invert(1);
   --grain-opacity: 0.1;
+  --print-shadow: 2px 2px 0 color-mix(in srgb, var(--line-strong) 60%, black);
 }
 
 /* --- Paper ------------------------------------------------------------ */
@@ -113,16 +118,7 @@
   border-radius: var(--radius);
   box-shadow:
     0.6px 1px 0 -0.2px var(--line-strong),
-    var(--shadow);
-}
-
-:root[data-drawn] :is(input:not([type='checkbox'], [type='radio']), select, textarea) {
-  border-width: var(--sketch-stroke);
-  border-radius: var(--radius-sm);
-}
-
-:root[data-drawn] :focus-visible {
-  outline-style: dashed !important;
+    var(--print-shadow);
 }
 
 /* Where something is chosen, it is shaded: stippled, dithered or hatched. */
