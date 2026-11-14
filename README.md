@@ -19,12 +19,15 @@ Kubernetes, also in an air gap.
 ## Features
 
 - **Editor** with live preview, optional Vim key bindings and a reading view; tasks, tables,
-  code, images, audio and video, embedded notes.
+  code with syntax highlighting, images, audio and video, embedded notes. The title above the
+  text renames the note; a right-click inserts headings, lists, tasks, code and more, and a
+  Markdown cheat sheet explains the rest. Notes export as Markdown or print as PDF.
 - **Synapses**: `[[Note]]`, `[[Note|Alias]]`, `[[Note#Heading]]` with suggestions; backlinks,
   a graph of all notes, synapses that follow renamed notes.
 - **Editing together**: everyone in a note sees the others' changes and cursors at once;
   changes made on disk (Obsidian, git, a sync tool) are taken over live.
-- **Drawings**: shapes, arrows that stick to shapes, text, freehand strokes and built-in icons
+- **Drawings**: shapes from rectangles to cylinders, stars and clouds, arrows that stick to
+  shapes, text, freehand strokes and built-in icons
   for project management, software, cloud and networking, plus icon packs (ZIP) in sections per
   soma and for the whole server; embedded in notes, downloadable as SVG or PNG.
 - **File tree** with several entries moved or deleted at once, folders sorted by name, date or
@@ -32,6 +35,10 @@ Kubernetes, also in an air gap.
 - **Links** to notes and drawings that keep working when they move, for people in the soma or
   public and read-only, with an optional expiry.
 - **Search** across all notes with phrases and `#tags`.
+- **Designs**: twelve, each with a light and a dark variant, from tissue stains and
+  fluorescence to true black for OLED screens; three are drawn like a neurobiologist's notes,
+  with neurons in the margins (Lab notebook, E-paper, Cyanotype).
+- **Tutorials** for the essentials, one click above the settings.
 - **Comments** with `@mentions`, a **history** of every note, a **trash** with restore.
 - **Email** through any SMTP relay: somas shared with you, mentions and replies you have not
   read yet, security notices, welcome emails and "forgot password".
@@ -62,7 +69,23 @@ Kubernetes, also in an air gap.
   </tr>
   <tr>
     <td align="center">Reading view; drawings follow light and dark mode</td>
-    <td align="center">Full-text search across all notes</td>
+    <td align="center">Full-text search across all notes, code in color</td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/screenshots/design-notebook.jpg" width="430" alt="A note in the reading view in the Lab notebook design: squared paper, an italic book face for the title and a red margin line"></td>
+    <td><img src="docs/assets/screenshots/design-cyanotype.jpg" width="430" alt="The empty page in the Cyanotype design, dark: a white pen drawing of a motor neuron on Prussian blue"></td>
+  </tr>
+  <tr>
+    <td align="center">The Lab notebook design</td>
+    <td align="center">The Cyanotype design, dark, with a motor neuron</td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/screenshots/links.png" width="430" alt="The share dialog of a note: a link for people in the soma and public read-only links with an expiry"></td>
+    <td><img src="docs/assets/screenshots/tutorials.png" width="430" alt="The tutorials with the Markdown cheat sheet"></td>
+  </tr>
+  <tr>
+    <td align="center">Links that follow a note, also public and read-only</td>
+    <td align="center">Tutorials and the Markdown cheat sheet</td>
   </tr>
 </table>
 

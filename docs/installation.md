@@ -273,6 +273,20 @@ auth:
 
 The relay must accept the sender: confirm the address or the whole domain at your provider and
 publish its SPF and DKIM records in DNS, otherwise the messages are refused or end up as spam.
+
+### Sign-up
+
+With `DENDRONOTES_SIGNUP=true` the sign-in page offers "Create an account": people choose a
+user name, e-mail address and password, and the account exists once they open the link from
+the confirmation e-mail (it works for 24 hours). It needs the e-mail settings above and password sign-in for everyone.
+`DENDRONOTES_SIGNUP_DOMAINS` limits it to some e-mail domains, comma-separated:
+
+```bash
+DENDRONOTES_SIGNUP=true
+DENDRONOTES_SIGNUP_DOMAINS=example.org,team.example
+```
+
+With Helm, both go into `config`.
 Other relays work the same way; `DENDRONOTES_SMTP_TLS=tls` is for implicit TLS (port 465),
 `none` only for a relay without a password in your own network. Every message asks Mailjet not
 to track opens and clicks (`X-Mailjet-TrackOpen: 0`, `X-Mailjet-TrackClick: 0`), so links reach

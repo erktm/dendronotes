@@ -23,6 +23,12 @@ Files in a soma remain plain, Obsidian-compatible Markdown; the wiki link syntax
   toggle in the top bar or ⌘E / Ctrl+E. A right-click in the text inserts headings, bold and
   italic text, code, links, synapses, lists, tasks, quotes, code blocks, tables and lines, so
   you need not know the syntax; Shift with a right-click keeps the browser's own menu.
+- **Title.** The note's name stands above the text. Editing it renames the note; synapses to
+  it follow when the setting for that is on.
+- **Code.** Code blocks name their language after the opening fence (` ```go `, ` ```python `)
+  and are highlighted in the editor and the reading view.
+- **Export.** The download button in the top bar saves the note as Markdown with its title, or
+  prints it ("Print or save as PDF"): the title and the reading view on white paper.
 - **Synapses.** Type `[[` for suggestions from the soma, and `[[Note#` for the headings of
   that note (`[[#` for this note's own). Click a synapse to open the note;
   in the editor, on the line you are editing, hold ⌘ / Ctrl while clicking. A synapse whose
