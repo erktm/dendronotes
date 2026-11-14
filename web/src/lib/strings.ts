@@ -940,7 +940,7 @@ export const strings = {
         steps: [
           'Drag notes and folders onto a folder to move them there.',
           '`⌘`-click (`Ctrl`-click) several entries, or `Shift`-click a range; the bar above the tree moves or deletes them together.',
-          'Right-click a folder and choose how to sort it: by name, last change, creation or by hand. Sorted by hand, drag entries into place.',
+          'The sort button above the tree sorts by name, last change, creation or by hand. Sorted by hand, drag entries into place; that order comes back whenever you sort by hand again.',
           'Drop files or whole folders from the Finder or Explorer onto a folder to upload them.',
         ],
         tip: 'Deleted entries go to the trash at the bottom of the file tree and can be restored from there.',
