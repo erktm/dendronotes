@@ -1536,6 +1536,48 @@ paths:
               schema: { $ref: "#/components/schemas/Change" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "503": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/poll:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+    get:
+      summary: Live updates by long polling
+      description: >
+        The same events as /events for networks that hold back streams (proxies
+        or security software that pass on only complete responses). Without
+        `stream` it opens a stream and answers its `hello` at once. With `stream`
+        and `after` (the number of the last event the client has) it answers the
+        events after it, waiting up to 25 seconds for some. A stream nobody polls
+        for a minute ends; then, or when the account or the soma no longer allow
+        it, the answer is 410 and the client opens a new stream.
+      parameters:
+        - name: stream
+          in: query
+          required: false
+          schema: { type: string }
+        - name: after
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0 }
+      responses:
+        "200":
+          description: The stream id and the events, each with its number, name and data.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  stream: { type: string }
+                  events:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        seq: { type: integer }
+                        name: { type: string }
+                        data: {}
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "410": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
   /api/somas/{soma}/collab/join:
     parameters:
       - $ref: "#/components/parameters/soma"

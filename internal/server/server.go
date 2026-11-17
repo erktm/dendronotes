@@ -43,6 +43,9 @@ type Server struct {
 	ldapSync ldapSyncStatus
 	// commentLimits holds a rate limiter per account (api_comments.go).
 	commentLimits sync.Map
+	// polls are the live streams read by long polling (poll.go).
+	pollMu sync.Mutex
+	polls  map[string]*pollStream
 	// mail sends email through the relay (mail.go); nil without SMTP.
 	mail    *mailer
 	metrics *serverMetrics

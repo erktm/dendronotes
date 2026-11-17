@@ -229,6 +229,9 @@ dendronotes speaks plain HTTP; TLS belongs to the proxy, ingress or gateway in f
   the whole request. dendronotes sets `X-Accel-Buffering: no` (nginx) and
   `Cache-Control: no-transform` (CDNs such as Cloudflare must not compress or hold back the
   stream).
+- Where something on the way holds the stream back anyway (a company proxy or security
+  software that inspects responses), browsers fall back to long polling on
+  `/api/somas/{soma}/poll` after eight seconds. Those requests end after at most 25 seconds.
 - Gateways with a total request timeout end the stream when it runs out: Envoy (also Envoy
   Gateway and Istio) uses 15 seconds unless the route says otherwise. The Helm chart's HTTPRoute
   sets `timeouts.request: "0s"`; do the same in a route of your own. If the status in the app

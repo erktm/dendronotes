@@ -146,6 +146,13 @@ Each browser tab holds one event stream per soma (Server-Sent Events). Changes i
 through dendronotes or on disk, reach it as `change` events, which only say *what* changed;
 the tab then reloads what it shows.
 
+Some networks hold a stream back until it ends: proxies or security software that pass on only
+complete responses. When a tab gets no `hello` within eight seconds, it falls back to long
+polling (`/api/somas/{soma}/poll`): one request after the other, each answered with the events
+since the last one, or empty after 25 seconds. A polled stream is a subscriber like any other;
+between two polls its events wait on the server, and it ends when nobody polls it for a minute.
+The browser remembers the fallback for a week and polls at once.
+
 A note that someone has open is a live document on the server: its text, its version and the
 change sets (CodeMirror's format) that led there.
 

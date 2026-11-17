@@ -117,6 +117,7 @@ func (s *Server) routes() []route {
 		{"GET", "/api/somas/{soma}/tags", s.handleTags, somaViewer},
 		{"GET", "/api/somas/{soma}/graph", s.handleGraph, somaViewer},
 		{"GET", "/api/somas/{soma}/events", s.handleEvents, somaViewer},
+		{"GET", "/api/somas/{soma}/poll", s.handlePoll, somaViewer},
 		{"POST", "/api/somas/{soma}/collab/join", s.handleCollabJoin, somaViewer},
 		{"POST", "/api/somas/{soma}/collab/leave", s.handleCollabLeave, somaViewer},
 		{"POST", "/api/somas/{soma}/collab/push", s.handleCollabPush, somaWriter},
