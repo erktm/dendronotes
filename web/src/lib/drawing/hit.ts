@@ -3,15 +3,21 @@
 
 import { type Box, type Pt, contains, grow, inBox, insideOutline, outlineDist, polylineDist } from './geometry'
 import { type Measure, lineLabelBox } from './render'
-import { type BoxEl, type Element, type Scene, bounds, isBox, isLinear, isShape, outlineOf, route } from './scene'
+import { type BoxEl, type Element, type Scene, bindBox, bounds, isBox, isLinear, isShape, outlineOf, route } from './scene'
 
 /** The topmost element at p; tol is the reach in scene units. */
 export function hitTest(scene: Scene, p: Pt, tol: number, measure: Measure): Element | null {
+  return hitAll(scene, p, tol, measure)[0] ?? null
+}
+
+/** Every element at p, the topmost first. */
+export function hitAll(scene: Scene, p: Pt, tol: number, measure: Measure): Element[] {
+  const out: Element[] = []
   for (let i = scene.elements.length - 1; i >= 0; i--) {
     const el = scene.elements[i]!
-    if (hits(el, scene, p, tol + el.width / 2, measure)) return el
+    if (hits(el, scene, p, tol + el.width / 2, measure)) out.push(el)
   }
-  return null
+  return out
 }
 
 function hits(el: Element, scene: Scene, p: Pt, tol: number, measure: Measure): boolean {
@@ -20,7 +26,8 @@ function hits(el: Element, scene: Scene, p: Pt, tol: number, measure: Measure): 
     if (el.fill !== 'none' || el.text.trim() !== '') return insideOutline(p, grow(el, tol), outlineOf(el))
     return outlineDist(p, el, outlineOf(el)) <= tol
   }
-  if (isBox(el)) return inBox(p, grow(el, tol))
+  // An icon is picked where it is drawn, so that what lies close to it stays reachable.
+  if (isBox(el)) return inBox(p, grow(bindBox(el), tol))
   if (isLinear(el)) {
     const label = lineLabelBox(el, scene, measure)
     return polylineDist(p, route(el, scene)) <= tol || (label !== null && inBox(p, label))
@@ -42,7 +49,7 @@ export function bindTargetAt(scene: Scene, p: Pt, tol: number, exclude: Readonly
   for (let i = scene.elements.length - 1; i >= 0; i--) {
     const el = scene.elements[i]!
     if (!isBox(el) || exclude.has(el.id)) continue
-    if (insideOutline(p, grow(el, tol), outlineOf(el))) return el
+    if (insideOutline(p, grow(bindBox(el), tol), outlineOf(el))) return el
   }
   return null
 }

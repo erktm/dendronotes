@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { bindTargetAt, elementsIn, hitTest, resizeBox } from './hit'
+import { bindTargetAt, elementsIn, hitAll, hitTest, resizeBox } from './hit'
 import { approxMeasure } from './render'
-import { type Element, type ShapeEl, add, emptyScene } from './scene'
+import { type Element, type IconEl, type ShapeEl, add, bindBox, emptyScene } from './scene'
 
 function shape(id: string, x: number, y: number, extra: Partial<ShapeEl> = {}): ShapeEl {
   return {
@@ -12,7 +12,27 @@ function shape(id: string, x: number, y: number, extra: Partial<ShapeEl> = {}): 
 
 const scene = (...els: Element[]) => add(emptyScene(), ...els)
 
+function icon(id: string, name: string, x: number, y: number, w = 100, h = 100): IconEl {
+  return { id, type: 'icon', icon: name, x, y, w, h, stroke: 'ink', width: 2, dash: 'solid', seed: 1 }
+}
+
 describe('hits', () => {
+  it('pick an icon where it is drawn, so what lies next to it stays reachable', () => {
+    // A wide icon in a square box: its lines fill the width, not the height.
+    const cloud = icon('c', 'cloud', 0, 0)
+    const drawn = bindBox(cloud)
+    expect(drawn.w).toBeGreaterThan(95)
+    expect(drawn.h).toBeLessThan(80)
+    const s = scene(cloud)
+    expect(hitTest(s, [50, 50], 2, approxMeasure)?.id).toBe('c')
+    expect(hitTest(s, [50, 3], 2, approxMeasure)).toBeNull()
+  })
+
+  it('list everything under the pointer, topmost first', () => {
+    const s = scene(shape('a', 0, 0, { fill: 'blue' }), icon('i', 'server', 20, 20, 60, 60), shape('b', 30, 30, { fill: 'red', w: 20, h: 20 }))
+    expect(hitAll(s, [40, 40], 2, approxMeasure).map((e) => e.id)).toEqual(['b', 'i', 'a'])
+  })
+
   it('find the topmost element', () => {
     const s = scene(shape('a', 0, 0, { fill: 'blue' }), shape('b', 50, 50, { fill: 'red' }))
     expect(hitTest(s, [60, 60], 4, approxMeasure)?.id).toBe('b')

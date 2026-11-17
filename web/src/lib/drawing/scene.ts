@@ -8,7 +8,7 @@
 // data:image URLs.
 
 import { type Color, type Fill, isColor } from './colors'
-import { builtinIcon } from './icons'
+import { builtinIcon, iconBounds } from './icons'
 import {
   type Box,
   type Outline,
@@ -81,9 +81,14 @@ export interface IconEl extends Common, Box {
   icon: string
 }
 
-/** An end of a line that sticks to an element. */
+/**
+ * An end of a line that sticks to an element. With `at` it sticks to one spot
+ * of the outline (the direction of that point of the element's box, both
+ * coordinates from 0 to 1); without, it moves round to face the other end.
+ */
 export interface Binding {
   id: string
+  at?: Pt
 }
 
 export interface LinearEl extends Common, TextStyle {
@@ -134,6 +139,31 @@ export const isBox = (e: Element): e is BoxEl => isShape(e) || e.type === 'text'
 /** Elements with a label or text. */
 export const hasText = (e: Element): e is ShapeEl | TextEl | LinearEl => isShape(e) || e.type === 'text' || isLinear(e)
 
+/** Where an icon is drawn in its box: its lines fill it, keeping their proportions. */
+export function iconFit(el: IconEl): { scale: number; x: number; y: number; area: Box } | null {
+  const icon = builtinIcon(el.icon)
+  if (!icon) return null
+  const g = iconBounds(icon)
+  const pad = el.width / 2
+  const w = Math.max(el.w - 2 * pad, 1)
+  const h = Math.max(el.h - 2 * pad, 1)
+  const scale = Math.max(Math.min(w / g.w, h / g.h), 0.01)
+  const left = el.x + pad + (w - g.w * scale) / 2
+  const top = el.y + pad + (h - g.h * scale) / 2
+  return {
+    scale,
+    x: left - g.x * scale,
+    y: top - g.y * scale,
+    area: { x: left - pad, y: top - pad, w: g.w * scale + 2 * pad, h: g.h * scale + 2 * pad },
+  }
+}
+
+/** The box a line end sticks to and the pointer picks: what is drawn of an icon, the box of anything else. */
+export function bindBox(e: BoxEl): Box {
+  if (e.type === 'icon') return iconFit(e)?.area ?? e
+  return { x: e.x, y: e.y, w: e.w, h: e.h }
+}
+
 /** The outline lines stick to. */
 export function outlineOf(e: BoxEl): Outline {
   if (!isShape(e)) return 'rect'
@@ -166,8 +196,9 @@ export function route(el: LinearEl, scene: Scene): Pt[] {
   const leavesHorizontally = (bind: Binding | null, p: Pt, other: Pt): boolean => {
     const target = bind && find(scene, bind.id)
     if (target && isBox(target)) {
-      if (p[0] <= target.x || p[0] >= target.x + target.w) return true
-      if (p[1] <= target.y || p[1] >= target.y + target.h) return false
+      const b = bindBox(target)
+      if (p[0] <= b.x || p[0] >= b.x + b.w) return true
+      if (p[1] <= b.y || p[1] >= b.y + b.h) return false
     }
     return Math.abs(other[0] - p[0]) >= Math.abs(other[1] - p[1])
   }
@@ -188,10 +219,43 @@ function dedupe(points: Pt[]): Pt[] {
   return points.filter((p, i) => i === 0 || p[0] !== points[i - 1]![0] || p[1] !== points[i - 1]![1])
 }
 
-/** Where an end bound to target goes, given the point the line comes from. */
-export function endPoint(target: BoxEl, from: Pt, elbow: boolean): Pt {
-  const [x, y] = elbow ? sidePoint(target, facingSide(target, from), BIND_GAP) : outlinePoint(target, outlineOf(target), from, BIND_GAP)
-  return [round(x), round(y)]
+/** The point of target's box an end stuck to it aims from: its spot, or the middle. */
+export function anchorOf(target: BoxEl, at?: Pt): Pt {
+  const b = bindBox(target)
+  return at ? [b.x + at[0] * b.w, b.y + at[1] * b.h] : center(b)
+}
+
+/**
+ * Where an end bound to target goes: at its spot of the outline (at), or
+ * where the outline faces the point the line comes from.
+ */
+export function endPoint(target: BoxEl, from: Pt, elbow: boolean, at?: Pt): Pt {
+  const b = bindBox(target)
+  let p: Pt
+  if (at && elbow) {
+    // The nearest side, at the spot's place along it.
+    const [ax, ay] = anchorOf(target, at)
+    const near = Math.min(at[0], 1 - at[0], at[1], 1 - at[1])
+    if (near === at[0]) p = [b.x - BIND_GAP, ay]
+    else if (near === 1 - at[0]) p = [b.x + b.w + BIND_GAP, ay]
+    else if (near === at[1]) p = [ax, b.y - BIND_GAP]
+    else p = [ax, b.y + b.h + BIND_GAP]
+  } else if (at) {
+    p = outlinePoint(b, outlineOf(target), anchorOf(target, at), BIND_GAP)
+  } else {
+    p = elbow ? sidePoint(b, facingSide(b, from), BIND_GAP) : outlinePoint(b, outlineOf(target), from, BIND_GAP)
+  }
+  return [round(p[0]), round(p[1])]
+}
+
+/** How an end dropped at p sticks to target: to that spot, or, near the middle, to the side facing the other end. */
+export function bindingAt(target: BoxEl, p: Pt): Binding {
+  const b = bindBox(target)
+  const fx = (p[0] - b.x) / Math.max(b.w, 1e-9)
+  const fy = (p[1] - b.y) / Math.max(b.h, 1e-9)
+  if (Math.abs(fx - 0.5) < 0.2 && Math.abs(fy - 0.5) < 0.2) return { id: target.id }
+  const clamp = (v: number) => Math.round(Math.min(Math.max(v, 0), 1) * 1000) / 1000
+  return { id: target.id, at: [clamp(fx), clamp(fy)] }
 }
 
 /** Moves the bound ends of a line to their elements. */
@@ -202,11 +266,11 @@ export function attach(el: LinearEl, scene: Scene): LinearEl {
   const t = endEl && isBox(endEl) ? endEl : null
   if (!s && !t) return el.start || el.end ? { ...el, start: null, end: null } : el
   let [a, b] = el.points
-  // Each end aims at the other element's center, or at the other free end.
-  const aimA: Pt = t ? center(t) : b
-  const aimB: Pt = s ? center(s) : a
-  if (s) a = endPoint(s, aimA, el.elbow)
-  if (t) b = endPoint(t, aimB, el.elbow)
+  // Each end aims at the other element's spot or middle, or at the other free end.
+  const aimA: Pt = t ? anchorOf(t, el.end?.at) : b
+  const aimB: Pt = s ? anchorOf(s, el.start?.at) : a
+  if (s) a = endPoint(s, aimA, el.elbow, el.start?.at)
+  if (t) b = endPoint(t, aimB, el.elbow, el.end?.at)
   const same = (p: Pt, q: Pt) => p[0] === q[0] && p[1] === q[1]
   const start = s ? el.start : null
   const end = t ? el.end : null
@@ -308,7 +372,7 @@ export function copies(els: readonly Element[], offset: number): Element[] {
   return els.map((e) => {
     let c = translate({ ...e, id: ids.get(e.id)!, seed: newSeed() }, offset, offset)
     if (isLinear(c)) {
-      const remap = (b: Binding | null) => (b && ids.has(b.id) ? { id: ids.get(b.id)! } : null)
+      const remap = (b: Binding | null): Binding | null => (b && ids.has(b.id) ? { ...b, id: ids.get(b.id)! } : null)
       c = { ...c, start: remap(c.start), end: remap(c.end) }
     }
     return c
@@ -447,7 +511,10 @@ function sanitizeElement(v: unknown, files: Record<string, FileData>): Element |
       if (pts.length < 2 || !pts[0] || !pts[pts.length - 1]) return null
       const bind = (b: unknown): Binding | null => {
         const bo = obj(b)
-        return bo && typeof bo.id === 'string' && ID.test(bo.id) ? { id: bo.id } : null
+        if (!bo || typeof bo.id !== 'string' || !ID.test(bo.id)) return null
+        const at = Array.isArray(bo.at) ? bo.at : null
+        const unit = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1
+        return at && at.length === 2 && unit(at[0]) && unit(at[1]) ? { id: bo.id, at: [at[0] as number, at[1] as number] } : { id: bo.id }
       }
       return {
         ...base, ...textStyle(o), type: o.type,

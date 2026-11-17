@@ -25,6 +25,7 @@ import {
   type ShapeEl,
   type TextEl,
   type TextStyle,
+  iconFit,
   isShape,
   outlineOf,
   route,
@@ -356,11 +357,10 @@ export function primitives(el: Element, scene: Scene, measure: Measure): Prim[] 
       return [{ tag: 'image', file: el.file, attrs: { x: f(el.x), y: f(el.y), width: f(el.w), height: f(el.h) } }]
     case 'icon': {
       const icon = builtinIcon(el.icon)
-      if (!icon) return []
-      // Drawn on its 24-unit grid, scaled to the box; the line keeps its width.
-      const sx = el.w / 24
-      const sy = el.h / 24
-      const scale = Math.max(Math.min(sx, sy), 0.01)
+      const fit = iconFit(el)
+      if (!icon || !fit) return []
+      // Its lines fill the box, keeping their proportions; the line keeps its width.
+      const { scale } = fit
       return [
         {
           tag: 'path',
@@ -370,7 +370,7 @@ export function primitives(el: Element, scene: Scene, measure: Measure): Prim[] 
             'stroke-width': f(el.width / scale),
             'stroke-linecap': 'round',
             'stroke-linejoin': 'round',
-            transform: `translate(${f(el.x)} ${f(el.y)}) scale(${fine(sx)} ${fine(sy)})`,
+            transform: `translate(${f(fit.x)} ${f(fit.y)}) scale(${fine(scale)})`,
             d: icon.d,
           },
         },

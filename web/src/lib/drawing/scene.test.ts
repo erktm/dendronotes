@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { BIND_GAP, type LinearEl, SHAPE_TYPES, type Scene, type ShapeEl, add, copies, emptyScene, find, move, outlineOf, remove, reorder, route, sanitizeScene } from './scene'
+import { BIND_GAP, type IconEl, type LinearEl, SHAPE_TYPES, type Scene, type ShapeEl, add, bindBox, bindingAt, copies, emptyScene, find, move, outlineOf, remove, reorder, route, sanitizeScene } from './scene'
 import { insideOutline, outlineDist } from './geometry'
 import { random, sketchEllipse, sketchLines } from './sketch'
+import { builtinIcon, iconBounds, pathPoints } from './icons'
 
 function rect(id: string, x: number, y: number, w = 100, h = 60): ShapeEl {
   return { id, type: 'rect', x, y, w, h, stroke: 'ink', fill: 'none', width: 2, dash: 'solid', seed: 1, rounded: false, flip: false, text: '', font: 'sans', size: 20, align: 'center' }
@@ -92,6 +93,80 @@ describe('lines between shapes', () => {
     for (let i = 1; i < pts.length; i++) {
       const [a, b] = [pts[i - 1]!, pts[i]!]
       expect(a[0] === b[0] || a[1] === b[1]).toBe(true)
+    }
+  })
+})
+
+describe('lines stuck to a spot', () => {
+  it('stay at that spot of the outline while things move', () => {
+    const a = rect('a', 0, 0)
+    const b = rect('b', 300, 0)
+    // Dropped at the top right corner area of b, not near its middle.
+    const end = bindingAt(b, [390, 5])
+    expect(end.at).toBeDefined()
+    let s = scene(a, b, { ...arrow('l', 'a', null), end })
+    const q = line(s, 'l').points[1]
+    expect(q[1]).toBeLessThan(0) // above b's top edge, a gap away
+    expect(q[0]).toBeGreaterThan(350)
+    // Moving a does not slide the end round b: it keeps its spot.
+    s = move(s, new Set(['a']), 0, 300)
+    expect(line(s, 'l').points[1]).toEqual(q)
+    // Moving b takes the spot along.
+    s = move(s, new Set(['b']), 50, 0)
+    expect(line(s, 'l').points[1]).toEqual([q[0] + 50, q[1]])
+  })
+
+  it('face the other end when dropped near the middle', () => {
+    expect(bindingAt(rect('b', 300, 0), [352, 28]).at).toBeUndefined()
+  })
+
+  it('leave elbow lines from the nearest side, at the spot', () => {
+    const b = rect('b', 300, 0)
+    const end = bindingAt(b, [330, 58]) // near the bottom edge
+    const s = scene(rect('a', 0, 0), b, { ...arrow('l', 'a', null, true), end })
+    const pts = route(line(s, 'l'), s)
+    expect(pts.at(-1)).toEqual([330, 60 + BIND_GAP])
+  })
+
+  it('survive copies and files', () => {
+    const s = scene(rect('a', 0, 0), rect('b', 300, 0), { ...arrow('l', 'a', 'b'), end: { id: 'b', at: [1, 0.25] } })
+    const [, , cl] = copies(s.elements, 10)
+    expect((cl as LinearEl).end?.at).toEqual([1, 0.25])
+    const read = sanitizeScene(JSON.parse(JSON.stringify(s)))!
+    expect((read.elements[2] as LinearEl).end).toEqual({ id: 'b', at: [1, 0.25] })
+    const bad = sanitizeScene({ ...JSON.parse(JSON.stringify(s)), elements: [s.elements[0], s.elements[1], { ...s.elements[2], end: { id: 'b', at: [2, 'x'] } }] })!
+    expect((bad.elements[2] as LinearEl).end).toEqual({ id: 'b' })
+  })
+})
+
+describe('icons', () => {
+  const icon = (name: string, w = 120, h = 120): IconEl => ({ id: 'i', type: 'icon', icon: name, x: 0, y: 0, w, h, stroke: 'ink', width: 2, dash: 'solid', seed: 1 })
+
+  it('know where their lines lie on the grid', () => {
+    // The task icon is a square from 4.5 to 19.5.
+    const b = iconBounds(builtinIcon('task')!)
+    expect(b.x).toBeCloseTo(4.5)
+    expect(b.w).toBeCloseTo(15)
+    // Arcs and curves count with their whole length.
+    const circle = pathPoints('M12 4a8 8 0 1 1 0 16a8 8 0 1 1 0-16z')
+    expect(Math.max(...circle.map((p) => p[0]))).toBeCloseTo(20, 1)
+  })
+
+  it('fill their box, and lines stick to what is drawn', () => {
+    const area = bindBox(icon('task'))
+    expect(area).toEqual({ x: 0, y: 0, w: 120, h: 120 })
+    const s = scene({ ...icon('cloud'), x: 300 }, rect('a', 0, 30), arrow('l', 'a', 'i'))
+    const drawn = bindBox(find(s, 'i') as IconEl)
+    const q = line(s, 'l').points[1]
+    expect(q[0]).toBeCloseTo(drawn.x - BIND_GAP, 0)
+  })
+
+  it('every built-in one has a drawing that fills some of the grid', () => {
+    for (const name of ['task', 'cloud', 'router', 'switch', 'globe', 'database']) {
+      const b = iconBounds(builtinIcon(name)!)
+      expect(b.x, name).toBeGreaterThanOrEqual(0)
+      expect(b.x + b.w, name).toBeLessThanOrEqual(24)
+      expect(b.w * b.h, name).toBeGreaterThan(20)
     }
   })
 })

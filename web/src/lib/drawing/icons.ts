@@ -127,3 +127,163 @@ const byName = new Map(ICON_GROUPS.flatMap((g) => g.icons).map((i) => [i.name, i
 export function builtinIcon(name: string): BuiltinIcon | undefined {
   return byName.get(name)
 }
+
+/** A part of the 24-unit grid. */
+export interface GridBox {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+const boundsCache = new Map<string, GridBox>()
+
+/**
+ * The part of the grid an icon's lines cover (their centers; the stroke adds
+ * half its width around). An icon is drawn so that this part fills its box,
+ * and lines stick to it, not to the empty grid around.
+ */
+export function iconBounds(icon: BuiltinIcon): GridBox {
+  let b = boundsCache.get(icon.d)
+  if (!b) {
+    const pts = pathPoints(icon.d)
+    const xs = pts.map((p) => p[0])
+    const ys = pts.map((p) => p[1])
+    const x = Math.min(...xs)
+    const y = Math.min(...ys)
+    b = pts.length ? { x, y, w: Math.max(Math.max(...xs) - x, 0.5), h: Math.max(Math.max(...ys) - y, 0.5) } : { x: 0, y: 0, w: 24, h: 24 }
+    boundsCache.set(icon.d, b)
+  }
+  return b
+}
+
+/** Points along path data (M, L, H, V, C, S, A, Z, absolute and relative), for its bounds. */
+export function pathPoints(d: string): [number, number][] {
+  const tokens = d.match(/[a-zA-Z]|[-+]?(?:\d*\.\d+|\d+\.?)(?:[eE][-+]?\d+)?/g) ?? []
+  const pts: [number, number][] = []
+  let i = 0
+  let cmd = ''
+  let x = 0
+  let y = 0
+  let startX = 0
+  let startY = 0
+  let ctrl: [number, number] | null = null // the last cubic control point, for S
+  const num = () => Number(tokens[i++])
+  const cubic = (c1: [number, number], c2: [number, number], e: [number, number]) => {
+    for (let k = 1; k <= 12; k++) {
+      const t = k / 12
+      const u = 1 - t
+      pts.push([
+        u * u * u * x + 3 * u * u * t * c1[0] + 3 * u * t * t * c2[0] + t * t * t * e[0],
+        u * u * u * y + 3 * u * u * t * c1[1] + 3 * u * t * t * c2[1] + t * t * t * e[1],
+      ])
+    }
+    ctrl = c2
+    ;[x, y] = e
+  }
+  while (i < tokens.length) {
+    if (/[a-zA-Z]/.test(tokens[i]!)) cmd = tokens[i++]!
+    const rel = cmd !== cmd.toUpperCase()
+    const ox = rel ? x : 0
+    const oy = rel ? y : 0
+    const before = i
+    switch (cmd.toUpperCase()) {
+      case 'M':
+        x = num() + ox
+        y = num() + oy
+        startX = x
+        startY = y
+        pts.push([x, y])
+        cmd = rel ? 'l' : 'L' // more pairs after M are lines
+        ctrl = null
+        break
+      case 'L':
+        x = num() + ox
+        y = num() + oy
+        pts.push([x, y])
+        ctrl = null
+        break
+      case 'H':
+        x = num() + ox
+        pts.push([x, y])
+        ctrl = null
+        break
+      case 'V':
+        y = num() + oy
+        pts.push([x, y])
+        ctrl = null
+        break
+      case 'C': {
+        const c1: [number, number] = [num() + ox, num() + oy]
+        const c2: [number, number] = [num() + ox, num() + oy]
+        cubic(c1, c2, [num() + ox, num() + oy])
+        break
+      }
+      case 'S': {
+        const c1: [number, number] = ctrl ? [2 * x - ctrl[0], 2 * y - ctrl[1]] : [x, y]
+        const c2: [number, number] = [num() + ox, num() + oy]
+        cubic(c1, c2, [num() + ox, num() + oy])
+        break
+      }
+      case 'A': {
+        const rx = Math.abs(num())
+        const ry = Math.abs(num())
+        const rot = (num() * Math.PI) / 180
+        const large = num() !== 0
+        const sweep = num() !== 0
+        const ex = num() + ox
+        const ey = num() + oy
+        for (const p of arcPoints(x, y, rx, ry, rot, large, sweep, ex, ey)) pts.push(p)
+        x = ex
+        y = ey
+        ctrl = null
+        break
+      }
+      case 'Z':
+        x = startX
+        y = startY
+        ctrl = null
+        break
+      default:
+        i++ // unknown: skip
+    }
+    if (i === before && !/[a-zA-Z]/.test(tokens[i] ?? 'Z')) i++ // never loop on bad data
+  }
+  return pts
+}
+
+/** Points along an SVG arc (endpoint form, SVG 1.1 F.6.5). */
+function arcPoints(x1: number, y1: number, rx: number, ry: number, rot: number, large: boolean, sweep: boolean, x2: number, y2: number): [number, number][] {
+  if (rx === 0 || ry === 0) return [[x2, y2]]
+  const cos = Math.cos(rot)
+  const sin = Math.sin(rot)
+  const dx = (x1 - x2) / 2
+  const dy = (y1 - y2) / 2
+  const px = cos * dx + sin * dy
+  const py = -sin * dx + cos * dy
+  const lambda = (px * px) / (rx * rx) + (py * py) / (ry * ry)
+  if (lambda > 1) {
+    rx *= Math.sqrt(lambda)
+    ry *= Math.sqrt(lambda)
+  }
+  const num = rx * rx * ry * ry - rx * rx * py * py - ry * ry * px * px
+  const den = rx * rx * py * py + ry * ry * px * px
+  let k = Math.sqrt(Math.max(num / den, 0))
+  if (large === sweep) k = -k
+  const cxp = (k * rx * py) / ry
+  const cyp = (-k * ry * px) / rx
+  const cx = cos * cxp - sin * cyp + (x1 + x2) / 2
+  const cy = sin * cxp + cos * cyp + (y1 + y2) / 2
+  const angle = (ux: number, uy: number, vx: number, vy: number) => Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy)
+  const t1 = angle(1, 0, (px - cxp) / rx, (py - cyp) / ry)
+  let dt = angle((px - cxp) / rx, (py - cyp) / ry, (-px - cxp) / rx, (-py - cyp) / ry)
+  if (!sweep && dt > 0) dt -= 2 * Math.PI
+  if (sweep && dt < 0) dt += 2 * Math.PI
+  const out: [number, number][] = []
+  const steps = Math.max(4, Math.ceil(Math.abs(dt) / (Math.PI / 16)))
+  for (let s = 1; s <= steps; s++) {
+    const t = t1 + (dt * s) / steps
+    out.push([cx + rx * Math.cos(t) * cos - ry * Math.sin(t) * sin, cy + rx * Math.cos(t) * sin + ry * Math.sin(t) * cos])
+  }
+  return out
+}

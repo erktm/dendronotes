@@ -21,7 +21,7 @@
   import { SceneLayer, measureText } from '../lib/drawing/dom'
   import { newIcon, newImage, newLine, newPen, newShape, newText } from '../lib/drawing/create'
   import { type Box, type Pt, boxFrom, center, dist, grow, simplify, snap } from '../lib/drawing/geometry'
-  import { ALL_HANDLES, CORNERS, type Handle, bindTargetAt, elementsIn, handlePoint, hitTest, resizeBox, shapeAt } from '../lib/drawing/hit'
+  import { ALL_HANDLES, CORNERS, type Handle, bindTargetAt, elementsIn, handlePoint, hitAll, hitTest, resizeBox, shapeAt } from '../lib/drawing/hit'
   import { LINE_HEIGHT, labelArea, midpoint, textBox } from '../lib/drawing/render'
   import {
     type LinearEl,
@@ -29,6 +29,7 @@
     type Scene,
     type ShapeType,
     add,
+    bindingAt,
     bounds,
     copies,
     find,
@@ -332,7 +333,7 @@
 
   type Gesture =
     | { kind: 'pan'; sx: number; sy: number; x: number; y: number }
-    | { kind: 'move'; start: Pt; before: Scene; base: Scene; ids: ReadonlySet<string>; box: Box; moved: boolean }
+    | { kind: 'move'; start: Pt; before: Scene; base: Scene; ids: ReadonlySet<string>; box: Box; moved: boolean; next?: string }
     | { kind: 'resize'; handle: Handle; frame: Box; before: Scene; ids: ReadonlySet<string> }
     | { kind: 'end'; which: 0 | 1; el: LinearEl; before: Scene }
     | { kind: 'shape'; type: ShapeType; id: string; start: Pt; before: Scene }
@@ -408,7 +409,7 @@
       case 'arrow': {
         const target = bindTargetAt(before, p, 10 / zoom, new Set())
         const start = snapPt(p)
-        const el = newLine(tool, start, start, style, target ? { id: target.id } : null, null)
+        const el = newLine(tool, start, start, style, target ? bindingAt(target, p) : null, null)
         doc.preview(add(before, el))
         gesture = { kind: 'line', el, before, exclude: new Set(target ? [target.id] : []) }
         return
@@ -450,7 +451,13 @@
         }
       }
     }
-    const hit = hitTest(before, p, 6 / zoom, measure)
+    const under = hitAll(before, p, 6 / zoom, measure)
+    // The selected element keeps the pointer, even below others; clicking it
+    // again without moving selects the next one underneath (the elements lying
+    // close or on top of each other are reached one after the other).
+    const keep = !e.shiftKey && single ? under.findIndex((x) => x.id === single.id) : -1
+    const hit = keep >= 0 ? under[keep]! : under[0]
+    const next = keep >= 0 && under.length > 1 ? under[(keep + 1) % under.length]!.id : undefined
     if (!hit) {
       if (!e.shiftKey) selected = new Set()
       gesture = { kind: 'marquee', start: p, base: selected }
@@ -477,7 +484,7 @@
       ids = new Set(made.map((x) => x.id))
     }
     const box = sceneBounds(base, ids) ?? { x: p[0], y: p[1], w: 0, h: 0 }
-    gesture = { kind: 'move', start: p, before, base, ids, box, moved: false }
+    gesture = { kind: 'move', start: p, before, base, ids, box, moved: false, next }
   }
 
   function moveEvent(e: PointerEvent) {
@@ -520,7 +527,8 @@
         const target = bindTargetAt(g.before, p, 10 / zoom, new Set([g.el.id]))
         const pt = snapPt(p)
         const pts: [Pt, Pt] = g.which === 0 ? [pt, g.el.points[1]] : [g.el.points[0], pt]
-        const bind = target ? { id: target.id } : null
+        // Dropped on an element, the end sticks to the spot it is on (near the middle: to the side facing the other end).
+        const bind = target ? bindingAt(target, p) : null
         const next = g.which === 0 ? { ...g.el, points: pts, start: bind } : { ...g.el, points: pts, end: bind }
         doc.preview(replace(g.before, next))
         bindHint = target?.id ?? null
@@ -546,7 +554,7 @@
           const len = dist(a, end)
           end = [a[0] + Math.cos(angle) * len, a[1] + Math.sin(angle) * len]
         }
-        g.el = { ...g.el, points: [g.el.points[0], end], end: target ? { id: target.id } : null }
+        g.el = { ...g.el, points: [g.el.points[0], end], end: target ? bindingAt(target, p) : null }
         doc.preview(add(g.before, g.el))
         bindHint = target?.id ?? null
         return
@@ -601,6 +609,12 @@
     switch (g.kind) {
       case 'move':
         if (g.moved) doc.commit(scene, g.before)
+        else if (g.next) {
+          // Wait a moment: a double-click edits the text instead.
+          const next = g.next
+          clearTimeout(cycleTimer)
+          cycleTimer = setTimeout(() => (selected = new Set([next])), 250)
+        }
         return
       case 'resize':
       case 'end':
@@ -638,7 +652,11 @@
     }
   }
 
+  /** Selecting the element underneath waits for a possible double-click. */
+  let cycleTimer: ReturnType<typeof setTimeout> | undefined
+
   function dblclick(e: MouseEvent) {
+    clearTimeout(cycleTimer)
     if (!mayEdit || tool !== 'select') return
     const p = toScene(e.clientX, e.clientY)
     // Inside an empty shape too: its label.

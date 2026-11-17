@@ -2,6 +2,7 @@
 
 import type { Box, Pt } from './geometry'
 import { round } from './geometry'
+import { builtinIcon, iconBounds } from './icons'
 import { type Measure, textBox } from './render'
 import {
   type Binding,
@@ -49,9 +50,19 @@ export function newText(p: Pt, s: Style, measure: Measure): TextEl {
   return { id: newId(), type: 'text', x: round(p[0]), y: round(p[1] - h / 2), w, h, stroke: s.stroke, width: 1, dash: 'solid', seed: newSeed(), ...style }
 }
 
+/** A built-in icon in box: the box takes the icon's proportions (its longer side stays), so the lines fill it. */
 export function newIcon(icon: string, box: Box, s: Style): IconEl {
+  const known = builtinIcon(icon)
+  let b = box
+  if (known) {
+    const g = iconBounds(known)
+    const side = Math.max(box.w, box.h) - s.width
+    const w = (g.w >= g.h ? side : (side * g.w) / g.h) + s.width
+    const h = (g.h >= g.w ? side : (side * g.h) / g.w) + s.width
+    b = { x: box.x + (box.w - w) / 2, y: box.y + (box.h - h) / 2, w, h }
+  }
   return {
-    id: newId(), type: 'icon', icon, x: round(box.x), y: round(box.y), w: round(box.w), h: round(box.h),
+    id: newId(), type: 'icon', icon, x: round(b.x), y: round(b.y), w: round(b.w), h: round(b.h),
     stroke: s.stroke, width: s.width, dash: 'solid', seed: newSeed(),
   }
 }
