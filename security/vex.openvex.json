@@ -3,8 +3,8 @@
   "@id": "https://github.com/erktm/dendronotes/security/vex/2026-11-10",
   "author": "Erik Haeger",
   "role": "Project maintainer",
-  "timestamp": "2026-11-10T09:30:00Z",
-  "version": 1,
+  "timestamp": "2026-11-17T18:40:00Z",
+  "version": 2,
   "tooling": "govulncheck v1.9.0 (vulndb 2026-11-05), npm audit",
   "statements": [
     {
@@ -44,6 +44,25 @@
       "status": "not_affected",
       "justification": "component_not_present",
       "impact_statement": "deepmerge is used by @sveltejs/vite-plugin-svelte while the web interface is built. It is a build tool dependency and is not part of the shipped bundle, binary or image."
+    },
+    {
+      "vulnerability": {
+        "name": "GHSA-fc5q-39xc-vjpf",
+        "description": "picomatch is vulnerable to ReDoS through single-branch repeated extglobs."
+      },
+      "products": [
+        {
+          "@id": "pkg:github/erktm/dendronotes@v0.1.0",
+          "subcomponents": [
+            {
+              "@id": "pkg:npm/picomatch"
+            }
+          ]
+        }
+      ],
+      "status": "not_affected",
+      "justification": "component_not_present",
+      "impact_statement": "picomatch is used by vite, vitest, svelte-check and tinyglobby to match file names while the web interface is built and tested. It is a build tool dependency and is not part of the shipped bundle, binary or image; the patterns it sees come from the build configuration, never from users."
     }
   ]
 }
