@@ -250,6 +250,7 @@ export const strings = {
       threshold: { name: 'Threshold', desc: 'All or none, as a neuron fires: true black for OLED screens, pure white by day, azure and amber' },
       notebook: { name: 'Lab notebook', desc: 'A neurobiologist’s notes and drawings: sepia ink and red pencil on squared paper' },
       epaper: { name: 'E-paper', desc: 'The lab notebook on an e-paper screen: black ink on gray, dithered shading' },
+      pencil: { name: 'Colored pencil', desc: 'Drawn with a green and a red pencil on gray paper: hatched shading, neurons behind the notes' },
       cyanotype: { name: 'Cyanotype', desc: 'Neuron plates as a sun print: Prussian blue and paper white, hatched shading' },
     },
     details: 'Show details panel',

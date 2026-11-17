@@ -73,6 +73,7 @@ class Drawing:
         self.labels = []   # (letter, x, y, leader from, leader to)
         self.lines = {}    # stroke width: outlines and hatching drawn as lines
         self.pts = []
+        self.boxes = []    # the bounds of each soma (for hatching in pencil)
 
     def line(self, d, width):
         self.lines.setdefault(width, []).append(d)
@@ -133,6 +134,7 @@ class Drawing:
         nx, ny = cx + r.uniform(-0.6, 0.6), cy + r.uniform(-0.4, 0.6)
         d += f'M{f(nx - nr)} {f(ny)}a{f(nr)} {f(nr * 0.92)} 0 1 0 {f(2 * nr)} 0a{f(nr)} {f(nr * 0.92)} 0 1 0 {f(-2 * nr)} 0Z'
         self.somata.append(d)
+        self.boxes.append((min(p[0] for p in outline), min(p[1] for p in outline), max(p[0] for p in outline), max(p[1] for p in outline)))
         dr = nr * 0.32
         self.dots.append((nx + nr * 0.15, ny - nr * 0.1, dr))
         self.pts += outline
@@ -284,5 +286,97 @@ m.labels += [('a', cx + 30, cy + 34, (cx + 28, cy + 30), (cx + 14, cy + 10)),
              ('b', nodes[1][0] + 16, nodes[1][1] + 3, (nodes[1][0] + 13, nodes[1][1]), (nodes[1][0] + 2.5, nodes[1][1])),
              ('c', ex + 32, ey - 10, (ex + 29, ey - 8), (ex + 12, ey + 4))]
 open(os.path.join(ART, 'motor.svg'), 'w').write(m.svg())
-for n in ('neuron.svg', 'purkinje.svg', 'motor.svg', 'dendrite.svg'):
+
+# --- Colored pencil ----------------------------------------------------------
+# The same cells drawn with two colored pencils: the cell in one color, its
+# axon and the letters in the other. Each drawing is two files with the same
+# view box, one per pencil, so the design colors them from its tokens (and
+# the whole cell, for one pencil). The
+# paper's tooth shows through every stroke (a noise filter that also lets the
+# lines waver a little), and the soma is hatched instead of filled.
+
+def mark(dr):
+    """Where the drawing stands: what comes after it goes to the second pencil."""
+    return dict(ink=len(dr.ink), fine=len(dr.fine), dots=len(dr.dots), somata=len(dr.somata),
+                labels=len(dr.labels), lines={w: len(v) for w, v in dr.lines.items()})
+
+def hatch(box, gap, slope, width):
+    """Parallel strokes across a box, as a pencil shades."""
+    x0, y0, x1, y1 = box
+    h = y1 - y0 + 2
+    d = ''
+    t = x0 - h * slope
+    while t < x1:
+        d += f'M{f(t)} {f(y1 + 1)}L{f(t + h * slope)} {f(y0 - 1)}'
+        t += gap
+    return f'<path fill="none" stroke="#000" stroke-width="{f(width)}" stroke-linecap="round" d="{d}"/>'
+
+def pencil(dr, name, split=None, margin=6):
+    xs = [p[0] for p in dr.pts]; ys = [p[1] for p in dr.pts]
+    x, y = min(xs) - margin, min(ys) - margin
+    w, h = max(xs) - min(xs) + 2 * margin, max(ys) - min(ys) + 2 * margin
+    # The whole cell for one pencil, and its two parts for two.
+    for suffix, lo, hi in (('', None, None), ('-a', None, split), ('-b', split, None))[:3 if split else 1]:
+        cut = lambda key: getattr(dr, key)[(lo[key] if lo else 0):(hi[key] if hi else None)]
+        out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{f(x)} {f(y)} {f(w)} {f(h)}">',
+               f'<filter id="tooth" filterUnits="userSpaceOnUse" x="{f(x)}" y="{f(y)}" width="{f(w)}" height="{f(h)}" color-interpolation-filters="sRGB">'
+               '<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="7" result="n"/>'
+               '<feDisplacementMap in="SourceGraphic" in2="n" scale="0.9" xChannelSelector="R" yChannelSelector="G" result="w"/>'
+               '<feColorMatrix in="n" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3.2 0 0 0 -0.75" result="t"/>'
+               '<feComposite in="w" in2="t" operator="in"/></filter>',
+               '<g filter="url(#tooth)">']
+        ink = cut('ink')
+        if ink:
+            # Pressed a little harder than the pen: the thinnest branches still show.
+            out.append(f'<path fill="#000" stroke="#000" stroke-width="0.4" stroke-linejoin="round" d="{"".join(ink)}"/>')
+        first = lo['somata'] if lo else 0
+        for i, soma in enumerate(cut('somata')):
+            box = dr.boxes[first + i]
+            out.append(f'<clipPath id="s{i}"><path clip-rule="evenodd" d="{soma}"/></clipPath>')
+            out.append(f'<path fill="none" stroke="#000" stroke-width="0.9" d="{soma}"/>')
+            out.append(f'<g clip-path="url(#s{i})">{hatch(box, 1.5, 0.7, 0.6)}{hatch((box[0], (box[1] + box[3]) / 2, box[2], box[3]), 2.2, -0.9, 0.45)}</g>')
+        for width, ds in sorted(dr.lines.items()):
+            a = lo['lines'].get(width, 0) if lo else 0
+            b = hi['lines'].get(width, 0) if hi else None
+            if ds[a:b]:
+                out.append(f'<path fill="none" stroke="#000" stroke-width="{f(width)}" stroke-linecap="round" stroke-linejoin="round" d="{"".join(ds[a:b])}"/>')
+        fine = cut('fine')
+        if fine:
+            out.append(f'<path fill="none" stroke="#000" stroke-width="0.6" stroke-linecap="round" d="{"".join(fine)}"/>')
+        dots = cut('dots')
+        if dots:
+            out.append('<path fill="#000" d="' + ''.join(f'M{f(px - r)} {f(py)}a{f(r)} {f(r)} 0 1 0 {f(2 * r)} 0a{f(r)} {f(r)} 0 1 0 {f(-2 * r)} 0' for px, py, r in dots) + '"/>')
+        for letter, lx, ly, (ax, ay), (bx, by) in cut('labels'):
+            out.append(f'<path fill="none" stroke="#000" stroke-width="0.5" d="M{f(ax)} {f(ay)}L{f(bx)} {f(by)}"/>')
+            out.append(f'<text x="{f(lx)}" y="{f(ly)}" font-family="Georgia, \'Times New Roman\', serif" font-style="italic" font-size="9">{letter}</text>')
+        out.append('</g></svg>')
+        open(os.path.join(ART, f'{name}{suffix}.svg'), 'w').write('\n'.join(out) + '\n')
+
+# The pyramidal cell in pencil: green cell, red axon.
+p = Drawing(21)
+cx, cy = 110, 190
+p.soma(cx, cy, 12, 9, points=11, top=12, nucleus=0.36)
+p.branch(cx, cy - 12, -math.pi / 2, 74, 4.2, 2.2, 0, 4, (14, 28), 0.45, 0.12)
+for ang, ln in ((160, 46), (205, 40), (20, 44), (-25, 38), (125, 36), (60, 40), (95, 30)):
+    t = math.radians(ang)
+    p.branch(cx + math.cos(t) * 8, cy + math.sin(t) * 6, t, ln, 2.6, 1.3, 1, 3, (18, 38), 0.5, 0.16)
+cell = mark(p)
+p.axon(cx + 1, cy + 7, math.pi / 2 + 0.05, 118, 1.5, 0.55, 3)
+p.labels += [('a', cx + 30, cy - 18, (cx + 28, cy - 20), (cx + 9, cy - 6)),
+             ('b', cx + 22, cy + 70, (cx + 20, cy + 67), (cx + 4, cy + 60)),
+             ('c', cx - 30, cy - 52, (cx - 24, cy - 54), (cx - 3, cy - 50))]
+pencil(p, 'pencil-neuron', cell)
+
+# The Purkinje cell in pencil, for one pencil.
+k = Drawing(5)
+cx, cy = 120, 230
+k.soma(cx, cy, 11, 12, points=11, nucleus=0.34)
+for lean in (-0.35, 0.3):
+    k.branch(cx + lean * 10, cy - 10, -math.pi / 2 + lean, 34, 4.4, 3.0, 0, 7, (16, 30), 0.38, 0.1, (2, 2, 3), (0.62, 0.8), 0.7, up=-math.pi / 2)
+k.axon(cx, cy + 11, math.pi / 2 - 0.03, 80, 1.5, 0.6, 2)
+k.labels += [('a', cx + 32, cy + 6, (cx + 30, cy + 3), (cx + 12, cy)),
+             ('b', cx - 34, cy + 48, (cx - 28, cy + 46), (cx - 2, cy + 42))]
+pencil(k, 'pencil-purkinje')
+
+for n in ('neuron.svg', 'purkinje.svg', 'motor.svg', 'dendrite.svg', 'pencil-neuron.svg', 'pencil-neuron-a.svg', 'pencil-neuron-b.svg', 'pencil-purkinje.svg'):
     print(n, len(open(os.path.join(ART, n)).read()))

@@ -1,7 +1,7 @@
 // The color palettes defined in styles/tokens.css, in the order the settings
 // show them. Names and descriptions live in strings.ts.
 
-export const PALETTES = ['cortex', 'sage', 'golgi', 'nissl', 'eosin', 'myelin', 'confocal', 'brainbow', 'threshold', 'notebook', 'epaper', 'cyanotype'] as const
+export const PALETTES = ['cortex', 'sage', 'golgi', 'nissl', 'eosin', 'myelin', 'confocal', 'brainbow', 'threshold', 'notebook', 'epaper', 'pencil', 'cyanotype'] as const
 export type Palette = (typeof PALETTES)[number]
 
 /** The palette when none is chosen; tokens.css also puts it on :root. */
@@ -20,6 +20,7 @@ export const THEME_COLORS: Record<Palette, { light: string; dark: string }> = {
   threshold: { light: '#0052cc', dark: '#000000' },
   notebook: { light: '#26211a', dark: '#18150f' },
   epaper: { light: '#151515', dark: '#101010' },
+  pencil: { light: '#1f6b3a', dark: '#131413' },
   cyanotype: { light: '#17406f', dark: '#0f2546' },
 }
 
@@ -28,4 +29,4 @@ export const THEME_COLORS: Record<Palette, { light: string; dark: string }> = {
  * neurons (styles/sketch.css). The settings list them under their own heading,
  * and <html data-drawn> is set while one is chosen.
  */
-export const DRAWN: ReadonlySet<Palette> = new Set(['notebook', 'epaper', 'cyanotype'])
+export const DRAWN: ReadonlySet<Palette> = new Set(['notebook', 'epaper', 'pencil', 'cyanotype'])

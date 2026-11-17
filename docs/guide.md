@@ -187,15 +187,17 @@ fluorescence of Confocal (cyan and magenta) and Brainbow (coral and turquoise). 
 none, as a neuron fires: true black in the dark, so OLED screens leave the pixels off, and pure
 white by day, with azure and amber.
 
-The settings list three **drawn designs** under their own heading. They look like a
+The settings list four **drawn designs** under their own heading. They look like a
 neurobiologist's notes and drawings rather than an app: Lab notebook (sepia ink and red pencil
-on squared paper), E-paper (the same notebook on a gray e-paper screen, with dithered shading)
-and Cyanotype (neuron plates as a sun print, Prussian blue and paper white, with hatched
-shading). Lines and boxes look drawn by hand, chosen entries are stippled, dithered or hatched,
-headings and the wordmark take a book face, and pen drawings labeled like an anatomical plate
-fill the empty page and the sign-in page: a pyramidal and a Purkinje cell, and on the Cyanotype
-a motor neuron whose myelinated axon ends on a muscle fibre. Each has a light and a dark
-variant.
+on squared paper), E-paper (the same notebook on a gray e-paper screen, with dithered shading),
+Colored pencil (drawn with a green and a red pencil on gray paper, with hatched shading) and
+Cyanotype (neuron plates as a sun print, Prussian blue and paper white, with hatched shading).
+Lines and boxes look drawn by hand, chosen entries are stippled, dithered or hatched, headings
+and the wordmark take a book face, and pen drawings labeled like an anatomical plate fill the
+empty page and the sign-in page: a pyramidal and a Purkinje cell, and on the Cyanotype a motor
+neuron whose myelinated axon ends on a muscle fibre. The Colored pencil draws its cells in
+green with the axon in red, and one of them faintly behind the open note. Each has a light and
+a dark variant.
 
 Uploads are limited to images (PNG, JPEG, GIF, WebP, AVIF, BMP, ICO, SVG), PDF, audio (MP3,
 WAV, Ogg, FLAC, M4A), video (MP4, WebM, MOV), text (Markdown, TXT, CSV, JSON) and zip files,

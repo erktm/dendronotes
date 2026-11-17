@@ -1,14 +1,15 @@
 /*
- * The drawn designs: Lab notebook, E-paper and Cyanotype (palettes.ts DRAWN;
- * <html data-drawn> while one is chosen).
+ * The drawn designs: Lab notebook, E-paper, Colored pencil and Cyanotype
+ * (palettes.ts DRAWN; <html data-drawn> while one is chosen).
  *
  * Beyond their colors (tokens.css) they look like a neurobiologist's notes:
  * paper with a faint grain, boxes drawn by hand with a second pen stroke,
  * shading stippled with ink dots (Lab notebook), dithered like an e-paper
- * screen (E-paper) or hatched with a fine pen (Cyanotype), a book face for
- * headings, and neuron drawings in the margins. The drawings (styles/art/,
- * made by scripts/neurons.py) are masks, so they take the ink color of the
- * design, light and dark.
+ * screen (E-paper), hatched with a green pencil (Colored pencil) or with a
+ * fine pen (Cyanotype), a book face for headings, and neuron drawings in the
+ * margins; the colored pencil draws one behind the open note too. The
+ * drawings (styles/art/, made by scripts/neurons.py) are masks, so they take
+ * the ink color of the design, light and dark.
  *
  * Only this file knows these designs; components keep their own styles and
  * are reached through their stable class names. The tokens are set on every
@@ -32,6 +33,8 @@
   --heading-spacing: -0.01em;
   /* The hard shadow of a printed box (dialogs, menus, cards; not the controls). */
   --print-shadow: 2px 2px 0 color-mix(in srgb, var(--text) 55%, transparent);
+  /* The second stroke drawn around a box. */
+  --second-stroke: var(--line-strong);
 }
 
 [data-drawn][data-palette='epaper'] {
@@ -42,6 +45,17 @@
   --grain-opacity: 0.16;
   --heading-style: normal;
   --print-shadow: 2px 2px 0 var(--text);
+}
+
+[data-drawn][data-palette='pencil'] {
+  /* Shading: green pencil strokes side by side. */
+  --shade: repeating-linear-gradient(-55deg, color-mix(in srgb, var(--accent) 34%, transparent) 0 1.1px, transparent 1.1px 4px);
+  /* The paper: gray with a fine dot grid, as on the e-paper, and more tooth. */
+  --paper: radial-gradient(circle, color-mix(in srgb, var(--line-strong) 45%, transparent) 0.8px, transparent 1.2px) 0 0 / 22px 22px;
+  --grain-opacity: 0.24;
+  /* Boxes go over again in green, their shadow in red. */
+  --second-stroke: color-mix(in srgb, var(--accent) 75%, transparent);
+  --print-shadow: 2px 2px 0 color-mix(in srgb, var(--accent-2) 45%, transparent);
 }
 
 [data-drawn][data-palette='cyanotype'] {
@@ -69,6 +83,17 @@
   --grain-filter: invert(1);
   --grain-opacity: 0.1;
   --print-shadow: 2px 2px 0 color-mix(in srgb, var(--line-strong) 60%, black);
+}
+/* The colored pencil keeps its red shadow in the dark. */
+@media (prefers-color-scheme: dark) {
+  :root[data-drawn][data-palette='pencil']:not([data-theme='light']) {
+    --grain-opacity: 0.14;
+    --print-shadow: 2px 2px 0 color-mix(in srgb, var(--accent-2) 40%, transparent);
+  }
+}
+:root[data-theme='dark'][data-drawn][data-palette='pencil'] {
+  --grain-opacity: 0.14;
+  --print-shadow: 2px 2px 0 color-mix(in srgb, var(--accent-2) 40%, transparent);
 }
 
 /* --- Paper ------------------------------------------------------------ */
@@ -102,12 +127,16 @@
 }
 
 /* The notebook's margin: a double rule beside the notes, in red pencil
-   (Lab notebook) or the second blue (Cyanotype). */
+   (Lab notebook) or the second blue (Cyanotype); a single red pencil line
+   (Colored pencil). */
 :root[data-drawn][data-palette='notebook'] .sidebar {
   border-right: 3px double color-mix(in srgb, var(--accent-2) 55%, transparent);
 }
 :root[data-drawn][data-palette='cyanotype'] .sidebar {
   border-right: 3px double color-mix(in srgb, var(--accent-2) 45%, transparent);
+}
+:root[data-drawn][data-palette='pencil'] .sidebar {
+  border-right: 2px solid color-mix(in srgb, var(--accent-2) 40%, transparent);
 }
 
 /* --- Lines drawn by hand ---------------------------------------------- */
@@ -117,7 +146,7 @@
   border: var(--sketch-stroke) solid var(--line-strong);
   border-radius: var(--radius);
   box-shadow:
-    0.6px 1px 0 -0.2px var(--line-strong),
+    0.6px 1px 0 -0.2px var(--second-stroke),
     var(--print-shadow);
 }
 
@@ -138,7 +167,8 @@
 
 /* The wordmark: an italic book face with "dendro" in red pencil (Lab
    notebook), typewriter letters (E-paper) or the small capitals of a plate
-   caption (Cyanotype), each with a dendrite drawn underneath. */
+   caption (Cyanotype), each with a dendrite drawn underneath (in red on the
+   Colored pencil, under "dendro" in green). */
 :root[data-drawn] .wordmark {
   position: relative;
   display: inline-block;
@@ -173,6 +203,9 @@
   content: '';
   mask: url('./art/dendrite.svg') no-repeat left center / 100% 100%;
 }
+:root[data-drawn][data-palette='pencil'] .wordmark::after {
+  background: var(--accent-2);
+}
 
 /* --- Drawings in the margins ------------------------------------------ */
 
@@ -191,6 +224,49 @@
 }
 :root[data-drawn] .empty > .mark > svg {
   visibility: hidden;
+}
+/* The colored pencil draws the cell in green and its axon in red: two layers. */
+:root[data-drawn][data-palette='pencil'] .empty > .mark {
+  position: relative;
+  background: none;
+  mask: none;
+}
+:root[data-drawn][data-palette='pencil'] .empty > .mark::before,
+:root[data-drawn][data-palette='pencil'] .empty > .mark::after {
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  content: '';
+  mask: url('./art/pencil-neuron-a.svg') no-repeat center / contain;
+}
+:root[data-drawn][data-palette='pencil'] .empty > .mark::after {
+  background: var(--accent-2);
+  mask-image: url('./art/pencil-neuron-b.svg');
+}
+
+/* Behind the open note, faintly, the same cell in the corner, as drawn on
+   the back of the page. */
+:root[data-drawn][data-palette='pencil'] .note:has(> .edit) {
+  position: relative;
+  isolation: isolate;
+}
+:root[data-drawn][data-palette='pencil'] .note:has(> .edit)::before,
+:root[data-drawn][data-palette='pencil'] .note:has(> .edit)::after {
+  position: absolute;
+  z-index: -1;
+  right: 28px;
+  bottom: 40px;
+  width: min(26vw, 250px);
+  height: min(52vh, 420px);
+  background: var(--accent);
+  content: '';
+  mask: url('./art/pencil-neuron-a.svg') no-repeat right bottom / contain;
+  opacity: 0.15;
+  pointer-events: none;
+}
+:root[data-drawn][data-palette='pencil'] .note:has(> .edit)::after {
+  background: var(--accent-2);
+  mask-image: url('./art/pencil-neuron-b.svg');
 }
 
 /* The sign-in page: a Purkinje cell on one side, a pyramidal cell (or the
@@ -225,6 +301,17 @@
 :root[data-drawn][data-palette='cyanotype'] .screen::after {
   mask-image: url('./art/motor.svg');
 }
+/* The colored pencil: the Purkinje cell in green, the pyramidal cell in red. */
+:root[data-drawn][data-palette='pencil'] .screen::before {
+  background: var(--accent);
+  mask-image: url('./art/pencil-purkinje.svg');
+  opacity: 0.2;
+}
+:root[data-drawn][data-palette='pencil'] .screen::after {
+  background: var(--accent-2);
+  mask-image: url('./art/pencil-neuron.svg');
+  opacity: 0.2;
+}
 :root[data-drawn] .screen > * {
   position: relative;
   z-index: 1;
@@ -246,6 +333,11 @@
   mask: url('./art/purkinje.svg') no-repeat right top / contain;
   opacity: 0.22;
   pointer-events: none;
+}
+:root[data-drawn][data-palette='pencil'] .tutorials > header::after {
+  background: var(--accent);
+  mask-image: url('./art/pencil-purkinje.svg');
+  opacity: 0.3;
 }
 
 /* The previews in the settings: paper, a shaded side and a small neuron. */
@@ -273,6 +365,10 @@
 }
 .palette > .preview[data-drawn][data-palette='cyanotype'] .body::after {
   mask-image: url('./art/motor.svg');
+}
+.palette > .preview[data-drawn][data-palette='pencil'] .body::after {
+  background: var(--accent);
+  mask-image: url('./art/pencil-neuron.svg');
 }
 
 /* --- E-paper: no animations, as the screen redraws at once ------------ */

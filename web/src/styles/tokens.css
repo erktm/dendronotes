@@ -1058,6 +1058,89 @@
   --scrim: rgb(0 0 0 / 0.6);
 }
 
+/* Colored pencil: the notebook drawn with a green and a red pencil on gray paper, hatched shading (styles/sketch.css) */
+[data-palette='pencil'] {
+  --bg: #e4e4de;
+  --bg-raised: #eeeee9;
+  --bg-sunken: #d9d9d2;
+  --bg-hover: #d0d0c8;
+  --line: #b3b3ab;
+  --line-strong: #7b7b74;
+  --text: #141414;
+  --text-muted: #3a3a38;
+  --text-faint: #4a4a47;
+  --accent: #1f6b3a;
+  --accent-strong: #134d29;
+  --accent-soft: #cbd9cc;
+  --on-accent: #f2f2ee;
+  --accent-2: #b02a22;
+  --ok: #2d5a36;
+  --warn: #6a4c10;
+  --err: #962520;
+  --focus: #1f6b3a;
+  --shadow: 0 1px 2px rgb(20 20 20 / 0.06), 0 4px 16px rgb(20 20 20 / 0.06);
+  --code-bg: #dbdbd4;
+  --warn-soft: #e4d9bd;
+  --warn-text: #6a4c10;
+  --scrim: rgb(20 20 20 / 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-palette='pencil']:not([data-theme='light']),
+  :root:not([data-theme='light']) [data-palette='pencil'] {
+    --bg: #131413;
+    --bg-raised: #1a1b1a;
+    --bg-sunken: #0c0d0c;
+    --bg-hover: #262826;
+    --line: #3a3c3a;
+    --line-strong: #6b6e6b;
+    --text: #ececea;
+    --text-muted: #b4b5b2;
+    --text-faint: #9a9b98;
+    --accent: #8fd4a0;
+    --accent-strong: #b5e8c1;
+    --accent-soft: #1f3325;
+    --on-accent: #0f1a12;
+    --accent-2: #f2958a;
+    --ok: #8fcf9b;
+    --warn: #e3c06c;
+    --err: #f39189;
+    --focus: #8fd4a0;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px rgb(0 0 0 / 0.25);
+    --code-bg: #0c0d0c;
+    --warn-soft: #29230f;
+    --warn-text: #e3c06c;
+    --scrim: rgb(0 0 0 / 0.6);
+  }
+}
+
+:root[data-theme='dark'][data-palette='pencil'],
+:root[data-theme='dark'] [data-palette='pencil'] {
+  --bg: #131413;
+  --bg-raised: #1a1b1a;
+  --bg-sunken: #0c0d0c;
+  --bg-hover: #262826;
+  --line: #3a3c3a;
+  --line-strong: #6b6e6b;
+  --text: #ececea;
+  --text-muted: #b4b5b2;
+  --text-faint: #9a9b98;
+  --accent: #8fd4a0;
+  --accent-strong: #b5e8c1;
+  --accent-soft: #1f3325;
+  --on-accent: #0f1a12;
+  --accent-2: #f2958a;
+  --ok: #8fcf9b;
+  --warn: #e3c06c;
+  --err: #f39189;
+  --focus: #8fd4a0;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px rgb(0 0 0 / 0.25);
+  --code-bg: #0c0d0c;
+  --warn-soft: #29230f;
+  --warn-text: #e3c06c;
+  --scrim: rgb(0 0 0 / 0.6);
+}
+
 /* Cyanotype – neuron plates as a sun print: Prussian blue and paper white, hatched shading (styles/sketch.css) */
 [data-palette='cyanotype'] {
   --bg: #edf1f2;

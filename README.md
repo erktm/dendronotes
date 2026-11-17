@@ -35,9 +35,9 @@ Kubernetes, also in an air gap.
 - **Links** to notes and drawings that keep working when they move, for people in the soma or
   public and read-only, with an optional expiry.
 - **Search** across all notes with phrases and `#tags`.
-- **Designs**: twelve, each with a light and a dark variant, from tissue stains and
-  fluorescence to true black for OLED screens; three are drawn like a neurobiologist's notes,
-  with neurons in the margins (Lab notebook, E-paper, Cyanotype).
+- **Designs**: thirteen, each with a light and a dark variant, from tissue stains and
+  fluorescence to true black for OLED screens; four are drawn like a neurobiologist's notes,
+  with neurons in the margins (Lab notebook, E-paper, Colored pencil, Cyanotype).
 - **Tutorials** for the essentials, one click above the settings.
 - **Comments** with `@mentions`, a **history** of every note, a **trash** with restore.
 - **Email** through any SMTP relay: somas shared with you, mentions and replies you have not
