@@ -1312,7 +1312,7 @@ export const strings = {
     },
     icons: {
       title: 'Icons',
-      hint: 'Pictures everyone in this soma can put into drawings. A drawing keeps its own copy.',
+      hint: 'Pictures everyone in this soma can put into drawings. A drawing keeps its own copy. Drag an icon onto a section to move it.',
       empty: 'No icons yet.',
       upload: 'Upload icon',
       uploading: 'Uploading …',

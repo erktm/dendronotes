@@ -59,7 +59,8 @@
     return out
   }
 
-  const ownGroups = $derived(groupsOf(own, false, b.uploaded).filter((g) => g.icons.length > 0 || (g.section && !q)))
+  // Empty sections show (to drop icons on); while dragging, "no section" too.
+  const ownGroups = $derived(groupsOf(own, false, b.uploaded).filter((g) => g.icons.length > 0 || (g.section && !q) || (!!dragging && !g.section)))
   const serverGroups = $derived(groupsOf(shared, true, t.noSection).filter((g) => g.icons.length > 0))
   const builtin = $derived(
     ICON_GROUPS.map((g) => ({ id: g.id, icons: g.icons.filter((i) => matches(b.names[i.name] ?? i.name)) })).filter((g) => g.icons.length > 0),
@@ -209,6 +210,20 @@
     await load()
   }
 
+  /** The icon being dragged onto another section, and the section it would land in. */
+  let dragging = $state<IconInfo | null>(null)
+  let dropKey = $state<string | null>(null)
+
+  const canDropOn = (g: Group) => !!dragging && !g.server && dragging.sectionId !== (g.section?.id ?? 0)
+
+  function dropOn(e: DragEvent, g: Group) {
+    e.preventDefault()
+    const icon = dragging
+    dragging = null
+    dropKey = null
+    if (icon && !g.server && icon.sectionId !== (g.section?.id ?? 0)) void moveIcon(icon, g.section?.id ?? 0)
+  }
+
   async function moveIcon(icon: IconInfo, section: number) {
     try {
       await api.somaIcons.move(icon.id, section)
@@ -253,7 +268,22 @@
 </script>
 
 {#snippet group(g: Group)}
-  <details class="group" open={!folded.has(g.key) || !!q} ontoggle={(e) => !q && toggle(g.key, e.currentTarget.open)}>
+  <details
+    class="group"
+    class:drop={dropKey === g.key}
+    open={!folded.has(g.key) || !!q}
+    ontoggle={(e) => !q && toggle(g.key, e.currentTarget.open)}
+    ondragover={(e) => {
+      if (!canDropOn(g)) return
+      e.preventDefault()
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+      dropKey = g.key
+    }}
+    ondragleave={(e) => {
+      if (dropKey === g.key && !e.currentTarget.contains(e.relatedTarget as Node | null)) dropKey = null
+    }}
+    ondrop={(e) => dropOn(e, g)}
+  >
     <summary aria-label={t.collapse(g.title)}>
       <span class="title">{g.title}</span>
       <span class="count">{g.icons.length}</span>
@@ -274,6 +304,17 @@
               aria-label={t.insert(icon.name)}
               onclick={() => void pick(icon, g.server)}
               oncontextmenu={(e) => !g.server && iconMenu(e, icon)}
+              draggable={!g.server && app.can.create}
+              ondragstart={(e) => {
+                if (g.server || !app.can.create) return
+                dragging = icon
+                e.dataTransfer?.setData('text/plain', icon.name)
+                if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
+              }}
+              ondragend={() => {
+                dragging = null
+                dropKey = null
+              }}
             >
               <img src={g.server ? api.serverIconURL(icon.id) : api.iconURL(icon.id)} alt="" loading="lazy" />
             </button>
@@ -470,6 +511,12 @@
     color: var(--text);
     font-size: var(--text-xs);
     font-weight: 650;
+  }
+  .group.drop {
+    border-radius: var(--radius-sm);
+    outline: 2px dashed var(--accent);
+    outline-offset: -2px;
+    background: var(--accent-soft);
   }
   .group summary {
     display: flex;
