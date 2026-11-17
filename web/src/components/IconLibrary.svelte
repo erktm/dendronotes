@@ -137,7 +137,7 @@
     if (!file || !app.may('create')) return
     busy = true
     try {
-      const r = await api.somaIcons.addPack(file)
+      const r = await api.somaIcons.addPack(file, target)
       app.toast(t.packAdded(r.added, r.sections.length), 'info')
       if (r.skipped.length) app.toast(t.packSkipped(r.skipped.length, `${r.skipped[0]!.file} (${r.skipped[0]!.reason})`))
     } catch (err) {
@@ -315,7 +315,7 @@
         {busy ? t.uploading : t.upload}
       </button>
       <div class="row">
-        <button type="button" class="upload small" disabled={busy} title={t.uploadPack} onclick={() => packInput?.click()}>{t.uploadPackShort}</button>
+        <button type="button" class="upload small" disabled={busy} title={`${t.uploadPack}. ${t.uploadPackHint}`} onclick={() => packInput?.click()}>{t.uploadPackShort}</button>
         <button type="button" class="upload small" disabled={busy} onclick={() => void newSection()}>{t.newSection}</button>
       </div>
     </div>

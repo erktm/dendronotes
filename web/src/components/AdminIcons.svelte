@@ -78,7 +78,7 @@
     const file = files?.[0]
     if (!file) return
     void run(async () => {
-      const r = await lib.addPack(file)
+      const r = await lib.addPack(file, target)
       app.toast(t.packAdded(r.added, r.sections.length), 'info')
       if (r.skipped.length) app.toast(t.packSkipped(r.skipped.length, `${r.skipped[0]!.file} (${r.skipped[0]!.reason})`))
       if (packInput) packInput.value = ''
@@ -141,7 +141,7 @@
         </label>
       {/if}
       <button type="button" class="admin-btn" disabled={busy} onclick={() => pictureInput?.click()}><Icon name="upload" size={15} /> {t.upload}</button>
-      <button type="button" class="admin-btn" disabled={busy} onclick={() => packInput?.click()}>{t.uploadPack}</button>
+      <button type="button" class="admin-btn" disabled={busy} title={t.uploadPackHint} onclick={() => packInput?.click()}>{t.uploadPack}</button>
       <button type="button" class="admin-btn" disabled={busy} onclick={() => void newSection()}><Icon name="plus" size={15} /> {t.newSection}</button>
     </div>
     <input

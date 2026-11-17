@@ -83,6 +83,25 @@ func TestIconPacksAndSections(t *testing.T) {
 		t.Fatalf("after the second pack: %+v", lib)
 	}
 
+	// A pack into a chosen section puts everything there, folders or not.
+	rec = admin.upload(base+"/icons/pack?name=Into.zip&section="+itoa(cloud.ID), string(iconPack(t, "Deep/Folder/a.svg", "Other/b.svg", "c.svg")))
+	expect(t, rec, 201, "")
+	if got := decode[packResult](t, rec); got.Added != 3 || strings.Join(got.Sections, ",") != "Cloud" {
+		t.Fatalf("pack into a section: %+v", got)
+	}
+	lib = decode[library](t, admin.do("GET", base+"/icons", ""))
+	inCloud := 0
+	for _, i := range lib.Icons {
+		if i.SectionID == cloud.ID {
+			inCloud++
+		}
+	}
+	if len(lib.Sections) != 2 || inCloud != 6 {
+		t.Fatalf("after the pack into Cloud: %d sections, %d in Cloud", len(lib.Sections), inCloud)
+	}
+	expect(t, admin.upload(base+"/icons/pack?name=Into.zip&section=99999", string(iconPack(t, "d.svg"))), 400, "invalid_section")
+	lib = decode[library](t, admin.do("GET", base+"/icons", ""))
+
 	// Sections: rename, order, move an icon out, delete with the icons in it.
 	expect(t, admin.do("PATCH", base+"/icon-sections/"+itoa(cloud.ID), `{"name":"Cloud services"}`), 204, "")
 	expect(t, admin.do("PUT", base+"/icon-sections/order", `{"ids":[`+itoa(lib.Sections[1].ID)+`]}`), 204, "")

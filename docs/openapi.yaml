@@ -1036,6 +1036,7 @@ paths:
           application/zip: { schema: { type: string, format: binary } }
       parameters:
         - { name: name, in: query, schema: { type: string }, description: The pack's file name; names the section of pictures not in a folder. }
+        - { name: section, in: query, schema: { type: integer }, description: "A section to put every picture into, whatever folder it lies in; without it, the pack's folders become sections." }
       responses:
         "201":
           description: What was added; files left out are listed with the reason (at most 50).
@@ -1738,6 +1739,7 @@ paths:
           application/zip: { schema: { type: string, format: binary } }
       parameters:
         - { name: name, in: query, schema: { type: string }, description: The pack's file name; names the section of pictures not in a folder. }
+        - { name: section, in: query, schema: { type: integer }, description: "A section to put every picture into, whatever folder it lies in; without it, the pack's folders become sections." }
       responses:
         "201":
           description: What was added; files left out are listed with the reason (at most 50).

@@ -191,11 +191,35 @@ func (s *Server) handleAdminAddIcon(w http.ResponseWriter, r *http.Request) {
 // maxReportedSkips bounds the list of skipped files in an answer.
 const maxReportedSkips = 50
 
-// addIconPack unpacks a ZIP of icons (named ?name=) into sections.
+// addIconPack unpacks a ZIP of icons (named ?name=) into sections: the
+// pack's folders become sections, or with ?section= every picture goes into
+// that section, whatever folder it lies in.
 func (s *Server) addIconPack(w http.ResponseWriter, r *http.Request, lib iconLibrary) {
 	packName, ok := iconLabel(w, strings.TrimSuffix(path.Base(r.URL.Query().Get("name")), path.Ext(r.URL.Query().Get("name"))), "Icons")
 	if !ok {
 		return
+	}
+	into, ok := sectionParam(w, r)
+	if !ok {
+		return
+	}
+	var intoSection store.IconSection
+	if into > 0 {
+		all, err := s.store.IconSections(r.Context(), lib.id)
+		if err != nil {
+			s.internalError(w, r, "reading icon sections", err)
+			return
+		}
+		found := false
+		for _, sec := range all {
+			if sec.ID == into {
+				intoSection, found = sec, true
+			}
+		}
+		if !found {
+			httpx.Error(w, http.StatusBadRequest, "invalid_section")
+			return
+		}
 	}
 	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, drawing.MaxPackBytes+1))
 	if err != nil {
@@ -212,6 +236,10 @@ func (s *Server) addIconPack(w http.ResponseWriter, r *http.Request, lib iconLib
 	var names []string
 	added := 0
 	for _, icon := range icons {
+		if into > 0 {
+			icon.Section = intoSection.Name
+			sections[icon.Section] = intoSection
+		}
 		sec, ok := sections[icon.Section]
 		if !ok {
 			sec, err = s.store.IconSection(r.Context(), lib.id, icon.Section)
@@ -234,6 +262,9 @@ func (s *Server) addIconPack(w http.ResponseWriter, r *http.Request, lib iconLib
 			return
 		}
 		added++
+	}
+	if into > 0 && added > 0 {
+		names = []string{intoSection.Name}
 	}
 	if lib.id == store.ServerIcons {
 		s.audit(r, "icons.pack", packName, strconv.Itoa(added)+" icons")

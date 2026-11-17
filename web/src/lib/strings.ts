@@ -1323,6 +1323,7 @@ export const strings = {
       unreadable: 'This picture couldn’t be read. Use PNG, JPEG, WebP, GIF or SVG.',
       close: 'Close icons',
       uploadPack: 'Upload a pack (ZIP)',
+      uploadPackHint: 'Its folders become sections, or everything goes into the section chosen under “Upload to”.',
       uploadPackShort: 'Upload pack',
       uploadTo: 'Upload to',
       noSection: 'No section',

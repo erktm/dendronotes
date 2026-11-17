@@ -60,8 +60,8 @@ export const serverLibrary = () => request<IconLibrary>('GET', '/api/admin/icons
 export interface LibraryApi {
   /** Adds a PNG (at most 512 px) or SVG, in a section or none (0). */
   add(name: string, picture: Blob, section?: number): Promise<IconInfo>
-  /** Adds a ZIP of pictures; its folders become sections. */
-  addPack(file: File): Promise<PackResult>
+  /** Adds a ZIP of pictures: all into a section, or (none, 0) its folders become sections. */
+  addPack(file: File, section?: number): Promise<PackResult>
   move(id: number, section: number): Promise<IconInfo>
   remove(id: number): Promise<unknown>
   addSection(name: string): Promise<IconSection>
@@ -74,7 +74,8 @@ function libraryApi(base: () => string): LibraryApi {
   return {
     add: (name, picture, section = 0) =>
       request<IconInfo>('POST', `${base()}/icons?name=${encodeURIComponent(name)}${section ? `&section=${section}` : ''}`, { raw: picture }),
-    addPack: (file) => request<PackResult>('POST', `${base()}/icons/pack?name=${encodeURIComponent(file.name)}`, { raw: file }),
+    addPack: (file, section) =>
+      request<PackResult>('POST', `${base()}/icons/pack?name=${encodeURIComponent(file.name)}${section ? `&section=${section}` : ''}`, { raw: file }),
     move: (id, section) => request<IconInfo>('PATCH', `${base()}/icons/${id}`, { body: { sectionId: section } }),
     remove: (id) => request('DELETE', `${base()}/icons/${id}`),
     addSection: (name) => request<IconSection>('POST', `${base()}/icon-sections`, { body: { name } }),
