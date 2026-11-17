@@ -66,8 +66,12 @@ Files in a soma remain plain, Obsidian-compatible Markdown; the wiki link syntax
   line from "Embed in a note" in the drawing editor. The editor has
   rectangles, ellipses, diamonds, lines and arrows, a pen, text, and icons; the button below the
   diamond opens more shapes: triangle, hexagon, parallelogram, cylinder, star and cloud (triangles
-  and parallelograms can be flipped in the properties). Double-click a shape to write in it. The ends of lines and arrows stick to shapes, text and icons and follow them
-  when they move; arrows can bend at right angles. Colors come from fixed slots that suit every
+  and parallelograms can be flipped in the properties). Double-click a shape to write in it. The
+  ends of lines and arrows stick to shapes, text and icons and follow them when they move: an end
+  dropped near the middle turns to face the other end, an end dropped anywhere else stays at that
+  spot of the outline. Arrows can bend at right angles. Icons fill their box, and lines stick to
+  what is drawn of them. Where elements lie close or on top of each other, a second click on the
+  selected one selects the next one underneath. Colors come from fixed slots that suit every
   palette, light and dark; strokes can be switched to a sketchy look per drawing. Changes save
   about a second after the last one ("Done" goes back to the note); if someone else saved the
   drawing meanwhile, you choose whose version stays. In a note, drawings show in place: a click
@@ -84,9 +88,10 @@ Files in a soma remain plain, Obsidian-compatible Markdown; the wiki link syntax
   files adds PNG, JPEG, WebP, GIF or SVG pictures (scaled to at most 512 pixels; SVG only
   without scripts or external references), and uploaders or editors delete them. A whole
   **icon pack** comes as a ZIP of SVG and PNG pictures (at most 20 MB and 500 pictures); its
-  folders become **sections**. Sections can be made, renamed and ordered by everyone who may add
-  icons; a right-click on an icon moves it to another section; editors delete sections with their
-  icons. Admins fill a library for everyone (*Administration → Icons*), shown after the soma's
+  folders become **sections**, unless a section is chosen under "Upload to": then everything goes
+  into that section, whatever folder it lies in. Sections can be made, renamed and ordered by
+  everyone who may add icons; dragging an icon onto a section (or a right-click on it) moves it
+  there; editors delete sections with their icons. Admins fill a library for everyone (*Administration → Icons*), shown after the soma's
   own. Every group folds away. A drawing keeps its own copy of the uploaded pictures it uses. A
   field above the icons finds one by name.
 - **Downloading drawings** ("Download" in the drawing editor or the large view): the SVG file
