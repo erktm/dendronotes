@@ -93,11 +93,12 @@ Files in a soma remain plain, Obsidian-compatible Markdown; the wiki link syntax
   everyone who may add icons; dragging an icon onto a section (or a right-click on it) moves it
   there; editors delete sections with their icons. Admins fill a library for everyone (*Administration → Icons*), shown after the soma's
   own. Every group folds away. A drawing keeps its own copy of the uploaded pictures it uses. A
-  field above the icons finds one by name. Pictures drawn in one dark color only (line icons,
-  black logos) are recognized when they are uploaded: the library shows them in the text color,
-  and in a drawing they take a color like the built-in icons, ink by default, so they show on a
-  dark page too; any other color of the drawing can be chosen for them. Colored pictures keep
-  their own colors.
+  field above the icons finds one by name. Pictures drawn in one dark color only (line icons, for
+  example) are recognized when they are uploaded: the library shows them in the text color, and
+  in a drawing they take a color like the built-in icons, ink by default, so they show on a dark
+  page too; any other color of the drawing can be chosen for them. Colored pictures keep their
+  own colors. Logos of other projects or companies usually must not be recolored: leave them in
+  ink, which matches their black and white versions.
 - **Downloading drawings** ("Download" in the drawing editor or the large view): the SVG file
   itself (any image viewer shows it, and it stays editable in dendronotes) or a PNG picture at
   twice its size, light or dark as the app is shown. Text in the PNG uses the fonts of the
