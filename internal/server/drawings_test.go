@@ -105,8 +105,11 @@ func TestIconLibrary(t *testing.T) {
 		t.Errorf("png icon: %+v", tree)
 	}
 	star := `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2l3 7h7l-6 4 2 8-6-5-6 5 2-8-6-4h7z"/></svg>`
-	if icon := decode[store.Icon](t, admin.do("POST", base+"/icons?name=Star", star)); icon.Mime != "image/svg+xml" {
-		t.Errorf("svg icon: %+v", icon)
+	if icon := decode[store.Icon](t, admin.do("POST", base+"/icons?name=Star", star)); icon.Mime != "image/svg+xml" || !icon.Mono {
+		t.Errorf("svg icon (black, so monochrome): %+v", icon)
+	}
+	if tree.Mono {
+		t.Errorf("a photo keeps its colors: %+v", tree)
 	}
 	expect(t, admin.do("POST", base+"/icons", "GIF89a"), 400, "invalid_icon")
 	expect(t, admin.do("POST", base+"/icons", testPhoto(t, 600)), 400, "invalid_icon")
@@ -153,7 +156,7 @@ func TestIconLibrary(t *testing.T) {
 
 	// The library has a limit.
 	for range store.MaxIcons - len(icons(admin)) {
-		if _, err := s.store.AddIcon(ctx, testSoma, "x", "image/svg+xml", []byte(star), 0, 0); err != nil {
+		if _, err := s.store.AddIcon(ctx, testSoma, "x", "image/svg+xml", []byte(star), false, 0, 0); err != nil {
 			t.Fatal(err)
 		}
 	}

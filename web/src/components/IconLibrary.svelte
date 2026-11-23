@@ -7,6 +7,7 @@
   import { ICON_GROUPS } from '../lib/drawing/icons'
   import { onMount } from 'svelte'
   import Icon from './Icon.svelte'
+  import IconPicture from './IconPicture.svelte'
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
   import * as api from '../lib/api/drawings'
   import type { IconInfo, IconLibrary, IconSection } from '../lib/api/drawings'
@@ -20,7 +21,7 @@
     onpick,
     onbuiltin,
     onclose,
-  }: { onpick: (file: FileData) => void; onbuiltin: (name: string) => void; onclose: () => void } = $props()
+  }: { onpick: (file: FileData, mono: boolean) => void; onbuiltin: (name: string) => void; onclose: () => void } = $props()
 
   const b = strings.drawing.builtin
   const t = strings.drawing.icons
@@ -106,7 +107,7 @@
   async function pick(icon: IconInfo, server: boolean) {
     try {
       const file = await pictureFile(server ? api.serverIconURL(icon.id) : api.iconURL(icon.id))
-      if (file) onpick(file)
+      if (file) onpick(file, icon.mono === true)
       else app.toast(t.unreadable)
     } catch (err) {
       app.toast(errorMessage(err))
@@ -316,7 +317,7 @@
                 dropKey = null
               }}
             >
-              <img src={g.server ? api.serverIconURL(icon.id) : api.iconURL(icon.id)} alt="" loading="lazy" />
+              <IconPicture src={g.server ? api.serverIconURL(icon.id) : api.iconURL(icon.id)} mono={icon.mono} />
             </button>
             {#if !g.server && mayDelete(icon)}
               <button type="button" class="remove" title={t.delete(icon.name)} aria-label={t.delete(icon.name)} onclick={() => void remove(icon)}>
@@ -580,10 +581,7 @@
     border-color: var(--line-strong);
     background: var(--bg-hover);
   }
-  .pick img {
-    max-width: 100%;
-    max-height: 100%;
-  }
+
   .filter {
     height: 30px;
     padding: 0 var(--space-2);

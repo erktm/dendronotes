@@ -33,6 +33,7 @@ type Icon struct {
 	Mime      string    `json:"mime"`
 	Size      int       `json:"size"`
 	SectionID int64     `json:"sectionId,omitempty"` // 0: no section
+	Mono      bool      `json:"mono,omitempty"`      // drawn in one dark color: drawings color it
 	CreatedBy int64     `json:"createdBy"`           // 0: unknown or gone
 	CreatedAt time.Time `json:"createdAt"`
 }
@@ -45,8 +46,9 @@ type IconSection struct {
 }
 
 // AddIcon stores an icon (already checked and normalized), in a section of
-// the same library or in none (section 0).
-func (s *Store) AddIcon(ctx context.Context, library, name, mime string, data []byte, by, section int64) (Icon, error) {
+// the same library or in none (section 0); mono says whether it is drawn in
+// one dark color only.
+func (s *Store) AddIcon(ctx context.Context, library, name, mime string, data []byte, mono bool, by, section int64) (Icon, error) {
 	var n int
 	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM soma_icons WHERE soma_id = ?`, library).Scan(&n); err != nil {
 		return Icon{}, err
@@ -62,8 +64,8 @@ func (s *Store) AddIcon(ctx context.Context, library, name, mime string, data []
 	if by != 0 {
 		who = by
 	}
-	res, err := s.db.ExecContext(ctx, `INSERT INTO soma_icons (soma_id, name, mime, data, created_by, created_at, section_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		library, name, mime, data, who, s.unixNow(), sec)
+	res, err := s.db.ExecContext(ctx, `INSERT INTO soma_icons (soma_id, name, mime, data, created_by, created_at, section_id, mono) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		library, name, mime, data, who, s.unixNow(), sec, mono)
 	if err != nil {
 		return Icon{}, err
 	}
@@ -85,12 +87,12 @@ func (s *Store) sectionRef(ctx context.Context, library string, section int64) (
 	return id, err
 }
 
-const iconCols = `id, name, mime, length(data), COALESCE(section_id, 0), COALESCE(created_by, 0), created_at`
+const iconCols = `id, name, mime, length(data), COALESCE(section_id, 0), COALESCE(created_by, 0), created_at, COALESCE(mono, 0)`
 
 func scanIcon(row interface{ Scan(...any) error }, extra ...any) (Icon, error) {
 	var i Icon
 	var at int64
-	err := row.Scan(append([]any{&i.ID, &i.Name, &i.Mime, &i.Size, &i.SectionID, &i.CreatedBy, &at}, extra...)...)
+	err := row.Scan(append([]any{&i.ID, &i.Name, &i.Mime, &i.Size, &i.SectionID, &i.CreatedBy, &at, &i.Mono}, extra...)...)
 	if errors.Is(err, sql.ErrNoRows) {
 		return i, ErrNotFound
 	}
@@ -114,6 +116,41 @@ func (s *Store) Icons(ctx context.Context, library string) ([]Icon, error) {
 		out = append(out, i)
 	}
 	return out, rows.Err()
+}
+
+// FillIconMono works out, with mono, whether the icons of a library stored
+// before it was known are drawn in one dark color.
+func (s *Store) FillIconMono(ctx context.Context, library string, mono func(mime string, data []byte) bool) error {
+	rows, err := s.db.QueryContext(ctx, `SELECT id, mime, data FROM soma_icons WHERE soma_id = ? AND mono IS NULL`, library)
+	if err != nil {
+		return err
+	}
+	type unknown struct {
+		id   int64
+		mono bool
+	}
+	var found []unknown
+	for rows.Next() {
+		var u unknown
+		var mime string
+		var data []byte
+		if err := rows.Scan(&u.id, &mime, &data); err != nil {
+			rows.Close()
+			return err
+		}
+		u.mono = mono(mime, data)
+		found = append(found, u)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, u := range found {
+		if _, err := s.db.ExecContext(ctx, `UPDATE soma_icons SET mono = ? WHERE id = ?`, u.mono, u.id); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // IconByID returns an icon of a library with its data.

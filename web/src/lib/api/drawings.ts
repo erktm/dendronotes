@@ -29,6 +29,8 @@ export interface IconInfo {
   size: number
   /** Left out for icons without a section. */
   sectionId?: number
+  /** Drawn in one dark color only: drawings color it (ink by default). */
+  mono?: boolean
   createdBy: number
   createdAt: string
 }

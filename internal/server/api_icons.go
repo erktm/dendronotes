@@ -70,6 +70,9 @@ type libraryContent struct {
 }
 
 func (s *Server) libraryContent(r *http.Request, library string) (libraryContent, error) {
+	if err := s.store.FillIconMono(r.Context(), library, drawing.Monochrome); err != nil {
+		return libraryContent{}, err
+	}
 	icons, err := s.store.Icons(r.Context(), library)
 	if err != nil {
 		return libraryContent{}, err
@@ -168,7 +171,7 @@ func (s *Server) addIcon(w http.ResponseWriter, r *http.Request, lib iconLibrary
 		return
 	}
 	me, _ := auth.UserFrom(r.Context())
-	icon, err := s.store.AddIcon(r.Context(), lib.id, name, mime, data, me.ID, section)
+	icon, err := s.store.AddIcon(r.Context(), lib.id, name, mime, data, drawing.Monochrome(mime, data), me.ID, section)
 	switch {
 	case errors.Is(err, store.ErrTooManyIcons):
 		httpx.Error(w, http.StatusConflict, "too_many_icons")
@@ -254,7 +257,7 @@ func (s *Server) addIconPack(w http.ResponseWriter, r *http.Request, lib iconLib
 			sections[icon.Section] = sec
 			names = append(names, sec.Name)
 		}
-		if _, err := s.store.AddIcon(r.Context(), lib.id, icon.Name, icon.Mime, icon.Data, me.ID, sec.ID); errors.Is(err, store.ErrTooManyIcons) {
+		if _, err := s.store.AddIcon(r.Context(), lib.id, icon.Name, icon.Mime, icon.Data, drawing.Monochrome(icon.Mime, icon.Data), me.ID, sec.ID); errors.Is(err, store.ErrTooManyIcons) {
 			skipped = append(skipped, drawing.PackSkip{File: icon.Section + "/" + icon.Name, Reason: "the library is full"})
 			continue
 		} else if err != nil {

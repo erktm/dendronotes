@@ -358,6 +358,9 @@ var migrations = []string{
 	);
 	CREATE INDEX icon_sections_soma ON icon_sections(soma_id);
 	ALTER TABLE soma_icons ADD COLUMN section_id INTEGER REFERENCES icon_sections(id) ON DELETE SET NULL;`,
+	// Whether an icon is drawn in one dark color only (drawing.Monochrome);
+	// NULL until worked out (FillIconMono), so icons stored before learn it too.
+	`ALTER TABLE soma_icons ADD COLUMN mono INTEGER;`,
 }
 
 // rebuilds are the migrations (by index) that recreate a table others refer

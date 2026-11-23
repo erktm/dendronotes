@@ -2,6 +2,7 @@
   // The server's icon library: admins fill it for everyone (single pictures
   // or ZIP packs, whose folders become sections) and arrange its sections.
   import Icon from './Icon.svelte'
+  import IconPicture from './IconPicture.svelte'
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
   import * as api from '../lib/api/drawings'
   import type { IconInfo, IconLibrary, IconSection } from '../lib/api/drawings'
@@ -186,7 +187,7 @@
             {#each g.icons as icon (icon.id)}
               <li>
                 <button type="button" class="tile" title={icon.name} aria-label={t.options(icon.name)} oncontextmenu={(e) => iconMenu(e, icon)} onclick={(e) => iconMenu(e, icon)}>
-                  <img src={api.serverIconURL(icon.id)} alt="" loading="lazy" />
+                  <span class="pic"><IconPicture src={api.serverIconURL(icon.id)} mono={icon.mono} /></span>
                   <span>{icon.name}</span>
                 </button>
               </li>
@@ -260,10 +261,9 @@
     border-color: var(--line-strong);
     background: var(--bg-hover);
   }
-  .tile img {
+  .tile .pic {
     width: 40px;
     height: 40px;
-    object-fit: contain;
   }
   .tile span {
     max-width: 100%;

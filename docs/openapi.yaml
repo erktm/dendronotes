@@ -2450,6 +2450,7 @@ components:
         mime: { type: string, enum: [image/png, image/svg+xml] }
         size: { type: integer }
         sectionId: { type: integer, description: Left out for icons without a section. }
+        mono: { type: boolean, description: "True when the picture is drawn in one dark color only; drawings then show it in a color of theirs (ink by default). Left out otherwise." }
         createdBy: { type: integer }
         createdAt: { type: string, format: date-time }
     IconSection:
