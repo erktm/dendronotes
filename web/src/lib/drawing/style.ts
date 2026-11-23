@@ -40,7 +40,7 @@ export type StyleKey = keyof Style
 /** The style keys that mean something for an element. */
 export function keysOf(el: Element): StyleKey[] {
   const keys: StyleKey[] = []
-  if (el.type !== 'image') keys.push('stroke')
+  if (el.type !== 'image' || el.mono) keys.push('stroke')
   if (isShape(el)) keys.push('fill')
   if (el.type === 'rect') keys.push('rounded')
   if (isShape(el) && FLIPPABLE.has(el.type)) keys.push('flip')

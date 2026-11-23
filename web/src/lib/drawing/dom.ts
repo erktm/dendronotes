@@ -8,6 +8,9 @@ import type { Element, Scene } from './scene'
 
 export const SVG_NS = 'http://www.w3.org/2000/svg'
 
+/** Masks need ids unique in the whole page: several drawings may show at once. */
+let masks = 0
+
 function primNode(p: Prim, scene: Scene): SVGElement | null {
   if (p.tag === 'image') {
     const file = p.file ? scene.files[p.file] : undefined
@@ -15,7 +18,20 @@ function primNode(p: Prim, scene: Scene): SVGElement | null {
     const img = document.createElementNS(SVG_NS, 'image')
     for (const [k, v] of Object.entries(p.attrs)) img.setAttribute(k, v)
     img.setAttribute('href', file.src) // a data:image URL (sanitizeScene)
-    return img
+    if (!p.tint) return img
+    // Only the picture's shape, in a color of the drawing (see svg.ts).
+    const g = document.createElementNS(SVG_NS, 'g')
+    const mask = document.createElementNS(SVG_NS, 'mask')
+    const id = `dn-tint-${++masks}`
+    mask.setAttribute('id', id)
+    mask.setAttribute('mask-type', 'alpha')
+    mask.appendChild(img)
+    const rect = document.createElementNS(SVG_NS, 'rect')
+    for (const [k, v] of Object.entries(p.attrs)) rect.setAttribute(k, v)
+    rect.setAttribute('class', p.tint.class)
+    rect.setAttribute('mask', `url(#${id})`)
+    g.append(mask, rect)
+    return g
   }
   const node = document.createElementNS(SVG_NS, p.tag)
   for (const [k, v] of Object.entries(p.attrs)) node.setAttribute(k, v)

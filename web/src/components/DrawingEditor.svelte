@@ -758,7 +758,8 @@
 
   // --- Icons --------------------------------------------------------------
 
-  function insertPicture(file: FileData) {
+  /** A picture from the library; a single-color one takes the current color. */
+  function insertPicture(file: FileData, mono: boolean) {
     if (!mayEdit) return
     const r = stageRect()
     const c = toScene(r.left + r.width / 2, r.top + r.height / 2)
@@ -766,7 +767,7 @@
     const w = Math.max(16, file.w * k)
     const h = Math.max(16, file.h * k)
     const key = newId()
-    const el = newImage(key, { x: c[0] - w / 2, y: c[1] - h / 2, w, h })
+    const el = newImage(key, { x: c[0] - w / 2, y: c[1] - h / 2, w, h }, mono, style.stroke)
     doc.commit(add({ ...scene, files: { ...scene.files, [key]: file } }, el))
     selected = new Set([el.id])
     tool = 'select'

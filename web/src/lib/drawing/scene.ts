@@ -72,6 +72,12 @@ export interface ImageEl extends Common, Box {
   type: 'image'
   /** Key into Scene.files. */
   file: string
+  /**
+   * The picture is drawn in one dark color (an icon the library found so):
+   * only its shape is used, filled with the stroke color, so it follows light
+   * and dark like the rest of the drawing.
+   */
+  mono: boolean
 }
 
 /** A built-in icon (lib/drawing/icons.ts), drawn in the stroke color. */
@@ -500,7 +506,7 @@ function sanitizeElement(v: unknown, files: Record<string, FileData>): Element |
       return { ...base, ...box(o), ...textStyle(o), type: 'text', align: oneOf(o.align, ['left', 'center', 'right'] as const, 'left') }
     case 'image':
       if (typeof o.file !== 'string' || !files[o.file]) return null
-      return { ...base, ...box(o), type: 'image', file: o.file }
+      return { ...base, ...box(o), type: 'image', file: o.file, mono: o.mono === true }
     case 'icon':
       // Only icons dendronotes knows: the picture comes from it, never from the file.
       if (typeof o.icon !== 'string' || !builtinIcon(o.icon)) return null

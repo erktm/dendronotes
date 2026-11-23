@@ -25,7 +25,8 @@ function sample(sketchy: boolean): Scene {
       startHead: 'none', endHead: 'arrow', stroke: 'red', dash: 'dotted', text: '',
     },
     { ...common, ...type, id: 'note', type: 'text', x: 0, y: 320, w: 120, h: 50, stroke: 'violet', text: 'Plant in\nMay', align: 'left', font: 'serif' },
-    { ...common, id: 'tree', type: 'image', x: 340, y: 220, w: 48, h: 48, stroke: 'ink', file: 'f1' },
+    { ...common, id: 'tree', type: 'image', x: 340, y: 220, w: 48, h: 48, stroke: 'ink', file: 'f1', mono: false },
+    { ...common, id: 'bush', type: 'image', x: 400, y: 220, w: 48, h: 48, stroke: 'blue', file: 'f1', mono: true },
     { ...common, id: 'twig', type: 'pen', points: [[20, 420], [30, 425], [45, 418], [60, 430]], stroke: 'orange' },
     { ...common, id: 'db', type: 'icon', icon: 'database', x: 200, y: 360, w: 48, h: 48, stroke: 'teal' },
     { ...common, ...type, id: 'seed', type: 'triangle', x: 0, y: 480, w: 100, h: 90, stroke: 'green', fill: 'green', rounded: false, flip: false, text: 'Seed' },
@@ -66,6 +67,13 @@ describe('drawing files', () => {
     expect(svg).toContain('Beds &amp; &lt;paths&gt;')
     expect(svg.split(PNG).length - 1).toBe(1)
     expect(svg).toContain('<use href="#file-f1"')
+  })
+
+  it('draw a single-color picture in its color: a rect masked by the picture', () => {
+    const svg = toSVG(sample(false), approxMeasure)
+    expect(svg).toContain('<mask id="tint-bush" mask-type="alpha"><use href="#file-f1" x="400" y="220" width="48" height="48"/></mask>')
+    expect(svg).toContain('<rect x="400" y="220" width="48" height="48" class="t-blue" mask="url(#tint-bush)"/>')
+    expect(svg).toContain('.t-blue{fill:')
   })
 
   it('size the canvas to the drawing', () => {

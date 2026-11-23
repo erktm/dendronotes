@@ -30,7 +30,13 @@ function primMarkup(p: Prim): string {
     const spans = (p.lines ?? []).map((l) => `<tspan x="${l.x}" y="${l.y}">${escapeText(l.text)}</tspan>`).join('')
     return `<text xml:space="preserve"${attrs(p.attrs)}>${spans}</text>`
   }
-  if (p.tag === 'image') return `<use href="#file-${escapeAttr(p.file ?? '')}"${attrs(p.attrs)}/>`
+  if (p.tag === 'image') {
+    const use = `<use href="#file-${escapeAttr(p.file ?? '')}"${attrs(p.attrs)}/>`
+    if (!p.tint) return use
+    // Only the picture's shape, in a color of the drawing: its alpha masks a filled rect.
+    const id = `tint-${escapeAttr(p.tint.id)}`
+    return `<mask id="${id}" mask-type="alpha">${use}</mask><rect${attrs({ ...p.attrs, class: p.tint.class })} mask="url(#${id})"/>`
+  }
   return `<${p.tag}${attrs(p.attrs)}/>`
 }
 

@@ -1,5 +1,6 @@
 // New elements in the current style.
 
+import type { Color } from './colors'
 import type { Box, Pt } from './geometry'
 import { round } from './geometry'
 import { builtinIcon, iconBounds } from './icons'
@@ -67,9 +68,10 @@ export function newIcon(icon: string, box: Box, s: Style): IconEl {
   }
 }
 
-export function newImage(file: string, box: Box): ImageEl {
+/** A picture; a single-color one (mono) is drawn in stroke. */
+export function newImage(file: string, box: Box, mono = false, stroke: Color = 'ink'): ImageEl {
   return {
-    id: newId(), type: 'image', file, x: round(box.x), y: round(box.y), w: round(box.w), h: round(box.h),
-    stroke: 'ink', width: 1, dash: 'solid', seed: newSeed(),
+    id: newId(), type: 'image', file, mono, x: round(box.x), y: round(box.y), w: round(box.w), h: round(box.h),
+    stroke, width: 1, dash: 'solid', seed: newSeed(),
   }
 }

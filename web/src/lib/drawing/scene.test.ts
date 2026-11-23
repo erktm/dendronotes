@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { BIND_GAP, type IconEl, type LinearEl, SHAPE_TYPES, type Scene, type ShapeEl, add, bindBox, bindingAt, copies, emptyScene, find, move, outlineOf, remove, reorder, route, sanitizeScene } from './scene'
+import { keysOf } from './style'
+import { BIND_GAP, type IconEl, type ImageEl, type LinearEl, SHAPE_TYPES, type Scene, type ShapeEl, add, bindBox, bindingAt, copies, emptyScene, find, move, outlineOf, remove, reorder, route, sanitizeScene } from './scene'
 import { insideOutline, outlineDist } from './geometry'
 import { random, sketchEllipse, sketchLines } from './sketch'
 import { builtinIcon, iconBounds, pathPoints } from './icons'
@@ -226,6 +227,21 @@ describe('untrusted scenes', () => {
       ['hexagon', false],
       ['cloud', false],
     ])
+  })
+
+  it('take a single-color picture only when it says so', () => {
+    const files = { ok: { src: 'data:image/png;base64,iVBORw0KGgo=', w: 1, h: 1 } }
+    const s = sanitizeScene(
+      {
+        version: 1,
+        elements: [true, 'yes', undefined].map((mono, i) => ({ id: `p${i}`, type: 'image', file: 'ok', x: 0, y: 0, w: 10, h: 10, stroke: 'blue', mono })),
+      },
+      files,
+    )!
+    expect(s.elements.map((e) => (e as ImageEl).mono)).toEqual([true, false, false])
+    // Only a single-color picture takes a color in the properties panel.
+    expect(keysOf(s.elements[0]!)).toContain('stroke')
+    expect(keysOf(s.elements[1]!)).not.toContain('stroke')
   })
 
   it('keep pictures only as data:image URLs', () => {

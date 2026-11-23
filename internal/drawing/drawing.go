@@ -52,7 +52,7 @@ var attributes = map[string]bool{
 	"dominant-baseline": true, "alignment-baseline": true, "letter-spacing": true, "white-space": true,
 	"clip-path": true, "mask": true, "offset": true, "stop-color": true, "stop-opacity": true,
 	"gradientUnits": true, "gradientTransform": true, "patternUnits": true, "clipPathUnits": true,
-	"maskUnits": true, "fx": true, "fy": true, "dx": true, "dy": true, "role": true, "aria-label": true,
+	"maskUnits": true, "mask-type": true, "fx": true, "fy": true, "dx": true, "dy": true, "role": true, "aria-label": true,
 	"data-name": true,
 }
 

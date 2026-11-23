@@ -46,6 +46,11 @@ export interface Prim {
   lines?: TextLine[]
   /** image: the picture (a key into Scene.files). */
   file?: string
+  /**
+   * image: draw only the shape of the picture, filled with a color class (a
+   * rect masked by the picture's alpha; id names the mask within a file).
+   */
+  tint?: { id: string; class: string }
 }
 
 /** Width of a text in pixels at a font and size. */
@@ -354,7 +359,14 @@ export function primitives(el: Element, scene: Scene, measure: Measure): Prim[] 
     case 'text':
       return textElPrims(el)
     case 'image':
-      return [{ tag: 'image', file: el.file, attrs: { x: f(el.x), y: f(el.y), width: f(el.w), height: f(el.h) } }]
+      return [
+        {
+          tag: 'image',
+          file: el.file,
+          attrs: { x: f(el.x), y: f(el.y), width: f(el.w), height: f(el.h) },
+          ...(el.mono ? { tint: { id: el.id, class: solidClass(el.stroke) } } : {}),
+        },
+      ]
     case 'icon': {
       const icon = builtinIcon(el.icon)
       const fit = iconFit(el)
