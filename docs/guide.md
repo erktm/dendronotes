@@ -115,6 +115,13 @@ Files in a soma remain plain, Obsidian-compatible Markdown; the wiki link syntax
   moved attachments (`![[photo.png]]`, `![](photo.png)`, `[report](report.pdf)`), unless
   switched off in the settings. A note that was changed by someone else in that moment is left
   alone and reported.
+- **Copying to a soma.** *Copy to soma …* in the menu of an entry in the tree copies a note, a
+  drawing, any other file or a whole folder into a folder of a soma where you may create entries
+  (contributor or more), the open soma included; seeing the original is enough. A taken name
+  gets a number, inside a copied folder everything keeps its name. The copy starts fresh:
+  comments, links and earlier versions stay with the original, and synapses are resolved in the
+  new soma. Files that soma would not take as an upload (other file types, broken drawings)
+  stay behind and are named. A copy holds at most 5000 entries and 512 MB.
 - **Editing together.** Everyone who has a note open (other people the soma is shared with,
   or your own second tab) edits the same text at once: changes appear right away, the others'
   cursors and selections show with their names, and the bar at the bottom of the note shows who
