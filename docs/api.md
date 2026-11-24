@@ -25,6 +25,7 @@ which a test keeps in sync with the server.
 | `POST /api/somas/{soma}/notes/{path}`   | Create a note                                        |
 | `POST /api/somas/{soma}/folders/{path}` | Create a folder                                      |
 | `POST /api/somas/{soma}/move`           | Rename or move: `{"from": …, "to": …, "updateSynapses": true}` |
+| `POST /api/somas/{soma}/copy`           | Copy into a folder of a soma where you are a contributor: `{"from": …, "soma": …, "to": …}` |
 | `DELETE /api/somas/{soma}/entries/{path}` | Move a file or folder to `.trash/` in the soma     |
 | `GET /api/somas/{soma}/trash`           | The trash; `POST …/trash/{path}` restores, `DELETE` deletes for good (owner) |
 | `GET /api/somas/{soma}/history/{path}`  | Versions of a note; `GET …/versions/{id}`, `POST …/versions/{id}/restore` |

@@ -523,6 +523,28 @@ class App {
     if (names.length) await this.placeInOrder(folder, names, before)
   }
 
+  // --- Copies into a soma ------------------------------------------------
+
+  /** The somas a copy can go to: those where the account may create entries. */
+  copyTargets = $derived(this.somas.filter((s) => capabilities(s.role).create))
+
+  /** Copies a file or folder into a folder of a soma (this one or another). */
+  async copyTo(path: string, somaId: string, folder: string): Promise<boolean> {
+    const target = this.copyTargets.find((s) => s.id === somaId)
+    if (!target) return false
+    try {
+      const r = await api.copyTo(path, somaId, folder)
+      this.toast(strings.copy.done(displayName(path), target.name), 'info')
+      const first = r.skipped[0]
+      if (first) this.toast(strings.tree.skippedFiles(r.skipped.length, `${basename(first.file)} (${first.reason})`))
+      return true
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'not_copied') this.toast(strings.copy.notCopied(String(err.body.reason ?? '')))
+      else this.toast(errorMessage(err))
+      return false
+    }
+  }
+
   // --- Links ---------------------------------------------------------------
 
   /** The file whose link dialog is open. */

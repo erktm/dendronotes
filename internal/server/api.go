@@ -90,6 +90,7 @@ func (s *Server) routes() []route {
 		{"PATCH", "/api/somas/{soma}/icon-sections/{id}", s.handleRenameIconSection, somaContributor},
 		{"DELETE", "/api/somas/{soma}/icon-sections/{id}", s.handleDeleteIconSection, somaEditor},
 		{"POST", "/api/somas/{soma}/move", s.handleMove, somaEditor},
+		{"POST", "/api/somas/{soma}/copy", s.handleCopy, somaViewer}, // the target soma needs contributor
 		{"DELETE", "/api/somas/{soma}/entries/{path...}", s.handleTrash, somaEditor},
 		{"PUT", "/api/somas/{soma}/order", s.handleSetOrder, somaEditor},
 		{"POST", "/api/somas/{soma}/links", s.handleInternalLink, somaViewer},

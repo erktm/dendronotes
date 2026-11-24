@@ -1166,6 +1166,65 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/Error" }
         "409": { $ref: "#/components/responses/Error" }
+  /api/somas/{soma}/copy:
+    parameters:
+      - $ref: "#/components/parameters/soma"
+    post:
+      summary: Copy a note, drawing, file or folder into a soma
+      description: >
+        Copies an entry of this soma (viewer is enough) into a folder of
+        another soma, or of this one, where the caller is at least a
+        contributor; without access to the target the answer is 404, with a
+        lower role 403. A taken name gets a " (n)" suffix; inside a copied
+        folder everything keeps its name. Copied notes start a history of their
+        own; comments, links and earlier versions stay with the original. Files
+        the target would not accept as uploads (types outside the allow list,
+        drawings that fail the check) are left out and listed in `skipped`. At
+        most 5000 entries and 512 MiB.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from, soma]
+              properties:
+                from: { type: string, description: The entry to copy. }
+                soma: { type: string, description: The id of the target soma. }
+                to: { type: string, description: The folder in the target soma; empty for the top level. }
+      responses:
+        "201":
+          description: Copied; `path` is where the copy landed in the target soma.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [path, files, folders, skipped]
+                properties:
+                  path: { type: string }
+                  files: { type: integer }
+                  folders: { type: integer }
+                  skipped:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        file: { type: string }
+                        reason: { type: string }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "413": { $ref: "#/components/responses/Error" }
+        "422":
+          description: A single file the target does not accept (`not_copied`, with a `reason`).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  reason: { type: string }
   /api/somas/{soma}/entries/{path}:
     parameters:
       - $ref: "#/components/parameters/soma"

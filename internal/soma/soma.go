@@ -290,6 +290,16 @@ func (s *Soma) WriteNote(p string, content []byte, ifMatch string) (Note, error)
 
 // CreateNote creates a new note; missing parent folders are created.
 func (s *Soma) CreateNote(p string, content []byte) (Note, error) {
+	return s.createNote(p, content, false)
+}
+
+// CreateNoteUnique creates a new note like CreateNote, but a taken name gets
+// a " (n)" suffix instead of failing with ErrExists.
+func (s *Soma) CreateNoteUnique(p string, content []byte) (Note, error) {
+	return s.createNote(p, content, true)
+}
+
+func (s *Soma) createNote(p string, content []byte, unique bool) (Note, error) {
 	p, err := cleanNewPath(p)
 	if err != nil {
 		return Note{}, err
@@ -309,6 +319,11 @@ func (s *Soma) CreateNote(p string, content []byte) (Note, error) {
 			return Note{}, mapErr(err)
 		}
 	}
+	if unique {
+		if p, err = s.freeName(p); err != nil {
+			return Note{}, err
+		}
+	}
 	f, err := s.root.OpenFile(p, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if err != nil {
 		return Note{}, mapErr(err)
@@ -324,7 +339,13 @@ func (s *Soma) CreateNote(p string, content []byte) (Note, error) {
 }
 
 // Mkdir creates a folder; missing parent folders are created.
-func (s *Soma) Mkdir(p string) (Entry, error) {
+func (s *Soma) Mkdir(p string) (Entry, error) { return s.mkdir(p, false) }
+
+// MkdirUnique creates a folder like Mkdir, but a taken name gets a " (n)"
+// suffix instead of failing with ErrExists.
+func (s *Soma) MkdirUnique(p string) (Entry, error) { return s.mkdir(p, true) }
+
+func (s *Soma) mkdir(p string, unique bool) (Entry, error) {
 	p, err := cleanNewPath(p)
 	if err != nil {
 		return Entry{}, err
@@ -336,6 +357,11 @@ func (s *Soma) Mkdir(p string) (Entry, error) {
 	if dir := path.Dir(p); dir != "." {
 		if err := s.root.MkdirAll(dir, 0o755); err != nil {
 			return Entry{}, mapErr(err)
+		}
+	}
+	if unique {
+		if p, err = s.freeName(p); err != nil {
+			return Entry{}, err
 		}
 	}
 	if err := s.root.Mkdir(p, 0o755); err != nil {

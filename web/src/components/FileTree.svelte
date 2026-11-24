@@ -3,6 +3,7 @@
   import TreeInput from './TreeInput.svelte'
   import ContextMenu, { type MenuItem } from './ContextMenu.svelte'
   import MoveDialog from './MoveDialog.svelte'
+  import CopyDialog from './CopyDialog.svelte'
   import Icon from './Icon.svelte'
   import { app, entryKind, type NewEntryKind } from '../lib/state/app.svelte'
   import { droppedEntries, hasFolder } from '../lib/dropped'
@@ -14,6 +15,8 @@
   const rootDrop = $derived(treeDrag.into === '')
   /** The entries the "Move to" dialog moves. */
   let moving = $state<string[] | null>(null)
+  /** The entry the "Copy to soma" dialog copies. */
+  let copying = $state<string | null>(null)
 
   const creatingAtRoot = $derived(app.edit && app.edit.kind !== 'rename' && app.edit.parent === '' ? app.edit : null)
   const startCreate = (kind: NewEntryKind, parent: string) => app.startCreate(kind, parent)
@@ -49,6 +52,10 @@
     }
     if (node && node.type === 'file') {
       items.push({ label: strings.links.open, icon: 'link', action: () => (app.linkDialog = node.path) })
+    }
+    // Copying out only reads this soma; the target soma needs contributor.
+    if (node && app.copyTargets.length) {
+      items.push({ label: strings.copy.menu, icon: 'copy', action: () => (copying = node.path) })
     }
     if (node && app.can.organize) {
       items.push(
@@ -164,6 +171,9 @@
 
 {#if moving}
   <MoveDialog paths={moving} onclose={() => (moving = null)} />
+{/if}
+{#if copying}
+  <CopyDialog path={copying} onclose={() => (copying = null)} />
 {/if}
 
 <style>

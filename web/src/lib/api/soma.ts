@@ -137,6 +137,22 @@ export interface MoveResult {
 export const move = (from: string, to: string, updateSynapses = false) =>
   request<MoveResult>('POST', `${somaBase()}/move`, { body: { from, to, updateSynapses } })
 
+export interface CopyResult {
+  /** Where the copy landed in the target soma. */
+  path: string
+  files: number
+  folders: number
+  /** Files the target would not take (type, size, broken drawings). */
+  skipped: { file: string; reason: string }[]
+}
+
+/** Copies a file or folder of the open soma into a folder of a soma (this one or another). */
+export const copyTo = (from: string, soma: string, to: string) =>
+  request<CopyResult>('POST', `${somaBase()}/copy`, { body: { from, soma, to } })
+
+/** The entries of any soma the account can open (to pick where a copy goes). */
+export const treeOf = (soma: string) => request<{ entries: Entry[] }>('GET', `/api/somas/${encodeURIComponent(soma)}/tree`)
+
 /** Uploads a file; with unique, a taken name gets a " (n)" suffix. Answers the stored entry. */
 export const uploadFile = (path: string, file: Blob, unique = true) =>
   request<Entry>('POST', `${somaBase()}/files/${encodePath(path)}${unique ? '?unique=1' : ''}`, { raw: file })

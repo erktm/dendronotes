@@ -1061,6 +1061,18 @@ export const strings = {
     tooManyFiles: (max: number) => `At most ${max} files can be dropped at once.`,
   },
 
+  copy: {
+    menu: 'Copy to soma …',
+    title: (name: string) => `Copy “${name}” to`,
+    soma: 'Soma',
+    folder: 'Folder',
+    loading: 'Loading folders …',
+    copy: 'Copy',
+    hint: 'A copy starts fresh: comments, links and earlier versions stay with the original. A taken name gets a number.',
+    done: (name: string, soma: string) => `Copied “${name}” to ${soma}.`,
+    notCopied: (reason: string) => `This file can’t be copied: ${reason}.`,
+  },
+
   names: {
     empty: 'Please enter a name.',
     leadingDot: 'Names can’t start with a dot.',
